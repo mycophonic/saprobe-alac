@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+        with:
+          fetch-depth: 0  # Full history for git-validation
+
+      - name: Set up Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c  # v6.1.0
+        with:
+          go-version: '1.25.6'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          make init-dev
+
+      - name: Lint
+        env:
+          LINT_COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || 'main..HEAD' }}
+        run: make lint
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c  # v6.1.0
+        with:
+          go-version: '1.25.6'
+          cache: true
+
+      - name: Install ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -qq ffmpeg
+
+      - name: Install ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg-full
+
+      - name: Install ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y
+
+      - name: Run tests
+        run: make test
+
+  test-success:
+    name: Test
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check test matrix results
+        run: |
+          if [[ "${{ needs.test.result }}" != "success" ]]; then
+            echo "Test matrix failed: ${{ needs.test.result }}"
+            exit 1
+          fi
+
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c  # v6.1.0
+        with:
+          go-version: '1.25.6'
+          cache: true
+
+      - name: Build binary
+        run: make build
+
+      - name: Verify binary
+        run: make verify
+
+  build-success:
+    name: Build
+    if: always()
+    needs: [build]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check build matrix results
+        run: |
+          if [[ "${{ needs.build.result }}" != "success" ]]; then
+            echo "Build matrix failed: ${{ needs.build.result }}"
+            exit 1
+          fi

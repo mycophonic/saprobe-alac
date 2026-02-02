@@ -1,0 +1,295 @@
+version: "2"
+
+run:
+  issues-exit-code: 2
+  modules-download-mode: readonly
+  allow-parallel-runners: true
+  allow-serial-runners: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: all
+  enable:
+    # These are the default set of golangci (errcheck is disabled, see below)
+    - govet             # Vet examines Go source code and reports suspicious constructs. It is roughly the same as 'go vet' and uses its passes.
+    - ineffassign       # Detects when assignments to existing variables are not used.
+    - staticcheck       # It's the set of rules from staticcheck.
+    - unused            # Checks Go code for unused constants, variables, functions and types.
+
+    # These are the linters we knowingly want enabled in addition to the default set
+
+    # Generic bugs catching
+    - asasalint         # prevents variadic any
+    - containedctx      # avoid embedding context into structs
+    - depguard          # allows to explicitly allow or disallow third party modules
+    - err113            # encourage static errors
+    - gochecknoglobals  # globals should be avoided as much as possible
+    - gosec             # various security checks
+    - modernize         # pushes towards modern go
+    - noctx             # warn about command execution without context
+    - revive            # meta linter (see settings below)
+    - wrapcheck         # ensure we wrap errors
+
+    # Complexity management
+    - interfacebloat    # limit complexity in public APIs
+
+    # Testing
+    - paralleltest      # enforces tests using parallel
+    - testpackage       # test packages should be separate from the package they test (eg: name them package_test)
+    - thelper           # enforces use of t.Helper()
+    - tparallel         # detects WRONG uses of parallel in tests
+
+    # Specialized linters
+    - promlinter        # prometheus
+    - sloglint          # slog
+    - zerologlint       # zerolog
+
+    # Documentation style
+    - godoclint         # warn if package level doc is duplicated
+    - godot             # forces dot at the end of comments
+    - testableexamples  # makes sure that examples are testable (have an expected output)
+
+    # Style preferences
+    - embeddedstructfieldcheck  # embedded field position
+    - funcorder         # encourage placing private methods after public ones
+    - varnamelen        # encourage readable descriptive names for variables instead of x, y, z
+    - wsl_v5            # general formatting
+
+    # Additional to be reviewed
+    - forbidigo         # might be convenient to forbid certain patterns
+    - gocritic
+    - misspell
+    - unconvert
+
+    # More linters that are enabled by default to review
+
+    # arangolint: Opinionated best practices for arangodb client.
+    # asciicheck: Checks that all code identifiers does not have non-ASCII symbols in the name. [fast]
+    # bidichk: Checks for dangerous unicode character sequences. [fast]
+    # bodyclose: Checks whether HTTP response body is closed successfully.
+    # canonicalheader: Canonicalheader checks whether net/http.Header uses canonical header. [auto-fix]
+    # contextcheck: Check whether the function uses a non-inherited context.
+    # copyloopvar: A linter detects places where loop variables are copied. [fast, auto-fix]
+    # decorder: Check declaration order and count of types, constants, variables and functions. [fast]
+    # dogsled: Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f()). [fast]
+    # dupl: Detects duplicate fragments of code. [fast]
+    # dupword: Checks for duplicate words in the source code. [fast, auto-fix]
+    # durationcheck: Check for two durations multiplied together.
+    # errorlint: Find code that can cause problems with the error wrapping scheme introduced in Go 1.13. [auto-fix]
+    # exhaustive: Check exhaustiveness of enum switch statements.
+    # exptostd: Detects functions from golang.org/x/exp/ that can be replaced by std functions. [auto-fix]
+    # fatcontext: Detects nested contexts in loops and function literals. [auto-fix]
+    # gocheckcompilerdirectives: Checks that go compiler directive comments (//go:) are valid. [fast]
+    # gochecknoinits: Checks that no init functions are present in Go code. [fast]
+    # gochecksumtype: Run exhaustiveness checks on Go "sum types".
+    # gomoddirectives: Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod. [fast]
+    # goprintffuncname: Checks that printf-like functions are named with `f` at the end. [fast]
+    # gosmopolitan: Report certain i18n/l10n anti-patterns in your Go codebase.
+    # grouper: Analyze expression groups. [fast]
+    # iface: Detect the incorrect use of interfaces, helping developers avoid interface pollution. [auto-fix]
+    # importas: Enforces consistent import aliases. [auto-fix]
+    # inamedparam: Reports interfaces with unnamed method parameters. [fast]
+    # intrange: Intrange is a linter to find places where for loops could make use of an integer range. [auto-fix]
+    # iotamixing: Checks if iotas are being used in const blocks with other non-iota declarations. [fast]
+    # maintidx: Maintidx measures the maintainability index of each function. [fast]
+    # makezero: Find slice declarations with non-zero initial length.
+    # mirror: Reports wrong mirror patterns of bytes/strings usage. [auto-fix]
+    # musttag: Enforce field tags in (un)marshaled structs.
+    # nilerr: Find the code that returns nil even if it checks that the error is not nil.
+    # nilnesserr: Reports constructs that checks for err != nil, but returns a different nil value error.
+    # nilnil: Checks that there is no simultaneous return of `nil` error and an invalid value.
+    # nlreturn: Checks for a new line before return and branch statements to increase code clarity. [fast, auto-fix]
+    # nolintlint: Reports ill-formed or insufficient nolint directives. [fast, auto-fix]
+    # nosprintfhostport: Checks for misuse of Sprintf to construct a host with port in a URL. [fast]
+    # perfsprint: Checks that fmt.Sprintf can be replaced with a faster alternative. [auto-fix]
+    # protogetter: Reports direct reads from proto message fields when getters should be used. [auto-fix]
+    # reassign: Checks that package variables are not reassigned.
+    # recvcheck: Checks for receiver type consistency.
+    # rowserrcheck: Checks whether Rows.Err of rows is checked successfully.
+    # spancheck: Checks for mistakes with OpenTelemetry/Census spans.
+    # sqlclosecheck: Checks that sql.Rows, sql.Stmt, sqlx.NamedStmt, pgx.Query are closed.
+    # tagalign: Check that struct tags are well aligned. [fast, auto-fix]
+    # tagliatelle: Checks the struct tags.
+    # unqueryvet: Detects SELECT * in SQL queries and SQL builders, preventing performance issues and encouraging explicit column selection. [fast]
+    # usestdlibvars: A linter that detect the possibility to use variables/constants from the Go standard library. [fast, auto-fix]
+    # usetesting: Reports uses of functions with replacement inside the testing package. [auto-fix]
+    # wastedassign: Finds wasted assignment statements.
+    # whitespace: Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc. [fast, auto-fix]
+
+    # Duplication
+    # goheader: Check if file header matches to pattern. [fast, auto-fix]
+    # MAYBE disable revive file-header
+
+  disable:
+    # Until we upstream patches on flac
+    - gomoddirectives
+    # These are the linters that we know we do not want
+    - copyloopvar       # no longer needed after go 1.22
+    - errchkjson        # forces handling of json err (eg: prevents _), which is too much
+    - exhaustruct       # does not serve much of a purpose
+    - ginkgolinter      # no ginkgo
+    - godox             # not helpful unless we could downgrade it to warning / info
+    - nestif            # already provided ten different ways with revive cognitive complexity, etc
+    - ireturn           # too annoying with not enough value
+    - noinlineerr       # useless theater
+    - nonamedreturns    # named returns are occasionally useful
+    - prealloc          # premature optimization
+    - testifylint       # no testify
+    - wsl               # deprecated
+
+    # Duplicates
+    - cyclop            # provided by revive
+    - gocyclo           # provided by revive
+    - errcheck          # provided by revive
+    - errname           # provide by revive
+    - forcetypeassert   # provided by revive
+    - funlen            # provided by revive
+    - gocognit          # provided by revive
+    - goconst           # provided by revive
+    - gomodguard        # we use depguard instead
+    - lll               # provided by golines
+    - loggercheck       # better dealt with by specialized libraries
+    - mnd               # already provided by revive add-constant
+    - nakedret          # provided by revive
+    - predeclared       # provided by revive
+    - unparam           # provided by revive
+
+  exclusions:
+    rules:
+      - path: _test.go
+        linters:
+          - varnamelen
+          - dupl
+          - dupword
+          - wrapcheck
+          - gosec
+          - err113
+          - modernize
+          - dogsled
+          - noctx
+          - perfsprint
+          - depguard
+      - path: _test.go
+        text: "add-constant|cognitive-complexity|confusing-results|nested-structs|use-waitgroup-go|unchecked-type-assertion|unhandled-error|unused-receiver"
+        linters:
+          - revive
+
+  settings:
+    # Note: default, no changes
+    wsl_v5:
+      # Configuration options
+      allow-first-in-block: true    # Allow cuddling if variable used first in following block
+      allow-whole-block: false      # Allow cuddling if variable used anywhere in block
+      branch-max-lines: 2           # Max lines before branch needs whitespace separation
+      case-max-lines: 0             # Max lines for case blocks (0 = off, 1 = always require)
+
+      # Default preset: 'all', 'none', 'default', or empty (~)
+      default: ""
+
+      # Individual checks - enable list
+      enable:
+        # Built-ins (all enabled by default)
+        - append               # Re-assign with append only if value exists above
+        - assign               # Assignments cuddle only with other assignments/inc-dec
+        - branch               # break/continue/fallthrough/goto separation rules
+        - decl                 # Declarations never cuddled
+        - defer                # Defer cuddles with other defer, after error check, or single var
+        - err                  # Error check must follow immediately after error assignment
+        - expr                 # Function calls/index expr cuddle with var used above
+        - for                  # For loops cuddle with single var used above
+        - go                   # Go cuddles with other go or single var above
+        - if                   # If cuddles with single var used above
+        - inc-dec              # ++/-- same rules as assign
+        - label                # Labels never cuddled
+        - range                # Range cuddles with single var used above
+        - return               # Return separation based on branch-max-lines
+        - select               # Select cuddles with single var above
+        - send                 # Send cuddles with single var above
+        - switch               # Switch cuddles with single var above
+        - type-switch          # Type switch cuddles with single var above
+        - leading-whitespace   # No leading empty lines in blocks
+        - trailing-whitespace  # No trailing empty lines in blocks
+
+      # Individual checks - disable list (disabled by default)
+      disable:
+        - assign-exclusive    # Only allow cuddling new OR existing variables, not both
+        - assign-expr         # Don't allow assignments cuddled with expressions
+
+    forbidigo:
+      forbid:
+        - pattern: '^fmt\.Print(ln|f)?$'
+          msg: "use structured logging instead"
+      exclude-godoc-examples: true
+      analyze-types: true
+
+    revive:
+      enable-all-rules: true
+      rules:
+        - name: function-length
+          arguments: [100, 0]
+        - name: add-constant
+          arguments:
+            - allowFloats: "0.0,1.0"
+              allowInts: "0,1,2,3,4,5,6,7,8,9,-1,16,20,24,32,0xf,0x1f,0x3,0x1,0xFF,0xE0,0x03,0x0F,0x00"
+              allowStrs: '"","%w: %q","%w: %w","%w: %s"," ","-","`","\n",":","@",".","%s:%s"'
+              ignoreFuncs: 'slog[.].*'
+        - name: cognitive-complexity
+          arguments: [30]
+        - name: cyclomatic
+          arguments: [30]
+        - name: max-public-structs
+          arguments: [10]
+
+        - name: line-length-limit
+          # Formatter `golines` takes care of this.
+          disabled: true
+        - name: unhandled-error
+          arguments:
+            - "fmt.Print"
+            - "fmt.Println"
+            - "fmt.Printf"
+            - "fmt.Fprint"
+            - "fmt.Fprintln"
+            - "fmt.Fprintf"
+
+    depguard:
+      rules:
+        main:
+          files:
+            - $all
+          allow:
+            - $gostd
+            - github.com/mycophonic/saprobe-alac
+            - github.com/abema/go-mp4
+            - github.com/mycophonic/agar
+
+    staticcheck:
+      checks:
+        - all
+
+formatters:
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/mycophonic)
+        - localmodule
+      no-inline-comments: true
+      no-prefix-comments: true
+      custom-order: true
+    gofumpt:
+      extra-rules: true
+    golines:
+      max-len: 120
+      tab-len: 4
+      shorten-comments: true
+  enable:
+    - gci
+    - gofumpt
+    - golines
+  exclusions:
+    generated: disable
