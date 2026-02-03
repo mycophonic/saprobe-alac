@@ -1,13 +1,13 @@
 # Saprobe ALAC
 
-A fast, pure Go ALAC streaming decoder, ported from Apple's open-source C implementation (Apache 2.0, 2011) with
-performance optimizations.
+A pure Go ALAC streaming decoder, ported from Apple's open-source C implementation (Apache 2.0, 2011).
+- fast (faster than CGO+CoreAudio)
+- no-dependency
+- zero allocation
 
-No encoder.
+This is a decoder only.
 
-A crude example decoder cli is provided as well.
-
-This library is low-level.
+A crude example cli is provided as well.
 
 For a proper full-blown, higher-level decoder library and cli, see [Saprobe](https://github.com/mycophonic/saprobe).
 
@@ -44,8 +44,6 @@ func (d *Decoder) Format() PCMFormat
 func NewStreamDecoder(rs io.ReadSeeker) (*StreamDecoder, error)
 func (s *StreamDecoder) Read(p []byte) (int, error)
 func (s *StreamDecoder) Format() PCMFormat
-
-func Decode(reader io.ReadSeeker) ([]byte, PCMFormat, error)
 ```
 
 ## Performance
@@ -59,16 +57,10 @@ Comparison with ffmpeg is more crushing, which is expected, given the highly opt
 
 It should be noted that the comparison with CoreAudio is not entirely fair (there is a cost associated with crossing GO/C
 boundaries). The comparison with Apple open-source alacconvert is more fair to Apple implementation
-(although shelling out does also introduce latency on smaller files).
+(although shelling out does also introduce latency on smaller files that has to be accounted for).
 
 Further optimization work would be unlikely to bring in significant returns and would presumably require intense assembly
 work...
-
-## Dependencies
-
-MP4 box parsing uses github.com/abema/go-mp4
-
-Other dependencies (agar) are purely for test tooling.
 
 ## Detailed documentation
 

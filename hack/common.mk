@@ -295,10 +295,17 @@ test-unit-bench:
 # with: runtime/cgo(.text): relocation target stderr not defined
 # Forcing -linkmode=external makes GCC perform the final link, resolving libc.
 #
+# Known warning (harmless): on macOS with Xcode 15+, Apple's ld-prime linker
+# emits "has malformed LC_DYSYMTAB" warnings during race builds. This is a
+# cosmetic issue in Go's Mach-O object generation — the produced binaries are
+# correct. The warning only appears with -race because the race detector
+# forces CGO and external linking.
+#
 # See:
 #   https://github.com/golang/go/issues/52690
 #   https://github.com/golang/go/issues/54313
 #   https://github.com/golang/go/issues/58619
+#   https://github.com/golang/go/issues/61229 (Apple ld-prime / LC_DYSYMTAB)
 test-unit-race:
 	$(call title, $@)
 	@CGO_ENABLED=1 go test $(VERBOSE_FLAG) -ldflags="-linkmode=external" $(PROJECT_DIR)/... -race
