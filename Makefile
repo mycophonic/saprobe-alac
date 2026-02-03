@@ -10,7 +10,9 @@
 #   distributed under the License is distributed on an "AS IS" BASIS,
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
-#   limitations under the License.NAME := alac
+#   limitations under the License.
+
+NAME := saprobe-alac
 ALLOWED_LICENSES := Apache-2.0,BSD-3-Clause,MIT
 LICENSE_IGNORES := --ignore gotest.tools
 
@@ -26,17 +28,20 @@ TEST_MODULE := $(PROJECT_DIR)/tests
 
 test-unit:
 	$(call title, $@)
-	@go test $(VERBOSE_FLAG) -count 1 $(PROJECT_DIR)/... $(TEST_MODULE)/...
+	@go test $(VERBOSE_FLAG) -count 1 $(PROJECT_DIR)/...
+	@cd $(TEST_MODULE) && go test $(VERBOSE_FLAG) -count 1 ./...
 	$(call footer, $@)
 
 test-unit-bench:
 	$(call title, $@)
-	@go test $(VERBOSE_FLAG) -count 1 $(PROJECT_DIR)/... $(TEST_MODULE)/... -bench=.
+	@go test $(VERBOSE_FLAG) -count 1 $(PROJECT_DIR)/... -bench=.
+	@cd $(TEST_MODULE) && go test $(VERBOSE_FLAG) -count 1 ./... -bench=.
 	$(call footer, $@)
 
 test-unit-race:
 	$(call title, $@)
-	@CGO_ENABLED=1 go test $(VERBOSE_FLAG) -ldflags="-linkmode=external" $(PROJECT_DIR)/... $(TEST_MODULE)/... -race
+	@CGO_ENABLED=1 go test $(VERBOSE_FLAG) -ldflags="-linkmode=external" $(PROJECT_DIR)/... -race
+	@cd $(TEST_MODULE) && CGO_ENABLED=1 go test $(VERBOSE_FLAG) -ldflags="-linkmode=external" ./... -race
 	$(call footer, $@)
 
 lint-mod:
