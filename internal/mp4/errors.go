@@ -22,12 +22,13 @@ import "errors"
 //
 //revive:disable:exported
 var (
-	ErrNoALACTrack   = errors.New("mp4: no ALAC track found in container")
-	ErrInvalidEntry  = errors.New("mp4: invalid ALAC sample entry")
-	ErrNoChunkOffset = errors.New("mp4: no chunk offset box (stco/co64)")
-	ErrInvalidCo64   = errors.New("mp4: invalid co64 payload")
-	ErrNoStsc        = errors.New("mp4: no stsc box")
-	ErrInvalidStsc   = errors.New("mp4: invalid stsc payload")
-	ErrNoStsz        = errors.New("mp4: no stsz box")
-	ErrInvalidStsz   = errors.New("mp4: invalid stsz payload")
+	ErrNoALACTrack    = errors.New("mp4: no ALAC track found in container")
+	ErrInvalidEntry   = errors.New("mp4: invalid ALAC sample entry")
+	ErrInvalidBoxSize = errors.New("mp4: invalid box size")
+	ErrNoChunkOffset  = errors.New("mp4: no chunk offset box (stco/co64)")
+	ErrInvalidCo64    = errors.New("mp4: invalid co64 payload")
+	ErrNoStsc         = errors.New("mp4: no stsc box")
+	ErrInvalidStsc    = errors.New("mp4: invalid stsc payload")
+	ErrNoStsz         = errors.New("mp4: no stsz box")
+	ErrInvalidStsz    = errors.New("mp4: invalid stsz payload")
 )
