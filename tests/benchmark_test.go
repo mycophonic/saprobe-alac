@@ -33,7 +33,7 @@ import (
 // Audio formats to benchmark.
 //
 //nolint:gochecknoglobals
-var benchFormats = []testutil.BenchFormat{
+var benchFormats = []agar.BenchFormat{
 	{Name: "CD 44.1kHz/16bit", SampleRate: 44100, BitDepth: 16, Channels: 2},
 	{Name: "HiRes 96kHz/24bit", SampleRate: 96000, BitDepth: 24, Channels: 2},
 }
@@ -62,11 +62,11 @@ func TestBenchmarkDecode(t *testing.T) {
 		t.Skip("alac-coreaudio required for benchmarks: run 'make alac-coreaudio'")
 	}
 
-	opts := testutil.BenchOptions{}.WithDefaults()
+	opts := agar.BenchOptions{}.WithDefaults()
 	tmpDir := t.TempDir()
 	hasAlacconvert := testutil.AlacConvertPath(t) != ""
 
-	var results []testutil.BenchResult
+	var results []agar.BenchResult
 
 	for _, dur := range benchDurations {
 		durationSec := int(dur.Seconds())
@@ -118,7 +118,7 @@ func TestBenchmarkDecode(t *testing.T) {
 				durations[iter] = time.Since(start)
 			}
 
-			results = append(results, testutil.ComputeResult(bf, "saprobe", "decode", durations, len(encoded)))
+			results = append(results, agar.ComputeResult(bf, "saprobe", "decode", durations, len(encoded)))
 
 			// Benchmark ffmpeg decode.
 			results = append(results, testutil.BenchDecodeFFmpeg(t, bf, opts, m4aPath))
@@ -142,7 +142,7 @@ func TestBenchmarkDecode(t *testing.T) {
 		}
 	}
 
-	testutil.PrintResults(t, opts, results)
+	agar.PrintResults(t, opts, results)
 }
 
 // TestBenchmarkDecodeFile benchmarks decoding a real M4A file.
@@ -159,7 +159,7 @@ func TestBenchmarkDecodeFile(t *testing.T) {
 		t.Skip("set BENCH_FILE to run this benchmark")
 	}
 
-	opts := testutil.BenchOptions{}.WithDefaults()
+	opts := agar.BenchOptions{}.WithDefaults()
 
 	encoded, err := os.ReadFile(filePath)
 	if err != nil {
@@ -176,14 +176,14 @@ func TestBenchmarkDecodeFile(t *testing.T) {
 		t.Fatalf("probe decode: %v", err)
 	}
 
-	bf := testutil.BenchFormat{
+	bf := agar.BenchFormat{
 		Name:       filepath.Base(filePath),
 		SampleRate: pcmFormat.SampleRate,
 		BitDepth:   pcmFormat.BitDepth,
 		Channels:   pcmFormat.Channels,
 	}
 
-	var results []testutil.BenchResult
+	var results []agar.BenchResult
 
 	// Benchmark saprobe decode.
 	durations := make([]time.Duration, opts.Iterations)
@@ -199,7 +199,7 @@ func TestBenchmarkDecodeFile(t *testing.T) {
 		durations[iter] = time.Since(start)
 	}
 
-	results = append(results, testutil.ComputeResult(bf, "saprobe", "decode", durations, len(encoded)))
+	results = append(results, agar.ComputeResult(bf, "saprobe", "decode", durations, len(encoded)))
 
 	// Write M4A to temp for tool-based decoders.
 	m4aPath := filepath.Join(tmpDir, "input.m4a")
@@ -233,5 +233,5 @@ func TestBenchmarkDecodeFile(t *testing.T) {
 		results = append(results, testutil.BenchDecodeAlacconvert(t, bf, opts, cafPath))
 	}
 
-	testutil.PrintResults(t, opts, results)
+	agar.PrintResults(t, opts, results)
 }

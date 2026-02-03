@@ -28,9 +28,26 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mycophonic/agar/pkg/agar"
 )
 
 const alacConvertBinary = "alacconvert"
+
+// AlacConvertPath returns the path to the alacconvert binary, or an empty
+// string if it is not available. Build it with: make alacconvert.
+func AlacConvertPath(t *testing.T) string {
+	t.Helper()
+
+	path, err := agar.LookFor(alacConvertBinary)
+	if err != nil {
+		t.Log("alacconvert not found: run 'make alacconvert' to enable Apple reference tests")
+
+		return ""
+	}
+
+	return path
+}
 
 // AlacConvertOptions configures an alacconvert invocation.
 type AlacConvertOptions struct {
@@ -167,8 +184,8 @@ func WriteWAV(t *testing.T, path string, pcm []byte, bitDepth, sampleRate, chann
 
 // BenchDecodeAlacconvert benchmarks alacconvert decoding a CAF to WAV.
 func BenchDecodeAlacconvert(
-	t *testing.T, format BenchFormat, opts BenchOptions, cafPath string,
-) BenchResult {
+	t *testing.T, format agar.BenchFormat, opts agar.BenchOptions, cafPath string,
+) agar.BenchResult {
 	t.Helper()
 
 	if AlacConvertPath(t) == "" {
@@ -199,5 +216,5 @@ func BenchDecodeAlacconvert(
 		t.Fatalf("stat: %v", err)
 	}
 
-	return ComputeResult(format, "alacconvert", "decode", durations, int(info.Size()))
+	return agar.ComputeResult(format, "alacconvert", "decode", durations, int(info.Size()))
 }

@@ -1,5 +1,20 @@
 # Implementation
 
+## ALAC Specification
+
+Apple released the ALAC codec as open source (Apache 2.0) in 2011. Key parameters from the reference implementation:
+
+| Parameter | Spec Range | Notes |
+|-----------|-----------|-------|
+| Bit depths | 16, 20, 24, 32 | Stored in ALACSpecificConfig |
+| Channels | 1-8 | Mono through 7.1 surround |
+| Sample rates | 1-4,294,967,295 Hz | Any uint32; practically 8kHz-192kHz |
+| Frame length | Any uint32 | Typically 4096 samples |
+| Predictor orders | 0-31 | 5-bit field; 31 = delta mode |
+| Element types | SCE, CPE, CCE, LFE, DSE, PCE, FIL, END | CCE and PCE rarely used |
+| Shift modes | 0, 1, 2 | LSB stripping for 24/32-bit |
+| Container | MP4/M4A, CAF | M4A is standard distribution format |
+
 ## Source Map
 
 Port of Apple's reference C sources:

@@ -1,14 +1,15 @@
 # Saprobe ALAC
 
-Pure Go ALAC streaming decoder, ported from Apple's open-source C implementation (Apache 2.0, 2011) with
+A fast, pure Go ALAC streaming decoder, ported from Apple's open-source C implementation (Apache 2.0, 2011) with
 performance optimizations.
 
 No encoder.
 
-An example cli decoder is provided.
-Note that file open in this example is crude and inefficient.
+A crude example decoder cli is provided as well.
 
-For a proper full-blown library and cli including buffered file IO, see [Saprobe](https://github.com/mycophonic/saprobe).
+This library is low-level.
+
+For a proper full-blown, higher-level decoder library and cli, see [Saprobe](https://github.com/mycophonic/saprobe).
 
 ## Support
 
@@ -27,7 +28,7 @@ For a proper full-blown library and cli including buffered file IO, see [Saprobe
 
 ### Not supported
 
-- CCE / PCE element types (returns error)
+- CCE / PCE element types (returns error) (note that no known encoder ever produce these)
 - Encoding
 - CAF container parsing
 
@@ -49,18 +50,23 @@ func Decode(reader io.ReadSeeker) ([]byte, PCMFormat, error)
 
 ## Performance
 
-Performance overall is very close to Apple CoreAudio.
+saprobe-alac is generally faster than CGO>Apple CoreAudio.
 
-To get there, optimization has been done with a mixture of targetted inlining, bound checks elimination and SIMD.
+To get there, optimizations have been done with a mixture of targeted inlining and bound checks elimination.
 See [optimization](./docs/OPTIM.md).
 
-Comparison with ffmpeg is more crushing, which is expected as well given the highly optimized nature of ffmpeg.
+Comparison with ffmpeg is more crushing, which is expected, given the highly optimized nature of ffmpeg.
+
+It should be noted that the comparison with CoreAudio is not entirely fair (there is a cost associated with crossing GO/C
+boundaries). The comparison with Apple open-source alacconvert is more fair to Apple implementatio
+(although shelling out does also introduce latency on smaller files).
+
+Further optimization work would be unlikely to bring in significant returns and would presumably require intense assembly
+work...
 
 ## Dependencies
 
 MP4 box parsing uses github.com/abema/go-mp4
-
-SIMD optimizations are provided by the primordium library.
 
 Other dependencies (agar) are purely for test tooling.
 

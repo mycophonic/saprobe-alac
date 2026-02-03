@@ -26,7 +26,7 @@ import (
 )
 
 // BenchDecodeFFmpeg benchmarks ffmpeg decoding of an encoded file.
-func BenchDecodeFFmpeg(t *testing.T, format BenchFormat, opts BenchOptions, srcPath string) BenchResult {
+func BenchDecodeFFmpeg(t *testing.T, format agar.BenchFormat, opts agar.BenchOptions, srcPath string) agar.BenchResult {
 	t.Helper()
 
 	opts = opts.WithDefaults()
@@ -51,5 +51,5 @@ func BenchDecodeFFmpeg(t *testing.T, format BenchFormat, opts BenchOptions, srcP
 		t.Fatalf("stat: %v", err)
 	}
 
-	return ComputeResult(format, "ffmpeg", "decode", durations, int(info.Size()))
+	return agar.ComputeResult(format, "ffmpeg", "decode", durations, int(info.Size()))
 }

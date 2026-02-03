@@ -4,7 +4,7 @@ go 1.25.6
 
 require (
 	github.com/abema/go-mp4 v1.4.1
-	github.com/mycophonic/agar v0.1.2
+	github.com/mycophonic/agar v0.1.3
 )
 
 require (

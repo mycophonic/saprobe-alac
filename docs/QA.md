@@ -138,16 +138,16 @@ Ratio columns show saprobe time relative to each reference tool (>1x = saprobe s
 
 | File | Duration | Size | Comp. | saprobe | ffmpeg | vs ffmpeg | coreaudio | vs coreaudio | alacconvert | vs alacconvert | Character |
 |------|----------|------|-------|---------|--------|-----------|-----------|--------------|-------------|----------------|-----------|
-| Horace Silver — Song for My Father | 7:06 | 40.6 MB | 0.55 | 991ms | 249ms | 4.0x | 957ms | 1.04x | 831ms | 1.2x | Typical jazz combo |
-| Art Blakey — Ending With the Theme | 0:29 | 82 KB | 0.017 | 22ms | 33ms | 0.7x | 14ms | 1.6x | 20ms | 1.1x | Near-silence, extreme compressibility |
+| Horace Silver — Song for My Father | 7:06 | 40.6 MB | 0.55 | 999ms | 278ms | 3.6x | 985ms | 1.01x | 851ms | 1.2x | Typical jazz combo |
+| Art Blakey — Ending With the Theme | 0:29 | 82 KB | 0.017 | 22ms | 34ms | 0.6x | 14ms | 1.6x | 21ms | 1.0x | Near-silence, extreme compressibility |
 | Charlie Parker — Estrellita (take 5) | 0:06 | 0.3 MB | 0.254 | 9ms | 29ms | 0.3x | 8ms | 1.1x | 12ms | 0.8x | Short take, sparse |
-| Cecil Taylor Unit — [untitled] | 1:09:50 | 341.7 MB | 0.485 | 9.605s | 2.726s | 3.5x | 9.103s | 1.06x | 8.028s | 1.2x | Long free jazz, moderate density |
-| Cecil Taylor — Calling It the 8th | 58:10 | 352.6 MB | 0.601 | 7.503s | 1.931s | 3.9x | 7.319s | 1.03x | 6.634s | 1.1x | Dense free piano, low compressibility |
-| John Coltrane — Ascension Ed. II | 40:57 | 287.7 MB | 0.696 | 4.806s | 1.164s | 4.1x | 4.686s | 1.03x | 4.553s | 1.06x | Dense ensemble, near-incompressible |
+| Cecil Taylor Unit — [untitled] | 1:09:50 | 341.7 MB | 0.485 | 9.159s | 2.307s | 4.0x | 9.249s | 0.99x | 8.177s | 1.1x | Long free jazz, moderate density |
+| Cecil Taylor — Calling It the 8th | 58:10 | 352.6 MB | 0.601 | 7.306s | 2.880s | 2.5x | 7.467s | 0.98x | 6.640s | 1.1x | Dense free piano, low compressibility |
+| John Coltrane — Ascension Ed. II | 40:57 | 287.7 MB | 0.696 | 4.678s | 1.163s | 4.0x | 4.707s | 0.99x | 4.609s | 1.01x | Dense ensemble, near-incompressible |
 
 On short files (<30s), saprobe is faster than ffmpeg (0.3-0.7x) due to zero process-spawn overhead, but slower than CGO CoreAudio (1.1-1.6x).
-On longer files, ffmpeg pulls ahead (3.5-4.1x faster) due to SIMD-optimized C.
-Saprobe is within ~1.03-1.06x of CoreAudio (CGO, in-process) on long files, and ~1.06-1.2x vs alacconvert. The gap narrowed significantly after adding a specialized predictor for order 6, which handles 70-85% of packets in real music files.
+On longer files, ffmpeg pulls ahead (2.5-4.0x faster) due to SIMD-optimized C.
+Saprobe has reached parity with CoreAudio (CGO, in-process) on long files, measuring 0.98-1.01x. Against alacconvert, the gap has narrowed to 1.01-1.2x. Specialized predictors for orders 5, 6, and 8 now cover ~95% of packets in real music files, leaving only residual orders for the generic path.
 
 Full paths:
 
