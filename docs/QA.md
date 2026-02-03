@@ -212,6 +212,6 @@ The `inuse_space` profile shows only 3.5-4.1 MB of live heap at program end — 
 
 ## Mass testing
 
-Comparative decoding is being done in Saprobe on a set of 8514 MP4A/ALAC files.
+Comparative decoding is being done in Saprobe on a set of 8409 MP4A/ALAC files.
 
 No failure or discrepancy has been found.
