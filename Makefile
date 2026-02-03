@@ -11,10 +11,14 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.NAME := alac
-ALLOWED_LICENSES := Apache-2.0,BSD-2-Clause,BSD-3-Clause,MIT
+ALLOWED_LICENSES := Apache-2.0,BSD-3-Clause,MIT
 LICENSE_IGNORES := --ignore gotest.tools
 
 include hack/common.mk
+
+# CGO is needed for tests only (CoreAudio reference decoder benchmarks).
+# The decoder itself is pure Go — builds must remain CGO_ENABLED=0.
+test-unit test-unit-bench test-unit-profile test-unit-cover: export CGO_ENABLED = 1
 
 ##########################
 # Apple ALAC reference (Apache-2.0)

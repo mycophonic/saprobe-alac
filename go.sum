@@ -14,8 +14,8 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/pty v1.1.8/go.mod h1:O1sed60cT9XZ5uDucP5qwvh+TE3NnUj51EiZO/lmSfw=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/mycophonic/agar v0.1.2 h1:gZxxcblbUgF/i9XfIdeIHDl97+e2p+uZ/RK0D0YEWkQ=
-github.com/mycophonic/agar v0.1.2/go.mod h1:7YwQ1davoZ4DG5uU5LIvV31P1pVvjSZMSJzmBuCZcX8=
+github.com/mycophonic/agar v0.1.3 h1:kMscwBzP1qUOMn+CziWIiRlCUW32XP2PvKSRHvnO58I=
+github.com/mycophonic/agar v0.1.3/go.mod h1:7YwQ1davoZ4DG5uU5LIvV31P1pVvjSZMSJzmBuCZcX8=
 github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e h1:s2RNOM/IGdY0Y6qfTeUKhDawdHDpK9RGBdx80qN4Ttw=
 github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e/go.mod h1:nBdnFKj15wFbf94Rwfq4m30eAcyY9V/IyKAGQFtqkW0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

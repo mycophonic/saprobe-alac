@@ -34,13 +34,13 @@ Each encoder produces an encoded file which is decoded by all compatible decoder
 
 **Encoder/decoder compatibility:**
 
-| Encoder     | Container | Decoders                           | Channels |
-|-------------|-----------|------------------------------------|----------|
-| ffmpeg      | M4A       | saprobe, ffmpeg, coreaudio         | 1-8      |
-| coreaudio   | M4A       | saprobe, ffmpeg, coreaudio         | 1-8      |
-| alacconvert | CAF       | ffmpeg, alacconvert                | 1-2      |
+| Encoder     | Container | Decoders                           | Channels (16-bit) | Channels (24-bit) |
+|-------------|-----------|------------------------------------|--------------------|--------------------|
+| ffmpeg      | M4A       | saprobe, ffmpeg, coreaudio         | 1-8                | 1-8                |
+| coreaudio   | M4A       | saprobe, ffmpeg, coreaudio         | 1-7                | 1-5                |
+| alacconvert | CAF       | ffmpeg, alacconvert                | 1-2                | 1-2                |
 
-With all tools available: 2 bit depths x 11 sample rates x (8ch ffmpeg + 8ch coreaudio + 2ch alacconvert) = 396 subtests.
+With all tools available: 11 sample rates x (16b: 8ch ffmpeg + 7ch coreaudio + 2ch alacconvert) + (24b: 8ch ffmpeg + 5ch coreaudio + 2ch alacconvert) = 352 subtests.
 With ffmpeg only: 2 x 11 x 8 = 176 subtests.
 
 **Verification:**
@@ -50,11 +50,13 @@ With ffmpeg only: 2 x 11 x 8 = 176 subtests.
 
 **Reference tools:**
 
-| Tool        | Role            | Bit Depths     | Channels | Container |
-|-------------|-----------------|----------------|----------|-----------|
-| ffmpeg      | Encode + Decode | 16, 24         | 1-8      | M4A       |
-| alacconvert | Encode + Decode | 16, 24         | 1-2      | CAF       |
-| coreaudio   | Encode + Decode | 16, 20, 24, 32 | 1-8      | M4A       |
+| Tool        | Role            | Bit Depths     | Channels         | Container |
+|-------------|-----------------|----------------|------------------|-----------|
+| ffmpeg      | Encode + Decode | 16, 24         | 1-8              | M4A       |
+| alacconvert | Encode + Decode | 16, 24         | 1-2              | CAF       |
+| coreaudio   | Encode + Decode | 16, 20, 24, 32 | 1-7 (16b), 1-5 (24b) | M4A  |
+
+CoreAudio's ALAC codec silently returns 0 frames (without error) for channel counts beyond these limits. The test matrix excludes unsupported CoreAudio configurations.
 
 CoreAudio and alacconvert are optional; tests skip gracefully when unavailable.
 
@@ -210,6 +212,6 @@ The `inuse_space` profile shows only 3.5-4.1 MB of live heap at program end — 
 
 ## Mass testing
 
-Comparative decoding is being done on a set of 7434 MP4A/ALAC files.
+Comparative decoding is being done in Saprobe on a set of 8514 MP4A/ALAC files.
 
 No failure or discrepancy has been found.

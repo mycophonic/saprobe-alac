@@ -129,16 +129,35 @@ func decoderName(dec decoderType) string {
 	}
 }
 
-// availableEncoders returns which encoders support the given channel count.
-// ffmpeg is always available (assumed test dependency).
-// CoreAudio requires alac-coreaudio to be built.
-// alacconvert encodes WAV to CAF but only supports mono and stereo.
+// coreAudioSupported reports whether CoreAudio's ALAC codec handles
+// the given bit depth and channel count combination.
 //
+// Empirically determined limits (macOS AudioToolbox):
+//
+//	16-bit: 1-7 channels
+//	24-bit: 1-5 channels
+//
+// Beyond these, CoreAudio's ExtAudioFileRead returns 0 frames
+// (OSStatus 0) without error, silently producing empty output.
+func coreAudioSupported(bitDepth, channels int) bool {
+	switch bitDepth {
+	case 16:
+		return channels <= 7
+	case 24:
+		return channels <= 5
+	default:
+		return channels <= 2
+	}
+}
 
-func availableEncoders(channels int, hasCoreAudio, hasAlacconvert bool) []encoderType {
+// availableEncoders returns which encoders support the given configuration.
+// ffmpeg is always available (assumed test dependency).
+// CoreAudio requires alac-coreaudio and is limited to supported configurations.
+// alacconvert encodes WAV to CAF but only supports mono and stereo.
+func availableEncoders(bitDepth, channels int, hasCoreAudio, hasAlacconvert bool) []encoderType {
 	encs := []encoderType{encoderFFmpeg}
 
-	if hasCoreAudio {
+	if hasCoreAudio && coreAudioSupported(bitDepth, channels) {
 		encs = append(encs, encoderCoreAudio)
 	}
 
@@ -153,15 +172,14 @@ func availableEncoders(channels int, hasCoreAudio, hasAlacconvert bool) []encode
 //
 // Container compatibility:
 //
-//	ffmpeg      → M4A: saprobe, ffmpeg, coreaudio
+//	ffmpeg      → M4A: saprobe, ffmpeg, coreaudio (within supported matrix)
 //	coreaudio   → M4A: saprobe, ffmpeg, coreaudio
 //	alacconvert → CAF: ffmpeg, alacconvert
-
-func decodersForEncoder(enc encoderType, hasCoreAudio, hasAlacconvert bool) []decoderType {
+func decodersForEncoder(enc encoderType, bitDepth, channels int, hasCoreAudio, hasAlacconvert bool) []decoderType {
 	switch enc {
 	case encoderFFmpeg, encoderCoreAudio:
 		decs := []decoderType{decoderSaprobe, decoderFFmpeg}
-		if hasCoreAudio {
+		if hasCoreAudio && coreAudioSupported(bitDepth, channels) {
 			decs = append(decs, decoderCoreAudio)
 		}
 
@@ -191,7 +209,7 @@ func TestConformance(t *testing.T) {
 	for _, bitDepth := range bitDepths {
 		for _, sampleRate := range sampleRates {
 			for _, channels := range channelCounts {
-				encoders := availableEncoders(channels, hasCoreAudio, hasAlacconvert)
+				encoders := availableEncoders(bitDepth, channels, hasCoreAudio, hasAlacconvert)
 
 				for _, enc := range encoders {
 					name := fmt.Sprintf("%dbit/%s/%dHz_%dch",
@@ -200,7 +218,7 @@ func TestConformance(t *testing.T) {
 					t.Run(name, func(t *testing.T) {
 						t.Parallel()
 
-						decoders := decodersForEncoder(enc, hasCoreAudio, hasAlacconvert)
+						decoders := decodersForEncoder(enc, bitDepth, channels, hasCoreAudio, hasAlacconvert)
 
 						runConformanceTest(t, enc, decoders,
 							bitDepth, sampleRate, channels)
