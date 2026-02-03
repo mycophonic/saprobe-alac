@@ -2,11 +2,13 @@
 
 ## Current Performance
 
-Saprobe is ~1.2x vs CoreAudio and ~1.3-1.4x vs alacconvert (Apple's reference C) on real files. FFmpeg is 3.7-4.5x faster due to SIMD-optimized C. On short files (<30s), saprobe is competitive or faster than all external tools due to zero process-spawn overhead.
+Saprobe has reached parity with CoreAudio (CGO, in-process) on long files, measuring 0.98-1.01x. On short files (<30s), saprobe is faster than ffmpeg (0.3-0.7x) due to zero process-spawn overhead, but slower than CGO CoreAudio (1.1-1.6x). Against alacconvert (Apple reference C, out-of-process), the gap has narrowed to 1.01-1.2x.
+
+FFmpeg is 2.5-4.0x faster on long files due to SIMD-optimized C.
 
 Memory: the decoder allocates zero significant memory. All allocations in benchmarks come from test infrastructure.
 
-See [saprobe-flac](https://github.com/mycophonic/saprobe-flac) for extra testing and bench tooling.
+See [QA.md](./QA.md) for full benchmark data and CPU profiles.
 
 ## Profile Summary
 
@@ -14,25 +16,36 @@ Two distinct regimes depending on input:
 
 | Hotspot | Synthetic (white noise) | Real Music | Function |
 |---|---|---|---|
-| Linear predictor | -- | **51-57%** | `unpcBlockGeneral` |
-| Entropy decode | -- | **23-26%** | `DynDecomp` + `dynGet32Bit` |
-| Bit reading | **25%** | ~1.5% | `BitBuffer.Read` |
+| Linear predictor | -- | **17-21%** | `unpcBlock6` (dominant), `unpcBlock4`, `unpcBlockGeneral` (residual 3.9-5.4%) |
+| Entropy decode | -- | **13-15%** | `DynDecomp` (with `dynGet32Bit` manually inlined) |
+| Sign adaptation | -- | **3.7-5.7%** | `signOfInt` |
+| Bit reading | **23%** | ~1.5% | `BitBuffer.Read` |
 | Output write | 6% | ~1.5% | `WriteStereo16/24` |
 
 Real music is the optimization target. White noise is a pathological case that maximizes bit-reading overhead due to incompressible data.
-
-**Important: the real-file profiles are stale.** They were collected before `unpcBlock8` was added. At the time, `numActive=8` traffic hit `unpcBlockGeneral` (the general-purpose path). Now it dispatches to the specialized `unpcBlock8`. Re-profiling is needed before any optimization work.
 
 ## Predictor Order (`numActive`)
 
 The Apple reference encoder (`ALACEncoder.cpp`) uses `kMinUV=4`, `kMaxUV=8`, step 4 -- it only tests predictor orders 4 and 8. FFmpeg defaults to orders 4-6.
 
 The switch in `UnpcBlock` dispatches:
-- `numActive=4` -> `unpcBlock4` (fully unrolled, 249 ARM64 instructions)
-- `numActive=8` -> `unpcBlock8` (fully unrolled, 501 ARM64 instructions)
-- everything else -> `unpcBlockGeneral` (loop-based, 181 instructions)
+- `numActive=4` -> `unpcBlock4` (fully unrolled)
+- `numActive=5` -> `unpcBlock5` (fully unrolled)
+- `numActive=6` -> `unpcBlock6` (fully unrolled)
+- `numActive=8` -> `unpcBlock8` (fully unrolled)
+- everything else -> `unpcBlockGeneral` (loop-based)
 
-Apple-encoded files (the vast majority of real ALAC) will only ever hit `unpcBlock4` and `unpcBlock8`.
+In practice, `unpcBlock6` handles 70-85% of packets in real music (ffmpeg-encoded files dominate this order). `unpcBlock4` and `unpcBlock8` cover Apple-encoded files. The generic path handles only residual order-5 and order-7+ packets, at 3.9-5.4% of CPU time.
+
+## Completed Optimizations
+
+### Specialized Predictors (unpcBlock5, unpcBlock6)
+
+Added hand-unrolled predictor paths for orders 5 and 6. `unpcBlock6` alone moved 70-85% of packets off the generic path, dropping `unpcBlockGeneral` from 51-57% to 3.9-5.4% flat.
+
+### Manual Inlining of `dynGet32Bit`
+
+`dynGet32Bit` exceeded the Go compiler's inline cost budget (177 vs 80). It was called once per sample in `DynDecomp`. Manually inlined the function body, eliminating per-sample function call overhead. `DynDecomp` now shows 13-15% flat (previously split across `DynDecomp` + `dynGet32Bit`).
 
 ## Investigation Findings
 
@@ -73,7 +86,6 @@ Inlined at every call site (cost 16, budget 80). No improvement possible.
 **Inlined** (good): `signOfInt`, `read32bit`, `lead`, `lg3a`, `BitBuffer.Read`, `BitBuffer.ReadSmall`, `BitBuffer.Advance`.
 
 **Not inlined** (exceeds cost budget of 80):
-- `dynGet32Bit` -- cost 177. Called per sample in `DynDecomp`. Full function call overhead (register save/restore) on the 12-13% entropy decode path.
 - `dynGet` -- cost 119. Called per zero-run in `DynDecomp`.
 - `getStreamBits` -- cost 101. Called from `dynGet32Bit` on escape codes.
 - `DynDecomp` -- cost 437.
@@ -82,23 +94,15 @@ Inlined at every call site (cost 16, budget 80). No improvement possible.
 
 Primordium has `DotFloat32` (ARM64 NEON + AMD64 SSE assembly) and `MatVecMul64x32`. Neither operates on `int16 x int32` which is what the ALAC predictor needs.
 
-However, since `numActive` is always 4 or 8 for Apple-encoded files, the predictor dot product is only 4 or 8 multiply-adds -- too short for SIMD vector lanes to amortize setup cost. The specialized `unpcBlock4`/`unpcBlock8` with full register unrolling are already close to what SIMD would achieve for these lengths.
+With specialized predictors covering orders 4-6 and 8, the dot product is only 4-8 multiply-adds -- too short for SIMD vector lanes to amortize setup cost. The hand-unrolled scalar specializations are already close to what SIMD would achieve for these lengths.
 
 SIMD would only help `unpcBlockGeneral` for hypothetical large predictor orders (>8), which no known encoder produces.
 
-## Prioritized Actions
-
-### P0: Re-profile
-
-The existing profile data is stale (collected before `unpcBlock8`). Re-run with real files to establish the current bottleneck distribution before any optimization work.
-
-```bash
-hack/bench.sh TestBenchmarkDecodeFile '/path/to/file.m4a'
-```
+## Remaining Actions
 
 ### P1: Eliminate Bounds Checks in Predictor
 
-Target: `unpcBlock4` and `unpcBlock8` (the only paths hit by real files).
+Target: `unpcBlock4`, `unpcBlock5`, `unpcBlock6`, `unpcBlock8`.
 
 Strategy: add upfront length assertions before the main loop so the compiler can prove all indexed accesses are in-bounds:
 
@@ -115,17 +119,7 @@ For history reads (`out[idx-1]` through `out[idx-4]`), the loop starts at `idx=l
 
 Expected gain: **3-8% overall decode time**.
 
-### P2: Inline `dynGet32Bit` into `DynDecomp`
-
-The function exceeds the inline cost budget (177 vs 80). It's called once per sample in the entropy decode loop. Manual inlining eliminates per-sample function call overhead.
-
-Options:
-1. Copy the function body directly into `DynDecomp` at the call site.
-2. Restructure to reduce cost below 80 (split into smaller helpers).
-
-Expected gain: **1-3% overall** (eliminates call overhead on the 12-13% entropy path).
-
-### P3: Eliminate Bounds Checks in `DynDecomp`
+### P2: Eliminate Bounds Checks in `DynDecomp`
 
 `predCoefs[count]` at golomb.go:200 and 226 has per-sample bounds checks. An upfront `_ = predCoefs[numSamples-1]` assertion would eliminate them.
 
@@ -133,7 +127,7 @@ Expected gain: **1-3% overall** (eliminates call overhead on the 12-13% entropy 
 
 Expected gain: **1-2% overall**.
 
-### P4: WriteStereo16/24 (Low Priority)
+### P3: WriteStereo16/24 (Low Priority)
 
 At 1.5% of real-file decode time, even a 2x speedup saves <1%. The strided write pattern with per-sample bounds checks could benefit from upfront assertions, but the return is marginal.
 
@@ -143,5 +137,5 @@ SIMD packing (ARM64 `ST2` for channel interleaving) would be clean but the gain 
 
 - **`signOfInt` optimization** -- already branchless, already inlined.
 - **`BitBuffer.Read` optimization** -- only dominates on incompressible synthetic data, not real music.
-- **SIMD for predictor dot product** -- vector lengths (4 or 8) are too short to benefit from SIMD lanes. The unrolled scalar specializations are already near-optimal for these sizes.
+- **SIMD for predictor dot product** -- vector lengths (4-8) are too short to benefit from SIMD lanes. The unrolled scalar specializations are already near-optimal for these sizes.
 - **Entropy decoding parallelism** -- Golomb-Rice is inherently serial (each codeword's length depends on its value, which determines the next codeword's start position).

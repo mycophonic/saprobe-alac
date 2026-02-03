@@ -49,6 +49,8 @@ M4A -> MP4 box traversal (moov/trak/mdia/minf/stbl)
 |-------|--------------------|----------------------------------|
 | 0     | Copy               | No prediction                    |
 | 4     | `unpcBlock4`       | Hand-unrolled 4-tap FIR          |
+| 5     | `unpcBlock5`       | Hand-unrolled 5-tap FIR          |
+| 6     | `unpcBlock6`       | Hand-unrolled 6-tap FIR (dominant path in real music) |
 | 8     | `unpcBlock8`       | Hand-unrolled 8-tap FIR          |
 | 31    | Delta mode         | First-order delta decode         |
 | Other | `unpcBlockGeneral` | General FIR with BCE sub-slicing |
@@ -60,4 +62,5 @@ M4A -> MP4 box traversal (moov/trak/mdia/minf/stbl)
 - **writeStereo16 BCE**: sub-slice pattern for bounds check elimination
 - **read32bit intrinsic**: `binary.BigEndian.Uint32` compiles to single load+bswap
 - **Register-friendly entropy decoder**: `dynGet32Bit`/`dynGet` return `(result, newBitPos)` instead of `*uint32`, keeping `bitPos` in a register
-- **Specialized predictors**: hand-unrolled `unpcBlock4`/`unpcBlock8` with coefficients in local variables
+- **Specialized predictors**: hand-unrolled `unpcBlock4`/`unpcBlock5`/`unpcBlock6`/`unpcBlock8` with coefficients in local variables
+- **Manual inlining**: `dynGet32Bit` inlined into `DynDecomp` to eliminate per-sample function call overhead

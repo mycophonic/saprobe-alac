@@ -20,6 +20,37 @@ include hack/common.mk
 # The decoder itself is pure Go — builds must remain CGO_ENABLED=0.
 test-unit test-unit-bench test-unit-profile test-unit-cover: export CGO_ENABLED = 1
 
+# Tests live in a separate module (tests/go.mod) to keep agar out of the
+# library go.mod. Override common.mk test targets to include both modules.
+TEST_MODULE := $(PROJECT_DIR)/tests
+
+test-unit:
+	$(call title, $@)
+	@go test $(VERBOSE_FLAG) -count 1 $(PROJECT_DIR)/... $(TEST_MODULE)/...
+	$(call footer, $@)
+
+test-unit-bench:
+	$(call title, $@)
+	@go test $(VERBOSE_FLAG) -count 1 $(PROJECT_DIR)/... $(TEST_MODULE)/... -bench=.
+	$(call footer, $@)
+
+test-unit-race:
+	$(call title, $@)
+	@CGO_ENABLED=1 go test $(VERBOSE_FLAG) -ldflags="-linkmode=external" $(PROJECT_DIR)/... $(TEST_MODULE)/... -race
+	$(call footer, $@)
+
+lint-mod:
+	$(call title, $@)
+	@cd $(PROJECT_DIR) && go mod tidy --diff
+	@cd $(TEST_MODULE) && go mod tidy --diff
+	$(call footer, $@)
+
+fix-mod:
+	$(call title, $@)
+	@cd $(PROJECT_DIR) && go mod tidy
+	@cd $(TEST_MODULE) && go mod tidy
+	$(call footer, $@)
+
 ##########################
 # Apple ALAC reference (Apache-2.0)
 ##########################

@@ -58,7 +58,7 @@ See [optimization](./docs/OPTIM.md).
 Comparison with ffmpeg is more crushing, which is expected, given the highly optimized nature of ffmpeg.
 
 It should be noted that the comparison with CoreAudio is not entirely fair (there is a cost associated with crossing GO/C
-boundaries). The comparison with Apple open-source alacconvert is more fair to Apple implementatio
+boundaries). The comparison with Apple open-source alacconvert is more fair to Apple implementation
 (although shelling out does also introduce latency on smaller files).
 
 Further optimization work would be unlikely to bring in significant returns and would presumably require intense assembly

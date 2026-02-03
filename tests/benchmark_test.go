@@ -19,6 +19,7 @@ package tests_test
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -121,7 +122,22 @@ func TestBenchmarkDecode(t *testing.T) {
 			results = append(results, agar.ComputeResult(bf, "saprobe", "decode", durations, len(encoded)))
 
 			// Benchmark ffmpeg decode.
-			results = append(results, testutil.BenchDecodeFFmpeg(t, bf, opts, m4aPath))
+			ffmpegDurations := make([]time.Duration, opts.Iterations)
+
+			for iter := range opts.Iterations {
+				start := time.Now()
+
+				agar.FFmpegDecode(t, agar.FFmpegDecodeOptions{
+					Src:      m4aPath,
+					BitDepth: bf.BitDepth,
+					Channels: bf.Channels,
+					Stdout:   io.Discard,
+				})
+
+				ffmpegDurations[iter] = time.Since(start)
+			}
+
+			results = append(results, agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())))
 
 			// Benchmark CoreAudio decode (CGO, in-process).
 			results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
@@ -208,7 +224,27 @@ func TestBenchmarkDecodeFile(t *testing.T) {
 	}
 
 	// Benchmark ffmpeg decode.
-	results = append(results, testutil.BenchDecodeFFmpeg(t, bf, opts, m4aPath))
+	m4aInfo, err := os.Stat(m4aPath)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+
+	ffmpegDurations := make([]time.Duration, opts.Iterations)
+
+	for iter := range opts.Iterations {
+		start := time.Now()
+
+		agar.FFmpegDecode(t, agar.FFmpegDecodeOptions{
+			Src:      m4aPath,
+			BitDepth: bf.BitDepth,
+			Channels: bf.Channels,
+			Stdout:   io.Discard,
+		})
+
+		ffmpegDurations[iter] = time.Since(start)
+	}
+
+	results = append(results, agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())))
 
 	// Benchmark CoreAudio decode (CGO, in-process).
 	results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
