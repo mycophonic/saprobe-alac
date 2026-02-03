@@ -32,11 +32,13 @@ import (
 	"os"
 
 	"github.com/mycophonic/saprobe-alac"
+	"github.com/mycophonic/saprobe-alac/version"
 )
 
 const formatWAV = "wav"
 
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
 	format := flag.String("format", formatWAV, "output format: wav or pcm")
 
 	flag.Usage = func() {
@@ -45,6 +47,11 @@ func main() {
 	}
 
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Fprintln(os.Stdout, version.String())
+		os.Exit(0)
+	}
 
 	if flag.NArg() != 1 {
 		flag.Usage()
