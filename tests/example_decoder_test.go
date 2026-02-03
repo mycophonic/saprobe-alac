@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mycophonic/agar/pkg/agar"
+
 	"github.com/mycophonic/saprobe-alac/tests/testutil"
 )
 
@@ -55,7 +57,7 @@ func TestExampleDecoder(t *testing.T) {
 		channels   = 2
 	)
 
-	srcPCM := generateWhiteNoise(sampleRate, bitDepth, channels, 1)
+	srcPCM := agar.GenerateWhiteNoise(sampleRate, bitDepth, channels, 1)
 
 	// Write source PCM as WAV (CoreAudio encoder requires WAV input).
 	wavPath := filepath.Join(tmpDir, "source.wav")
@@ -74,7 +76,7 @@ func TestExampleDecoder(t *testing.T) {
 		t.Fatalf("read encoded: %v", err)
 	}
 
-	refPCM, err := testutil.CoreAudioDecode(m4aData)
+	refPCM, err := agar.CoreAudioDecode(m4aData)
 	if err != nil {
 		t.Fatalf("coreaudio decode: %v", err)
 	}
@@ -98,7 +100,7 @@ func TestExampleDecoder(t *testing.T) {
 	}
 
 	// Compare sample data.
-	compareLosslessSamples(t, "example-decoder vs coreaudio", refPCM, exPCM, bitDepth, channels)
+	agar.CompareLosslessSamples(t, "example-decoder vs coreaudio", refPCM, exPCM, bitDepth, channels)
 
 	// Also verify WAV output mode produces valid output with correct size.
 	var wavStdout, wavStderr bytes.Buffer
@@ -126,5 +128,5 @@ func TestExampleDecoder(t *testing.T) {
 
 	wavPCM := testutil.ReadWAVPCMData(t, wavOutPath)
 
-	compareLosslessSamples(t, "example-decoder(wav) vs coreaudio", refPCM, wavPCM, bitDepth, channels)
+	agar.CompareLosslessSamples(t, "example-decoder(wav) vs coreaudio", refPCM, wavPCM, bitDepth, channels)
 }

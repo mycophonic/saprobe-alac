@@ -83,6 +83,8 @@ func UnpcBlock(pc1, out []int32, num int, coefs []int16, numActive int32, chanBi
 	switch numActive {
 	case 4:
 		unpcBlock4(pc1, out, num, coefs, lim, chanShift, denShift, denHalf)
+	case 6:
+		unpcBlock6(pc1, out, num, coefs, lim, chanShift, denShift, denHalf)
 	case 8:
 		unpcBlock8(pc1, out, num, coefs, lim, chanShift, denShift, denHalf)
 	default:
@@ -184,9 +186,139 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, lim int, chanShift, de
 	coefs[3] = int16(coef3)
 }
 
-// unpcBlock8 is the optimized predictor for numActive == 8.
+// unpcBlock6 is the optimized predictor for numActive == 6.
 //
-//revive:disable:cognitive-complexity // deal with it!
+//revive:disable:cognitive-complexity
+func unpcBlock6(pc1, out []int32, num int, coefs []int16, lim int, chanShift, denShift uint32, denHalf int32) {
+	// BCE: reslice to exact length so compiler knows bounds for forward and backward indexing.
+	_ = coefs[5]
+	pc1 = pc1[:num:num]
+	out = out[:num:num]
+
+	coef0 := int32(coefs[0])
+	coef1 := int32(coefs[1])
+	coef2 := int32(coefs[2])
+	coef3 := int32(coefs[3])
+	coef4 := int32(coefs[4])
+	coef5 := int32(coefs[5])
+
+	for idx := lim; idx < num; idx++ {
+		top := out[idx-lim]
+
+		diff0 := top - out[idx-1]
+		diff1 := top - out[idx-2]
+		diff2 := top - out[idx-3]
+		diff3 := top - out[idx-4]
+		diff4 := top - out[idx-5]
+		diff5 := top - out[idx-6]
+
+		sum1 := (denHalf - coef0*diff0 - coef1*diff1 - coef2*diff2 - coef3*diff3 - coef4*diff4 - coef5*diff5) >> denShift
+
+		del := pc1[idx]
+		del0 := del
+		sign := signOfInt(del)
+		del += top + sum1
+
+		out[idx] = (del << chanShift) >> chanShift
+
+		if sign > 0 {
+			sgn := signOfInt(diff5)
+			coef5 -= int32(int16(sgn))
+
+			del0 -= 1 * ((sgn * diff5) >> denShift)
+			if del0 <= 0 {
+				goto store6
+			}
+
+			sgn = signOfInt(diff4)
+			coef4 -= int32(int16(sgn))
+
+			del0 -= 2 * ((sgn * diff4) >> denShift)
+			if del0 <= 0 {
+				goto store6
+			}
+
+			sgn = signOfInt(diff3)
+			coef3 -= int32(int16(sgn))
+
+			del0 -= 3 * ((sgn * diff3) >> denShift)
+			if del0 <= 0 {
+				goto store6
+			}
+
+			sgn = signOfInt(diff2)
+			coef2 -= int32(int16(sgn))
+
+			del0 -= 4 * ((sgn * diff2) >> denShift)
+			if del0 <= 0 {
+				goto store6
+			}
+
+			sgn = signOfInt(diff1)
+			coef1 -= int32(int16(sgn))
+
+			del0 -= 5 * ((sgn * diff1) >> denShift)
+			if del0 <= 0 {
+				goto store6
+			}
+
+			coef0 -= int32(int16(signOfInt(diff0)))
+		} else if sign < 0 {
+			sgn := -signOfInt(diff5)
+			coef5 -= int32(int16(sgn))
+
+			del0 -= 1 * ((sgn * diff5) >> denShift)
+			if del0 >= 0 {
+				goto store6
+			}
+
+			sgn = -signOfInt(diff4)
+			coef4 -= int32(int16(sgn))
+
+			del0 -= 2 * ((sgn * diff4) >> denShift)
+			if del0 >= 0 {
+				goto store6
+			}
+
+			sgn = -signOfInt(diff3)
+			coef3 -= int32(int16(sgn))
+
+			del0 -= 3 * ((sgn * diff3) >> denShift)
+			if del0 >= 0 {
+				goto store6
+			}
+
+			sgn = -signOfInt(diff2)
+			coef2 -= int32(int16(sgn))
+
+			del0 -= 4 * ((sgn * diff2) >> denShift)
+			if del0 >= 0 {
+				goto store6
+			}
+
+			sgn = -signOfInt(diff1)
+			coef1 -= int32(int16(sgn))
+
+			del0 -= 5 * ((sgn * diff1) >> denShift)
+			if del0 >= 0 {
+				goto store6
+			}
+
+			coef0 += int32(int16(signOfInt(diff0)))
+		}
+
+	store6:
+	}
+
+	coefs[0] = int16(coef0)
+	coefs[1] = int16(coef1)
+	coefs[2] = int16(coef2)
+	coefs[3] = int16(coef3)
+	coefs[4] = int16(coef4)
+	coefs[5] = int16(coef5)
+}
+
+//revive:disable-next-line:cognitive-complexity
 func unpcBlock8(pc1, out []int32, num int, coefs []int16, lim int, chanShift, denShift uint32, denHalf int32) {
 	// BCE: reslice to exact length so compiler knows bounds for forward and backward indexing.
 	_ = coefs[7]

@@ -97,17 +97,16 @@ go test ./tests/ -run TestBenchmarkDecode -count=1 -v
 make test-unit-profile
 ```
 
-Total: 22.19s, 7.81s in sampled functions (35.20%).
+Total: 23s, 7990ms in sampled functions (34.74%).
 
 | Function         | Flat  | Flat%  | Cum   | Cum%   |
 |------------------|-------|--------|-------|--------|
-| runtime.cgocall  | 2.31s | 29.58% | 2.31s | 29.58% |
-| BitBuffer.Read   | 1.51s | 19.33% | 1.57s | 20.10% |
-| decodeCPEEscape  | 1.03s | 13.19% | 2.65s | 33.93% |
-| WriteStereo24    | 0.35s | 4.48%  | 0.35s | 4.48%  |
-| WriteStereo16    | 0.05s | 0.64%  | 0.05s | 0.64%  |
+| runtime.cgocall  | 2.39s | 29.91% | 2.39s | 29.91% |
+| BitBuffer.Read   | 1.83s | 22.90% | 1.89s | 23.65% |
+| decodeCPEEscape  | 1.03s | 12.89% | 2.65s | 33.17% |
+| WriteStereo24    | 0.25s | 3.13%  | 0.25s | 3.13%  |
 
-The CGO CoreAudio decoder (`runtime.cgocall`) now appears at 29.58% since it runs in-process. Among saprobe-only functions, bit reading dominates at 19.33%, followed by the CPE element decoder (13.19% flat, 33.93% cumulative).
+The CGO CoreAudio decoder (`runtime.cgocall`) appears at ~30% since it runs in-process. Among saprobe-only functions, bit reading dominates at 22.90%, followed by the CPE element decoder (12.89% flat, 33.17% cumulative). The synthetic profile is dominated by BitBuffer.Read because white noise maximizes entropy, exercising the bit reader more than the predictor.
 
 #### Memory
 
@@ -121,7 +120,7 @@ Decoder allocations are negligible. All significant allocations come from test i
 | WriteWAV           | 223 MB     | 1.41%  |
 | os.ReadFile        | 223 MB     | 1.42%  |
 
-The `alac.Decode` path itself allocates no significant memory. The CGO `GoBytes` allocation (15.56%) is the CoreAudio benchmark copying decoded PCM from C to Go heap. `inuse_space` at exit: 3 MB (runtime goroutine stacks only).
+The `alac.Decode` path itself allocates no significant memory. The CGO `GoBytes` allocation (15.56%) is the CoreAudio benchmark copying decoded PCM from C to Go heap. `inuse_space` at exit: 4.6 KB.
 
 ### Real Files (`TestBenchmarkDecodeFile`)
 
@@ -139,16 +138,16 @@ Ratio columns show saprobe time relative to each reference tool (>1x = saprobe s
 
 | File | Duration | Size | Comp. | saprobe | ffmpeg | vs ffmpeg | coreaudio | vs coreaudio | alacconvert | vs alacconvert | Character |
 |------|----------|------|-------|---------|--------|-----------|-----------|--------------|-------------|----------------|-----------|
-| Horace Silver — Song for My Father | 7:06 | 40.6 MB | 0.55 | 1.152s | 245ms | 4.7x | 947ms | 1.2x | 818ms | 1.4x | Typical jazz combo |
-| Art Blakey — Ending With the Theme | 0:29 | 82 KB | 0.017 | 21ms | 32ms | 0.7x | 14ms | 1.5x | 21ms | 1.0x | Near-silence, extreme compressibility |
-| Charlie Parker — Estrellita (take 5) | 0:06 | 0.3 MB | 0.254 | 10ms | 28ms | 0.4x | 8ms | 1.3x | 12ms | 0.8x | Short take, sparse |
-| Cecil Taylor Unit — [untitled] | 1:09:50 | 341.7 MB | 0.485 | 11.03s | 2.24s | 4.9x | 9.07s | 1.2x | 8.04s | 1.4x | Long free jazz, moderate density |
-| Cecil Taylor — Calling It the 8th | 58:10 | 352.6 MB | 0.601 | 9.01s | 2.03s | 4.4x | 7.28s | 1.2x | 6.54s | 1.4x | Dense free piano, low compressibility |
-| John Coltrane — Ascension Ed. II | 40:57 | 287.7 MB | 0.696 | 5.70s | 1.12s | 5.1x | 4.64s | 1.2x | 4.60s | 1.2x | Dense ensemble, near-incompressible |
+| Horace Silver — Song for My Father | 7:06 | 40.6 MB | 0.55 | 991ms | 249ms | 4.0x | 957ms | 1.04x | 831ms | 1.2x | Typical jazz combo |
+| Art Blakey — Ending With the Theme | 0:29 | 82 KB | 0.017 | 22ms | 33ms | 0.7x | 14ms | 1.6x | 20ms | 1.1x | Near-silence, extreme compressibility |
+| Charlie Parker — Estrellita (take 5) | 0:06 | 0.3 MB | 0.254 | 9ms | 29ms | 0.3x | 8ms | 1.1x | 12ms | 0.8x | Short take, sparse |
+| Cecil Taylor Unit — [untitled] | 1:09:50 | 341.7 MB | 0.485 | 9.605s | 2.726s | 3.5x | 9.103s | 1.06x | 8.028s | 1.2x | Long free jazz, moderate density |
+| Cecil Taylor — Calling It the 8th | 58:10 | 352.6 MB | 0.601 | 7.503s | 1.931s | 3.9x | 7.319s | 1.03x | 6.634s | 1.1x | Dense free piano, low compressibility |
+| John Coltrane — Ascension Ed. II | 40:57 | 287.7 MB | 0.696 | 4.806s | 1.164s | 4.1x | 4.686s | 1.03x | 4.553s | 1.06x | Dense ensemble, near-incompressible |
 
-On short files (<30s), saprobe is faster than ffmpeg (0.4-0.7x) due to zero process-spawn overhead, but slower than CGO CoreAudio (1.3-1.5x).
-On longer files, ffmpeg pulls ahead (4.4-5.1x faster) due to SIMD-optimized C.
-Saprobe is consistently ~1.2x vs CoreAudio (CGO, in-process) and ~1.2-1.4x vs alacconvert.
+On short files (<30s), saprobe is faster than ffmpeg (0.3-0.7x) due to zero process-spawn overhead, but slower than CGO CoreAudio (1.1-1.6x).
+On longer files, ffmpeg pulls ahead (3.5-4.1x faster) due to SIMD-optimized C.
+Saprobe is within ~1.03-1.06x of CoreAudio (CGO, in-process) on long files, and ~1.06-1.2x vs alacconvert. The gap narrowed significantly after adding a specialized predictor for order 6, which handles 70-85% of packets in real music files.
 
 Full paths:
 
@@ -171,37 +170,32 @@ Profiled against two contrasting tracks: Cecil Taylor Unit — [untitled] (1:09:
 
 **Cecil Taylor Unit — [untitled] (1:09:50, 341.7 MB)**
 
-Total: 355.64s, 212.29s in sampled functions (59.69%).
+Total: 349.58s, 195.48s in sampled functions (55.92%).
 
 | Function         | Flat    | Flat%  | Cum     | Cum%   |
 |------------------|---------|--------|---------|--------|
-| runtime.cgocall  | 88.94s  | 41.90% | 88.94s  | 41.90% |
-| unpcBlockGeneral | 70.99s  | 33.44% | 77.26s  | 36.39% |
-| dynGet32Bit      | 14.86s  | 7.00%  | 16.61s  | 7.82%  |
-| DynDecomp        | 14.12s  | 6.65%  | 31.00s  | 14.60% |
-| signOfInt        | 3.80s   | 1.79%  | 3.80s   | 1.79%  |
-| WriteStereo16    | 1.81s   | 0.85%  | 1.84s   | 0.87%  |
-| read32bit        | 1.25s   | 0.59%  | 1.52s   | 0.72%  |
-| unpcBlock4       | 1.02s   | 0.48%  | 1.50s   | 0.71%  |
+| runtime.cgocall  | 89.54s  | 45.81% | 89.54s  | 45.81% |
+| unpcBlock6       | 41.40s  | 21.18% | 54.28s  | 27.77% |
+| DynDecomp        | 26.48s  | 13.55% | 30.68s  | 15.69% |
+| signOfInt        | 11.20s  | 5.73%  | 11.74s  | 6.01%  |
+| unpcBlockGeneral | 7.63s   | 3.90%  | 8.15s   | 4.17%  |
 
 **John Coltrane — Ascension Ed. II (40:57, 287.7 MB)**
 
-Total: 190.15s, 110.50s in sampled functions (58.11%).
+Total: 185.29s, 99.38s in sampled functions (53.63%).
 
 | Function         | Flat    | Flat%  | Cum     | Cum%   |
 |------------------|---------|--------|---------|--------|
-| runtime.cgocall  | 45.68s  | 41.34% | 45.68s  | 41.34% |
-| unpcBlockGeneral | 32.43s  | 29.35% | 35.32s  | 31.96% |
-| DynDecomp        | 8.57s   | 7.76%  | 17.21s  | 15.57% |
-| dynGet32Bit      | 7.27s   | 6.58%  | 8.48s   | 7.67%  |
-| signOfInt        | 2.23s   | 2.02%  | 2.24s   | 2.03%  |
-| unpcBlock4       | 1.89s   | 1.71%  | 2.82s   | 2.55%  |
-| WriteStereo16    | 1.08s   | 0.98%  | 1.08s   | 0.98%  |
-| read32bit        | 0.89s   | 0.81%  | 1.07s   | 0.97%  |
+| runtime.cgocall  | 45.32s  | 45.60% | 45.32s  | 45.60% |
+| unpcBlock6       | 17.07s  | 17.18% | 20.77s  | 20.90% |
+| DynDecomp        | 15.31s  | 15.41% | 17.32s  | 17.43% |
+| unpcBlockGeneral | 5.32s   | 5.35%  | 5.75s   | 5.79%  |
+| signOfInt        | 3.72s   | 3.74%  | 3.88s   | 3.90%  |
+| unpcBlock4       | 2.22s   | 2.23%  | 2.93s   | 2.95%  |
 
-The CGO CoreAudio decoder (`runtime.cgocall`) now dominates at ~41% since it runs in-process rather than via shell-out. Excluding CGO, the profile is consistent across both tracks: the linear predictor (`unpcBlockGeneral`) at 29-33%, followed by entropy decoding (`DynDecomp` + `dynGet32Bit`, 14-15% combined flat).
+The CGO CoreAudio decoder (`runtime.cgocall`) dominates at ~46% since it runs in-process. The new `unpcBlock6` specialization handles 70-85% of packets in real music and appears at 17-21% flat. `dynGet32Bit` has been manually inlined into `DynDecomp`, which now shows 13-15% flat (previously split across `DynDecomp` + `dynGet32Bit`). The generic predictor path `unpcBlockGeneral` dropped from 29-33% to 3.9-5.4%, now handling only the residual order-5 and order-7+ packets.
 
-Compared to the synthetic profile (white noise) where `BitBuffer.Read` dominated at 19%, real music shifts the bottleneck to the linear predictor's reconstruction loop — random noise maximizes bit-reading overhead while structured audio exercises the predictor more heavily.
+Compared to the synthetic profile (white noise) where `BitBuffer.Read` dominates at 23%, real music shifts the bottleneck to the linear predictor — random noise maximizes entropy and bit-reading overhead, while structured audio exercises the predictor reconstruction loop more heavily.
 
 #### Memory (Real Files)
 
@@ -209,10 +203,10 @@ Decoder allocations remain zero. The CGO `GoBytes` allocation is the CoreAudio b
 
 | File | io.ReadAll | CGO GoBytes | WriteWAV | os.ReadFile | inuse_space |
 |------|-----------|-------------|----------|-------------|-------------|
-| Cecil Taylor Unit (341.7 MB) | 51.3 GB (80%) | 9.0 GB (14%) | 0.69 GB | 0.33 GB | 3.5 MB |
-| Coltrane Ascension (287.7 MB) | 26.3 GB (84%) | 4.4 GB (14%) | 0.40 GB | 0.28 GB | 3.5 MB |
+| Cecil Taylor Unit (341.7 MB) | 51.28 GB (85.56%) | 7.57 GB (12.63%) | 0.69 GB | 0.33 GB | 3.5 MB |
+| Coltrane Ascension (287.7 MB) | 26.25 GB (83.56%) | 4.44 GB (14.13%) | 0.40 GB | 0.28 GB | 4.1 MB |
 
-The `inuse_space` profile shows only 3.5 MB of live heap at program end — runtime goroutine stacks. The decoder holds no persistent allocations between packets.
+The `inuse_space` profile shows only 3.5-4.1 MB of live heap at program end — runtime goroutine stacks. The decoder holds no persistent allocations between packets.
 
 ## Mass testing
 

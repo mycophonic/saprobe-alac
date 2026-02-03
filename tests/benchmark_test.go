@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mycophonic/agar/pkg/agar"
+
 	"github.com/mycophonic/saprobe-alac"
 	"github.com/mycophonic/saprobe-alac/tests/testutil"
 )
@@ -75,7 +77,7 @@ func TestBenchmarkDecode(t *testing.T) {
 
 			t.Logf("=== %s ===", bf.Name)
 
-			srcPCM := generateWhiteNoise(bf.SampleRate, bf.BitDepth, bf.Channels, durationSec)
+			srcPCM := agar.GenerateWhiteNoise(bf.SampleRate, bf.BitDepth, bf.Channels, durationSec)
 
 			// Write WAV for encoding.
 			wavPath := filepath.Join(tmpDir, fmt.Sprintf("src_%d_%d_%ds.wav", bf.SampleRate, bf.BitDepth, durationSec))
@@ -122,7 +124,7 @@ func TestBenchmarkDecode(t *testing.T) {
 			results = append(results, testutil.BenchDecodeFFmpeg(t, bf, opts, m4aPath))
 
 			// Benchmark CoreAudio decode (CGO, in-process).
-			results = append(results, testutil.BenchDecodeCoreAudio(t, bf, opts, encoded))
+			results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
 
 			// Benchmark alacconvert decode (from CAF).
 			if hasAlacconvert {
@@ -209,7 +211,7 @@ func TestBenchmarkDecodeFile(t *testing.T) {
 	results = append(results, testutil.BenchDecodeFFmpeg(t, bf, opts, m4aPath))
 
 	// Benchmark CoreAudio decode (CGO, in-process).
-	results = append(results, testutil.BenchDecodeCoreAudio(t, bf, opts, encoded))
+	results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
 
 	// Benchmark alacconvert decode (from CAF).
 	// Setup: saprobe decode → WAV → alacconvert encode → CAF.

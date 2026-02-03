@@ -173,7 +173,7 @@ linters:
           - perfsprint
           - depguard
       - path: _test.go
-        text: "add-constant|cognitive-complexity|confusing-results|nested-structs|use-waitgroup-go|unchecked-type-assertion|unhandled-error|unused-receiver"
+        text: "add-constant|cognitive-complexity|confusing-results|flag-parameter|nested-structs|use-waitgroup-go|unchecked-type-assertion|unhandled-error|unused-receiver"
         linters:
           - revive
 

@@ -49,18 +49,18 @@ func Decode(reader io.ReadSeeker) ([]byte, PCMFormat, error)
 
 ## Performance
 
-Performance is around 1.3x slower that Apple open-source C implementation and CoreAudio decoder across the board.
+Performance overall is very close to Apple CoreAudio.
 
-Given Go vs. C, this is respectable.
-
-Additional efforts are underway to leverage SIMD, bound checks elimination, and better inlining to squeeze out a little
-bit more juice out of it. See [optimization](./docs/OPTIM.md).
+To get there, optimization has been done with a mixture of targetted inlining, bound checks elimination and SIMD.
+See [optimization](./docs/OPTIM.md).
 
 Comparison with ffmpeg is more crushing, which is expected as well given the highly optimized nature of ffmpeg.
 
 ## Dependencies
 
 MP4 box parsing uses github.com/abema/go-mp4
+
+SIMD optimizations are provided by the primordium library.
 
 Other dependencies (agar) are purely for test tooling.
 

@@ -135,7 +135,6 @@ func decoderName(dec decoderType) string {
 // alacconvert encodes WAV to CAF but only supports mono and stereo.
 //
 
-//nolint:revive // flag-parameter: bools indicate optional tool availability, not control coupling.
 func availableEncoders(channels int, hasCoreAudio, hasAlacconvert bool) []encoderType {
 	encs := []encoderType{encoderFFmpeg}
 
@@ -157,9 +156,7 @@ func availableEncoders(channels int, hasCoreAudio, hasAlacconvert bool) []encode
 //	ffmpeg      → M4A: saprobe, ffmpeg, coreaudio
 //	coreaudio   → M4A: saprobe, ffmpeg, coreaudio
 //	alacconvert → CAF: ffmpeg, alacconvert
-//
 
-//nolint:revive // flag-parameter: bools indicate optional tool availability, not control coupling.
 func decodersForEncoder(enc encoderType, hasCoreAudio, hasAlacconvert bool) []decoderType {
 	switch enc {
 	case encoderFFmpeg, encoderCoreAudio:
@@ -226,7 +223,7 @@ func runConformanceTest(
 	tmpDir := t.TempDir()
 
 	// Generate source PCM (white noise, 1 second).
-	srcPCM := generateWhiteNoise(sampleRate, bitDepth, channels, 1)
+	srcPCM := agar.GenerateWhiteNoise(sampleRate, bitDepth, channels, 1)
 
 	// Encode.
 	encPath := runEncode(t, enc, srcPCM, tmpDir, bitDepth, sampleRate, channels)
@@ -263,7 +260,7 @@ func runConformanceTest(
 				t.Errorf("%s length mismatch: source=%d, decoded=%d", label, len(srcPCM), len(pcm))
 			}
 
-			compareLosslessSamples(t, label, srcPCM, pcm, bitDepth, channels)
+			agar.CompareLosslessSamples(t, label, srcPCM, pcm, bitDepth, channels)
 		}
 
 		decoded[decName] = pcm
@@ -297,7 +294,7 @@ func runConformanceTest(
 					label, nameA, len(decoded[nameA]), nameB, len(decoded[nameB]))
 			}
 
-			compareLosslessSamples(t, label, decoded[nameA], decoded[nameB], bitDepth, channels)
+			agar.CompareLosslessSamples(t, label, decoded[nameA], decoded[nameB], bitDepth, channels)
 		}
 	}
 }
@@ -412,7 +409,7 @@ func runDecode(
 			t.Fatalf("read encoded file: %v", err)
 		}
 
-		pcm, err := testutil.CoreAudioDecode(encoded)
+		pcm, err := agar.CoreAudioDecode(encoded)
 		if err != nil {
 			t.Fatalf("coreaudio decode: %v", err)
 		}
