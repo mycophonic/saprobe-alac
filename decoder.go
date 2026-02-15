@@ -32,6 +32,37 @@ var alacBitDepths = []uint8{
 	32,
 }
 
+// channelLayoutOffsets maps bitstream channel index to output channel position.
+// This converts MPEG element order (used in ALAC bitstream) to SMPTE/standard
+// PCM interleave order (L, R, C, LFE, Ls, Rs, ...).
+//
+// Index: [numChannels-1][bitstreamChannelIdx] → outputChannelIdx
+//
+// Bitstream order (MPEG):     Output order (SMPTE):
+//
+//	1ch: C                      C
+//	2ch: L, R                   L, R
+//	3ch: C, L, R                L, R, C
+//	4ch: C, L, R, Cs            L, R, C, Cs
+//	5ch: C, L, R, Ls, Rs        L, R, C, Ls, Rs
+//	6ch: C, L, R, Ls, Rs, LFE   L, R, C, LFE, Ls, Rs
+//	7ch: C, L, R, Ls, Rs, Cs, LFE   L, R, C, LFE, Ls, Rs, Cs
+//	8ch: C, Lc, Rc, L, R, Ls, Rs, LFE   L, R, C, LFE, Ls, Rs, Lc, Rc
+//
+// This matches FFmpeg's ff_alac_channel_layout_offsets.
+//
+//nolint:gochecknoglobals
+var channelLayoutOffsets = [8][8]int{
+	{0},                      // 1ch: mono (no change)
+	{0, 1},                   // 2ch: stereo (no change)
+	{2, 0, 1},                // 3ch: C,L,R → L,R,C
+	{2, 0, 1, 3},             // 4ch: C,L,R,Cs → L,R,C,Cs
+	{2, 0, 1, 3, 4},          // 5ch: C,L,R,Ls,Rs → L,R,C,Ls,Rs
+	{2, 0, 1, 4, 5, 3},       // 6ch: C,L,R,Ls,Rs,LFE → L,R,C,LFE,Ls,Rs
+	{2, 0, 1, 4, 5, 6, 3},    // 7ch: C,L,R,Ls,Rs,Cs,LFE → L,R,C,LFE,Ls,Rs,Cs
+	{2, 6, 7, 0, 1, 4, 5, 3}, // 8ch: C,Lc,Rc,L,R,Ls,Rs,LFE → L,R,C,LFE,Ls,Rs,Lc,Rc
+}
+
 // Element type tags from the ALAC bitstream.
 const (
 	elemSCE = 0 // Single Channel Element
@@ -39,14 +70,14 @@ const (
 	elemCCE = 2 // Coupling Channel Element (unsupported)
 	elemLFE = 3 // LFE Channel Element
 	elemDSE = 4 // Data Stream Element
-	elemPCE = 5 // Program Config Element (unsupported)
+	elemPCE = 5 // Program PacketConfig Element (unsupported)
 	elemFIL = 6 // Fill Element
 	elemEND = 7 // End of Frame
 )
 
-// Decoder decodes ALAC audio packets into interleaved LE signed PCM.
-type Decoder struct {
-	config      Config
+// PacketDecoder decodes ALAC audio packets into interleaved LE signed PCM.
+type PacketDecoder struct {
+	config      PacketConfig
 	format      PCMFormat
 	mixBufferU  []int32
 	mixBufferV  []int32
@@ -55,15 +86,15 @@ type Decoder struct {
 	bits        alacint.BitBuffer // reusable bit reader (avoids per-packet allocation)
 }
 
-// NewDecoder creates a new ALAC decoder from the given configuration.
-func NewDecoder(config Config) (*Decoder, error) {
+// NewPacketDecoder creates a new ALAC packet decoder from the given configuration.
+func NewPacketDecoder(config PacketConfig) (*PacketDecoder, error) {
 	if !slices.Contains(alacBitDepths, config.BitDepth) {
 		return nil, fmt.Errorf("%w: %w: %d", ErrConfig, alacint.ErrBitDepth, config.BitDepth)
 	}
 
 	frameLen := int(config.FrameLength)
 
-	return &Decoder{
+	return &PacketDecoder{
 		config: config,
 		format: PCMFormat{
 			SampleRate: int(config.SampleRate),
@@ -78,12 +109,12 @@ func NewDecoder(config Config) (*Decoder, error) {
 }
 
 // Format returns the PCM output format.
-func (d *Decoder) Format() PCMFormat {
+func (d *PacketDecoder) Format() PCMFormat {
 	return d.format
 }
 
 // DecodePacket decodes a single ALAC packet into interleaved LE signed PCM bytes.
-func (d *Decoder) DecodePacket(packet []byte) ([]byte, error) {
+func (d *PacketDecoder) DecodePacket(packet []byte) ([]byte, error) {
 	numChan := int(d.config.NumChannels)
 	bps := alacint.BytesPerSample(d.config.BitDepth)
 	output := make([]byte, int(d.config.FrameLength)*numChan*bps)
@@ -99,13 +130,14 @@ func (d *Decoder) DecodePacket(packet []byte) ([]byte, error) {
 // decodePacketInto decodes a single ALAC packet into the provided output buffer.
 // Returns the number of bytes written. The output buffer must be large enough
 // to hold one full frame (FrameLength * NumChannels * BytesPerSample).
-func (d *Decoder) decodePacketInto(packet, output []byte) (int, error) {
+func (d *PacketDecoder) decodePacketInto(packet, output []byte) (int, error) {
 	d.bits.Reset(packet)
 	bits := &d.bits
 	numSamples := d.config.FrameLength
 	numChan := int(d.config.NumChannels)
 	bps := alacint.BytesPerSample(d.config.BitDepth)
 	chanIdx := 0
+	offsets := &channelLayoutOffsets[numChan-1]
 
 	for {
 		if bits.PastEnd() {
@@ -116,7 +148,10 @@ func (d *Decoder) decodePacketInto(packet, output []byte) (int, error) {
 
 		switch tag {
 		case elemSCE, elemLFE:
-			ns, err := d.decodeSCE(bits, output, chanIdx, numChan, numSamples)
+			// Map bitstream channel to output position (MPEG → SMPTE order).
+			outChanIdx := offsets[chanIdx]
+
+			ns, err := d.decodeSCE(bits, output, outChanIdx, numChan, numSamples)
 			if err != nil {
 				return 0, fmt.Errorf("%w: SCE/LFE: %w", ErrDecode, err)
 			}
@@ -129,7 +164,11 @@ func (d *Decoder) decodePacketInto(packet, output []byte) (int, error) {
 				goto done
 			}
 
-			ns, err := d.decodeCPE(bits, output, chanIdx, numChan, numSamples)
+			// Map bitstream channel to output position (MPEG → SMPTE order).
+			// CPE pairs always map to consecutive output positions.
+			outChanIdx := offsets[chanIdx]
+
+			ns, err := d.decodeCPE(bits, output, outChanIdx, numChan, numSamples)
 			if err != nil {
 				return 0, fmt.Errorf("%w: CPE: %w", ErrDecode, err)
 			}
@@ -168,7 +207,7 @@ done:
 }
 
 // decodeSCE decodes a Single Channel Element (mono) or LFE element.
-func (d *Decoder) decodeSCE(
+func (d *PacketDecoder) decodeSCE(
 	bits *alacint.BitBuffer, output []byte, chanIdx, numChan int, numSamples uint32,
 ) (uint32, error) {
 	_ = bits.ReadSmall(4) // element instance tag
@@ -225,7 +264,11 @@ func (d *Decoder) decodeSCE(
 	return numSamples, nil
 }
 
-func (d *Decoder) decodeSCECompressed(bits *alacint.BitBuffer, chanBits uint32, bytesShifted, numSamples int) error {
+func (d *PacketDecoder) decodeSCECompressed(
+	bits *alacint.BitBuffer,
+	chanBits uint32,
+	bytesShifted, numSamples int,
+) error {
 	_ = bits.Read(8) // mixBits (unused for mono)
 	_ = bits.Read(8) // mixRes (unused for mono)
 
@@ -270,36 +313,39 @@ func (d *Decoder) decodeSCECompressed(bits *alacint.BitBuffer, chanBits uint32, 
 	// Read shift buffer from saved position.
 	if bytesShifted != 0 {
 		shift := uint8(bytesShifted * 8)
-		for i := range numSamples {
-			d.shiftBuffer[i] = uint16(shiftBits.Read(shift))
+		sb := d.shiftBuffer[:numSamples:numSamples]
+
+		for i := range sb {
+			sb[i] = uint16(shiftBits.Read(shift))
 		}
 	}
 
 	return nil
 }
 
-func (d *Decoder) decodeSCEEscape(bits *alacint.BitBuffer, chanBits uint32, numSamples int) {
+func (d *PacketDecoder) decodeSCEEscape(bits *alacint.BitBuffer, chanBits uint32, numSamples int) {
 	shift := uint32(32) - chanBits
+	mixU := d.mixBufferU[:numSamples:numSamples]
 
 	if chanBits <= 16 {
-		for idx := range numSamples {
+		for idx := range mixU {
 			val := int32(bits.Read(uint8(chanBits)))
 			val = (val << shift) >> shift
-			d.mixBufferU[idx] = val
+			mixU[idx] = val
 		}
 	} else {
 		extraBits := chanBits - 16
 
-		for idx := range numSamples {
+		for idx := range mixU {
 			val := int32(bits.Read(16))
 			val = (val << 16) >> shift
-			d.mixBufferU[idx] = val | int32(bits.Read(uint8(extraBits)))
+			mixU[idx] = val | int32(bits.Read(uint8(extraBits)))
 		}
 	}
 }
 
 // decodeCPE decodes a Channel Pair Element (stereo).
-func (d *Decoder) decodeCPE(
+func (d *PacketDecoder) decodeCPE(
 	bits *alacint.BitBuffer,
 	output []byte,
 	chanIdx, numChan int,
@@ -367,7 +413,7 @@ func (d *Decoder) decodeCPE(
 	return numSamples, nil
 }
 
-func (d *Decoder) decodeCPECompressed(
+func (d *PacketDecoder) decodeCPECompressed(
 	bits *alacint.BitBuffer,
 	chanBits uint32,
 	bytesShifted, numSamples int,
@@ -445,45 +491,51 @@ func (d *Decoder) decodeCPECompressed(
 	// Read shift buffer from saved position.
 	if bytesShifted != 0 {
 		shift := uint8(bytesShifted * 8)
-		for i := 0; i < numSamples*2; i += 2 {
-			d.shiftBuffer[i+0] = uint16(shiftBits.Read(shift))
-			d.shiftBuffer[i+1] = uint16(shiftBits.Read(shift))
+		sb := d.shiftBuffer[: numSamples*2 : numSamples*2] //nolint:varnamelen // shift buffer sub-slice.
+
+		for len(sb) >= 2 {
+			pair := sb[:2:2]
+			pair[0] = uint16(shiftBits.Read(shift))
+			pair[1] = uint16(shiftBits.Read(shift))
+			sb = sb[2:]
 		}
 	}
 
 	return mixBits, mixRes, nil
 }
 
-func (d *Decoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32, numSamples int) {
+func (d *PacketDecoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32, numSamples int) {
 	shift := uint32(32) - chanBits
+	mixU := d.mixBufferU[:numSamples:numSamples]
+	mixV := d.mixBufferV[:numSamples:numSamples]
 
 	if chanBits <= 16 {
-		for idx := range numSamples {
+		for idx := range mixU {
 			val := int32(bits.Read(uint8(chanBits)))
 			val = (val << shift) >> shift
-			d.mixBufferU[idx] = val
+			mixU[idx] = val
 
 			val = int32(bits.Read(uint8(chanBits)))
 			val = (val << shift) >> shift
-			d.mixBufferV[idx] = val
+			mixV[idx] = val
 		}
 	} else {
 		extraBits := chanBits - 16
 
-		for idx := range numSamples {
+		for idx := range mixU {
 			val := int32(bits.Read(16))
 			val = (val << 16) >> shift
-			d.mixBufferU[idx] = val | int32(bits.Read(uint8(extraBits)))
+			mixU[idx] = val | int32(bits.Read(uint8(extraBits)))
 
 			val = int32(bits.Read(16))
 			val = (val << 16) >> shift
-			d.mixBufferV[idx] = val | int32(bits.Read(uint8(extraBits)))
+			mixV[idx] = val | int32(bits.Read(uint8(extraBits)))
 		}
 	}
 }
 
 // skipFIL skips a Fill Element.
-func (*Decoder) skipFIL(bits *alacint.BitBuffer) error {
+func (*PacketDecoder) skipFIL(bits *alacint.BitBuffer) error {
 	count := int16(bits.ReadSmall(4))
 	if count == 15 { //revive:disable-line:add-constant
 		count += int16(bits.ReadSmall(8)) - 1
@@ -499,7 +551,7 @@ func (*Decoder) skipFIL(bits *alacint.BitBuffer) error {
 }
 
 // skipDSE skips a Data Stream Element.
-func (*Decoder) skipDSE(bits *alacint.BitBuffer) error {
+func (*PacketDecoder) skipDSE(bits *alacint.BitBuffer) error {
 	_ = bits.ReadSmall(4) // element instance tag
 	dataByteAlignFlag := bits.ReadOne()
 

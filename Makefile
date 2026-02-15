@@ -57,43 +57,48 @@ fix-mod:
 	$(call footer, $@)
 
 ##########################
-# Apple ALAC reference (Apache-2.0)
+# Test reference tools
+#
+# These are test-only binaries (reference encoders/decoders) used by
+# conformance tests and benchmarks.  They live under tests/bin/ so that
+# agar.LookFor finds them via the tests/go.mod module root, and so that
+# `make clean` (which removes bin/) does not destroy them.
 ##########################
 
+TEST_BIN := $(TEST_MODULE)/bin
+
+# Apple ALAC reference (Apache-2.0)
 ALAC_COMMIT := c38887c5c5e64a4b31108733bd79ca9b2496d987
-ALAC_BUILD_DIR := bin/tmp/alac
+ALAC_BUILD_DIR := $(TEST_BIN)/tmp/alac
 
 # Build alacconvert from Apple's open-source ALAC reference implementation.
-alacconvert: bin/alacconvert ## Build Apple ALAC reference converter
+alacconvert: $(TEST_BIN)/alacconvert ## Build Apple ALAC reference converter
 
-bin/alacconvert:
+$(TEST_BIN)/alacconvert:
 	@echo "=== Fetching Apple ALAC ($(ALAC_COMMIT)) ==="
 	@rm -rf $(ALAC_BUILD_DIR)
-	@mkdir -p bin
+	@mkdir -p $(TEST_BIN)
 	@git clone --depth 1 \
 		https://github.com/macosforge/alac.git \
 		$(ALAC_BUILD_DIR)
 	@echo "=== Building alacconvert ==="
 	@cd $(ALAC_BUILD_DIR)/convert-utility && $(MAKE)
-	@cp $(ALAC_BUILD_DIR)/convert-utility/alacconvert bin/alacconvert
-	@echo "=== alacconvert built: bin/alacconvert ==="
+	@cp $(ALAC_BUILD_DIR)/convert-utility/alacconvert $(TEST_BIN)/alacconvert
+	@echo "=== alacconvert built: $(TEST_BIN)/alacconvert ==="
 
 clean-alacconvert: ## Clean ALAC build artifacts
-	@rm -rf $(ALAC_BUILD_DIR) bin/alacconvert
+	@rm -rf $(ALAC_BUILD_DIR) $(TEST_BIN)/alacconvert
 
-##########################
 # CoreAudio ALAC encoder/decoder (macOS)
-##########################
-
 COREAUDIO_DIR := tests/testutil/coreaudio
 
 # Build alac-coreaudio from CoreAudio (macOS only).
-alac-coreaudio: bin/alac-coreaudio ## Build CoreAudio ALAC encoder/decoder
+alac-coreaudio: $(TEST_BIN)/alac-coreaudio ## Build CoreAudio ALAC encoder/decoder
 
-bin/alac-coreaudio:
+$(TEST_BIN)/alac-coreaudio:
 	@echo "=== Building alac-coreaudio ==="
-	@$(MAKE) -C $(COREAUDIO_DIR) OUTPUT_DIR=$(CURDIR)/bin
-	@echo "=== alac-coreaudio built: bin/alac-coreaudio ==="
+	@$(MAKE) -C $(COREAUDIO_DIR) OUTPUT_DIR=$(TEST_BIN)
+	@echo "=== alac-coreaudio built: $(TEST_BIN)/alac-coreaudio ==="
 
 clean-coreaudio: ## Clean CoreAudio build artifacts
-	@rm -f bin/alac-coreaudio
+	@rm -f $(TEST_BIN)/alac-coreaudio

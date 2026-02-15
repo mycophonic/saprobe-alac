@@ -309,7 +309,7 @@ const (
 
 // extractCookie reads the stsd box from stbl, finds an 'alac' sample entry,
 // and extracts the raw magic cookie (ALACSpecificConfig, possibly wrapped in
-// 'frma'+'alac' atoms which ParseConfig handles).
+// 'frma'+'alac' atoms which ParseMagicCookie handles).
 func extractCookie(reader io.ReadSeeker, stbl *boxInfo) ([]byte, error) {
 	fccStsd := [4]byte{'s', 't', 's', 'd'}
 

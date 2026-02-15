@@ -53,8 +53,11 @@ func (b *BitBuffer) Reset(data []byte) {
 // Read reads up to 16 bits and returns them right-aligned.
 // Equivalent to BitBufferRead in the Apple implementation.
 func (b *BitBuffer) Read(numBits uint8) uint32 {
+	// BCE: sub-slice with constant length 3; element indices 0,1,2 are provably in-bounds.
+	// Safety: 4-byte padding guarantees Pos+2 < len(Buf) for any valid position.
+	w := b.Buf[b.Pos : b.Pos+3 : b.Pos+3]
 	// Load 3 bytes starting at current position (24 bits available).
-	returnBits := uint32(b.Buf[b.Pos])<<16 | uint32(b.Buf[b.Pos+1])<<8 | uint32(b.Buf[b.Pos+2])
+	returnBits := uint32(w[0])<<16 | uint32(w[1])<<8 | uint32(w[2])
 	returnBits = (returnBits << b.BitIdx) & 0x00FFFFFF //revive:disable-line:add-constant
 	returnBits >>= 24 - uint32(numBits)
 
@@ -68,7 +71,9 @@ func (b *BitBuffer) Read(numBits uint8) uint32 {
 // ReadSmall reads up to 8 bits.
 // Equivalent to BitBufferReadSmall.
 func (b *BitBuffer) ReadSmall(numBits uint8) uint8 {
-	returnBits := uint16(b.Buf[b.Pos])<<8 | uint16(b.Buf[b.Pos+1])
+	// BCE: sub-slice with constant length 2; element indices 0,1 are provably in-bounds.
+	w := b.Buf[b.Pos : b.Pos+2 : b.Pos+2]
+	returnBits := uint16(w[0])<<8 | uint16(w[1])
 	returnBits <<= b.BitIdx
 	returnBits >>= 16 - uint16(numBits)
 

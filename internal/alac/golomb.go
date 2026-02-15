@@ -233,10 +233,10 @@ func DynDecomp(params *AGParams, bitBuf *BitBuffer, predCoefs []int32, numSample
 				return ErrSampleOverrun
 			}
 
-			for range residual {
-				predCoefs[count] = 0
-				count++
-			}
+			// BCE: single slice check replaces per-element bounds checks.
+			end := count + int(residual)
+			clear(predCoefs[count:end])
+			count = end
 
 			if residual >= maxZeroRun {
 				zmode = 0

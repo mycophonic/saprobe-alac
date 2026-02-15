@@ -115,6 +115,27 @@ lint-go-all:
 	$(call footer, $@)
 endif
 
+lint-go-bce: ## Report bounds check elimination failures
+	$(call title, $@)
+	@cd $(PROJECT_DIR) \
+		&& echo "Bounds Check Elimination Report" \
+		&& echo "================================" \
+		&& echo "" \
+		&& output=$$(go build -gcflags='-d=ssa/check_bce/debug=1' ./... 2>&1 | grep -v '^#' || true); \
+		if [ -z "$$output" ]; then \
+			echo "No bounds checks detected (BCE fully eliminated)."; \
+		else \
+			total=$$(echo "$$output" | wc -l | tr -d ' '); \
+			echo "Total: $$total bounds checks"; \
+			echo ""; \
+			echo "By file:"; \
+			echo "$$output" | sed 's/:.*$$//' | sort | uniq -c | sort -rn; \
+			echo ""; \
+			echo "Details:"; \
+			echo "$$output" | sort; \
+		fi
+	$(call footer, $@)
+
 lint-yaml:
 	$(call title, $@)
 	@cd $(PROJECT_DIR) \
@@ -372,7 +393,7 @@ test-unit-cover: ## Run tests with coverage reporting
 	unit \
 	init-dev init-dev-system \
 	install-dev-tools install-dev-gotestsum \
-	lint-commits lint-go lint-go-all lint-headers lint-licenses lint-licenses-all lint-mod lint-shell lint-vuln lint-yaml \
+	lint-commits lint-go lint-go-all lint-go-bce lint-headers lint-licenses lint-licenses-all lint-mod lint-shell lint-vuln lint-yaml \
 	fix-go fix-go-all fix-headers fix-mod \
 	test-unit test-unit-race test-unit-bench test-unit-cover test-unit-profile \
 	build build-debug build-static install verify clean

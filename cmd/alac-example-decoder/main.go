@@ -76,26 +76,38 @@ func run(format, inputPath string) int {
 
 	defer cleanup()
 
-	pcm, pcmFormat, err := alac.Decode(reader)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "decode: %v\n", err)
+	dec, decErr := alac.NewDecoder(reader)
+	if decErr != nil {
+		fmt.Fprintf(os.Stderr, "decode: %v\n", decErr)
 
 		return 1
 	}
 
-	fmt.Fprintf(os.Stderr, "%d Hz, %d-bit, %d ch, %d bytes PCM\n",
-		pcmFormat.SampleRate, pcmFormat.BitDepth, pcmFormat.Channels, len(pcm))
+	pcmFormat := dec.Format()
+
+	fmt.Fprintf(os.Stderr, "%d Hz, %d-bit, %d ch\n",
+		pcmFormat.SampleRate, pcmFormat.BitDepth, pcmFormat.Channels)
 
 	if format == formatWAV {
-		err = writeWAV(os.Stdout, pcm, pcmFormat)
+		// WAV header requires total data size upfront.
+		pcm, err := io.ReadAll(dec)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "decode: %v\n", err)
+
+			return 1
+		}
+
+		if err := writeWAV(os.Stdout, pcm, pcmFormat); err != nil {
+			fmt.Fprintf(os.Stderr, "write: %v\n", err)
+
+			return 1
+		}
 	} else {
-		_, err = os.Stdout.Write(pcm)
-	}
+		if _, err := io.Copy(os.Stdout, dec); err != nil {
+			fmt.Fprintf(os.Stderr, "write: %v\n", err)
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "write: %v\n", err)
-
-		return 1
+			return 1
+		}
 	}
 
 	return 0

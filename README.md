@@ -1,13 +1,16 @@
 # Saprobe ALAC
 
-A pure Go ALAC streaming decoder, ported from Apple's open-source C implementation (Apache 2.0, 2011).
+A pure Go ALAC decoder, ported from Apple's open-source C implementation (Apache 2.0, 2011).
+- streaming / seekable
 - fast (faster than CGO+CoreAudio)
 - no-dependency
-- zero allocation
+- zero runtime allocation
+- minimal BCE
+- no unsafe
 
 This is a decoder only.
 
-A crude example cli is provided as well.
+A _crude_ example cli is provided as well.
 
 For a proper full-blown, higher-level decoder library and cli, see [Saprobe](https://github.com/mycophonic/saprobe).
 
@@ -35,15 +38,19 @@ For a proper full-blown, higher-level decoder library and cli, see [Saprobe](htt
 ## API
 
 ```go
-func ParseConfig(cookie []byte) (Config, error)
-
-func NewDecoder(config Config) (*Decoder, error)
-func (d *Decoder) DecodePacket(packet []byte) ([]byte, error)
+// High-level — M4A/MP4 files
+func NewDecoder(rs io.ReadSeeker) (*Decoder, error)
+func (d *Decoder) Read(p []byte) (int, error)
 func (d *Decoder) Format() PCMFormat
+func (d *Decoder) Duration() time.Duration
+func (d *Decoder) Position() time.Duration
+func (d *Decoder) Seek(t time.Duration) (time.Duration, error)
 
-func NewStreamDecoder(rs io.ReadSeeker) (*StreamDecoder, error)
-func (s *StreamDecoder) Read(p []byte) (int, error)
-func (s *StreamDecoder) Format() PCMFormat
+// Low-level — custom containers, network streams
+func ParseMagicCookie(cookie []byte) (PacketConfig, error)
+func NewPacketDecoder(config PacketConfig) (*PacketDecoder, error)
+func (d *PacketDecoder) DecodePacket(packet []byte) ([]byte, error)
+func (d *PacketDecoder) Format() PCMFormat
 ```
 
 ## Performance
