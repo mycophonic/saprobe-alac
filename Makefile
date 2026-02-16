@@ -22,50 +22,16 @@ include hack/common.mk
 # The decoder itself is pure Go — builds must remain CGO_ENABLED=0.
 test-unit test-unit-bench test-unit-profile test-unit-cover: export CGO_ENABLED = 1
 
-# Tests live in a separate module (tests/go.mod) to keep agar out of the
-# library go.mod. Override common.mk test targets to include both modules.
-TEST_MODULE := $(PROJECT_DIR)/tests
-
-test-unit:
-	$(call title, $@)
-	@go test $(VERBOSE_FLAG) -count 1 $(PROJECT_DIR)/...
-	@cd $(TEST_MODULE) && go test $(VERBOSE_FLAG) -count 1 ./...
-	$(call footer, $@)
-
-test-unit-bench:
-	$(call title, $@)
-	@go test $(VERBOSE_FLAG) -count 1 $(PROJECT_DIR)/... -bench=.
-	@cd $(TEST_MODULE) && go test $(VERBOSE_FLAG) -count 1 ./... -bench=.
-	$(call footer, $@)
-
-test-unit-race:
-	$(call title, $@)
-	@CGO_ENABLED=1 go test $(VERBOSE_FLAG) -ldflags="-linkmode=external" $(PROJECT_DIR)/... -race
-	@cd $(TEST_MODULE) && CGO_ENABLED=1 go test $(VERBOSE_FLAG) -ldflags="-linkmode=external" ./... -race
-	$(call footer, $@)
-
-lint-mod:
-	$(call title, $@)
-	@cd $(PROJECT_DIR) && go mod tidy --diff
-	@cd $(TEST_MODULE) && go mod tidy --diff
-	$(call footer, $@)
-
-fix-mod:
-	$(call title, $@)
-	@cd $(PROJECT_DIR) && go mod tidy
-	@cd $(TEST_MODULE) && go mod tidy
-	$(call footer, $@)
-
 ##########################
 # Test reference tools
 #
 # These are test-only binaries (reference encoders/decoders) used by
 # conformance tests and benchmarks.  They live under tests/bin/ so that
-# agar.LookFor finds them via the tests/go.mod module root, and so that
-# `make clean` (which removes bin/) does not destroy them.
+# agar.LookFor finds them via the module root, and so that `make clean`
+# (which removes bin/) does not destroy them.
 ##########################
 
-TEST_BIN := $(TEST_MODULE)/bin
+TEST_BIN := $(PROJECT_DIR)/tests/bin
 
 # Apple ALAC reference (Apache-2.0)
 ALAC_COMMIT := c38887c5c5e64a4b31108733bd79ca9b2496d987

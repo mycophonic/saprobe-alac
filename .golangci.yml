@@ -263,8 +263,8 @@ linters:
           allow:
             - $gostd
             - github.com/mycophonic/saprobe-alac
-            - github.com/abema/go-mp4
             - github.com/mycophonic/agar
+            - github.com/mycophonic/primordium
 
     staticcheck:
       checks:
