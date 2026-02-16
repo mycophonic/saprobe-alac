@@ -78,18 +78,17 @@ func UnpcBlock(pc1, out []int32, num int, coefs []int16, numActive int32, chanBi
 		out[idx] = (del << chanShift) >> chanShift
 	}
 
-	lim := int(numActive) + 1
-
 	switch numActive {
 	case 4:
-		unpcBlock4(pc1, out, num, coefs, lim, chanShift, denShift, denHalf)
+		unpcBlock4(pc1, out, num, coefs, chanShift, denShift, denHalf)
 	case 5:
-		unpcBlock5(pc1, out, num, coefs, lim, chanShift, denShift, denHalf)
+		unpcBlock5(pc1, out, num, coefs, chanShift, denShift, denHalf)
 	case 6:
-		unpcBlock6(pc1, out, num, coefs, lim, chanShift, denShift, denHalf)
+		unpcBlock6(pc1, out, num, coefs, chanShift, denShift, denHalf)
 	case 8:
-		unpcBlock8(pc1, out, num, coefs, lim, chanShift, denShift, denHalf)
+		unpcBlock8(pc1, out, num, coefs, chanShift, denShift, denHalf)
 	default:
+		lim := int(numActive) + 1
 		unpcBlockGeneral(pc1, out, num, coefs, numActive, lim, chanShift, denShift, denHalf)
 	}
 }
@@ -97,7 +96,9 @@ func UnpcBlock(pc1, out []int32, num int, coefs []int16, numActive int32, chanBi
 // unpcBlock4 is the optimized predictor for numActive == 4.
 //
 //revive:disable:argument-limit
-func unpcBlock4(pc1, out []int32, num int, coefs []int16, lim int, chanShift, denShift uint32, denHalf int32) {
+func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
+	const lim = 5 // numActive(4) + 1
+
 	// BCE: reslice to exact length so compiler knows bounds for forward and backward indexing.
 	_ = coefs[3]
 	pc1 = pc1[:num:num]
@@ -109,12 +110,15 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, lim int, chanShift, de
 	coef3 := int32(coefs[3])
 
 	for idx := lim; idx < num; idx++ {
-		top := out[idx-lim]
+		// BCE: window sub-slice with compile-time constant indices.
+		// w[0]=out[idx-5]=top, w[1]=out[idx-4], ..., w[4]=out[idx-1].
+		w := out[idx-lim : idx : idx] //nolint:varnamelen // BCE window sub-slice.
+		top := w[0]
 
-		diff0 := top - out[idx-1]
-		diff1 := top - out[idx-2]
-		diff2 := top - out[idx-3]
-		diff3 := top - out[idx-4]
+		diff0 := top - w[4]
+		diff1 := top - w[3]
+		diff2 := top - w[2]
+		diff3 := top - w[1]
 
 		sum1 := (denHalf - coef0*diff0 - coef1*diff1 - coef2*diff2 - coef3*diff3) >> denShift
 
@@ -191,7 +195,9 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, lim int, chanShift, de
 // unpcBlock5 is the optimized predictor for numActive == 5.
 //
 //revive:disable-next-line:cognitive-complexity
-func unpcBlock5(pc1, out []int32, num int, coefs []int16, lim int, chanShift, denShift uint32, denHalf int32) {
+func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
+	const lim = 6 // numActive(5) + 1
+
 	// BCE: reslice to exact length so compiler knows bounds for forward and backward indexing.
 	_ = coefs[4]
 	pc1 = pc1[:num:num]
@@ -204,13 +210,15 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, lim int, chanShift, de
 	coef4 := int32(coefs[4])
 
 	for idx := lim; idx < num; idx++ {
-		top := out[idx-lim]
+		// BCE: window sub-slice with compile-time constant indices.
+		w := out[idx-lim : idx : idx] //nolint:varnamelen // BCE window sub-slice.
+		top := w[0]
 
-		diff0 := top - out[idx-1]
-		diff1 := top - out[idx-2]
-		diff2 := top - out[idx-3]
-		diff3 := top - out[idx-4]
-		diff4 := top - out[idx-5]
+		diff0 := top - w[5]
+		diff1 := top - w[4]
+		diff2 := top - w[3]
+		diff3 := top - w[2]
+		diff4 := top - w[1]
 
 		sum1 := (denHalf - coef0*diff0 - coef1*diff1 - coef2*diff2 - coef3*diff3 - coef4*diff4) >> denShift
 
@@ -304,7 +312,9 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, lim int, chanShift, de
 // unpcBlock6 is the optimized predictor for numActive == 6.
 //
 //revive:disable-next-line:cognitive-complexity
-func unpcBlock6(pc1, out []int32, num int, coefs []int16, lim int, chanShift, denShift uint32, denHalf int32) {
+func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
+	const lim = 7 // numActive(6) + 1
+
 	// BCE: reslice to exact length so compiler knows bounds for forward and backward indexing.
 	_ = coefs[5]
 	pc1 = pc1[:num:num]
@@ -318,14 +328,16 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, lim int, chanShift, de
 	coef5 := int32(coefs[5])
 
 	for idx := lim; idx < num; idx++ {
-		top := out[idx-lim]
+		// BCE: window sub-slice with compile-time constant indices.
+		w := out[idx-lim : idx : idx] //nolint:varnamelen // BCE window sub-slice.
+		top := w[0]
 
-		diff0 := top - out[idx-1]
-		diff1 := top - out[idx-2]
-		diff2 := top - out[idx-3]
-		diff3 := top - out[idx-4]
-		diff4 := top - out[idx-5]
-		diff5 := top - out[idx-6]
+		diff0 := top - w[6]
+		diff1 := top - w[5]
+		diff2 := top - w[4]
+		diff3 := top - w[3]
+		diff4 := top - w[2]
+		diff5 := top - w[1]
 
 		sum1 := (denHalf - coef0*diff0 - coef1*diff1 - coef2*diff2 - coef3*diff3 - coef4*diff4 - coef5*diff5) >> denShift
 
@@ -434,7 +446,9 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, lim int, chanShift, de
 }
 
 //revive:disable-next-line:cognitive-complexity
-func unpcBlock8(pc1, out []int32, num int, coefs []int16, lim int, chanShift, denShift uint32, denHalf int32) {
+func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
+	const lim = 9 // numActive(8) + 1
+
 	// BCE: reslice to exact length so compiler knows bounds for forward and backward indexing.
 	_ = coefs[7]
 	pc1 = pc1[:num:num]
@@ -450,16 +464,18 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, lim int, chanShift, de
 	coef7 := int32(coefs[7])
 
 	for idx := lim; idx < num; idx++ {
-		top := out[idx-lim]
+		// BCE: window sub-slice with compile-time constant indices.
+		w := out[idx-lim : idx : idx] //nolint:varnamelen // BCE window sub-slice.
+		top := w[0]
 
-		diff0 := top - out[idx-1]
-		diff1 := top - out[idx-2]
-		diff2 := top - out[idx-3]
-		diff3 := top - out[idx-4]
-		diff4 := top - out[idx-5]
-		diff5 := top - out[idx-6]
-		diff6 := top - out[idx-7]
-		diff7 := top - out[idx-8]
+		diff0 := top - w[8]
+		diff1 := top - w[7]
+		diff2 := top - w[6]
+		diff3 := top - w[5]
+		diff4 := top - w[4]
+		diff5 := top - w[3]
+		diff6 := top - w[2]
+		diff7 := top - w[1]
 
 		sum1 := (denHalf - coef0*diff0 - coef1*diff1 - coef2*diff2 - coef3*diff3 - coef4*diff4 - coef5*diff5 - coef6*diff6 - coef7*diff7) >> denShift
 

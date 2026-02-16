@@ -17,26 +17,27 @@
 package tests_test
 
 import (
-	"bytes"
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
+"bytes"
+"fmt"
+"io"
+"os"
+"path/filepath"
+"testing"
+"time"
 
-	"github.com/mycophonic/agar/pkg/agar"
+"github.com/mycophonic/agar/pkg/agar"
+"github.com/mycophonic/agar/pkg/coreaudio"
+"github.com/mycophonic/saprobe-alac"
 
-	"github.com/mycophonic/saprobe-alac"
-	"github.com/mycophonic/saprobe-alac/tests/testutil"
+"github.com/mycophonic/saprobe-alac/tests/testutil"
 )
 
 // Audio formats to benchmark.
 //
 //nolint:gochecknoglobals
 var benchFormats = []agar.BenchFormat{
-	{Name: "CD 44.1kHz/16bit", SampleRate: 44100, BitDepth: 16, Channels: 2},
-	{Name: "HiRes 96kHz/24bit", SampleRate: 96000, BitDepth: 24, Channels: 2},
+{Name: "CD 44.1kHz/16bit", SampleRate: 44100, BitDepth: 16, Channels: 2},
+{Name: "HiRes 96kHz/24bit", SampleRate: 96000, BitDepth: 24, Channels: 2},
 }
 
 // Audio durations to benchmark: short captures decoder overhead,
@@ -44,8 +45,8 @@ var benchFormats = []agar.BenchFormat{
 //
 //nolint:gochecknoglobals
 var benchDurations = []time.Duration{
-	10 * time.Second,
-	5 * time.Minute,
+10 * time.Second,
+5 * time.Minute,
 }
 
 // TestBenchmarkDecode benchmarks decoding across all available decoders.
@@ -55,110 +56,99 @@ var benchDurations = []time.Duration{
 //
 //nolint:paralleltest // Benchmark must run sequentially for accurate timing.
 func TestBenchmarkDecode(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping benchmark in short mode")
-	}
+if testing.Short() {
+t.Skip("skipping benchmark in short mode")
+}
 
-	if testutil.CoreAudioPath(t) == "" {
-		t.Skip("alac-coreaudio required for benchmarks: run 'make alac-coreaudio'")
-	}
+if testutil.CoreAudioPath(t) == "" {
+t.Skip("alac-coreaudio required for benchmarks: run 'make alac-coreaudio'")
+}
 
-	opts := agar.BenchOptions{}.WithDefaults()
-	tmpDir := t.TempDir()
-	hasAlacconvert := testutil.AlacConvertPath(t) != ""
+opts := agar.BenchOptions{}.WithDefaults()
+tmpDir := t.TempDir()
+hasAlacconvert := testutil.AlacConvertPath(t) != ""
 
-	var results []agar.BenchResult
+var results []agar.BenchResult
 
-	for _, dur := range benchDurations {
-		durationSec := int(dur.Seconds())
+for _, dur := range benchDurations {
+durationSec := int(dur.Seconds())
 
-		for _, bf := range benchFormats {
-			// Tag the format name with duration for results display.
-			bf.Name = fmt.Sprintf("%s %ds", bf.Name, durationSec)
+for _, bf := range benchFormats {
+// Tag the format name with duration for results display.
+bf.Name = fmt.Sprintf("%s %ds", bf.Name, durationSec)
 
-			t.Logf("=== %s ===", bf.Name)
+t.Logf("=== %s ===", bf.Name)
 
-			srcPCM := agar.GenerateWhiteNoise(bf.SampleRate, bf.BitDepth, bf.Channels, durationSec)
+srcPCM := agar.GenerateWhiteNoise(bf.SampleRate, bf.BitDepth, bf.Channels, durationSec)
 
-			// Write WAV for encoding.
-			wavPath := filepath.Join(tmpDir, fmt.Sprintf("src_%d_%d_%ds.wav", bf.SampleRate, bf.BitDepth, durationSec))
-			testutil.WriteWAV(t, wavPath, srcPCM, bf.BitDepth, bf.SampleRate, bf.Channels)
+t.Logf("  PCM size: %.1f MB (%d bytes)", float64(len(srcPCM))/(1024*1024), len(srcPCM))
 
-			t.Logf("  PCM size: %.1f MB (%d bytes)", float64(len(srcPCM))/(1024*1024), len(srcPCM))
+// Write WAV for alacconvert (which requires WAV input).
+wavPath := filepath.Join(tmpDir, fmt.Sprintf("src_%d_%d_%ds.wav", bf.SampleRate, bf.BitDepth, durationSec))
+testutil.WriteWAV(t, wavPath, srcPCM, bf.BitDepth, bf.SampleRate, bf.Channels)
 
-			// Encode to M4A via CoreAudio.
-			m4aPath := filepath.Join(tmpDir, fmt.Sprintf("enc_%d_%d_%ds.m4a", bf.SampleRate, bf.BitDepth, durationSec))
+// Encode to M4A via CoreAudio binary.
+m4aPath := filepath.Join(tmpDir, fmt.Sprintf("enc_%d_%d_%ds.m4a", bf.SampleRate, bf.BitDepth, durationSec))
 
-			testutil.CoreAudio(t, testutil.CoreAudioOptions{
-				Args: []string{"encode", wavPath, m4aPath},
-			})
+testutil.CoreAudioEncode(t, srcPCM, coreaudio.Format{
+SampleRate: bf.SampleRate,
+BitDepth:   bf.BitDepth,
+Channels:   bf.Channels,
+}, m4aPath)
 
-			m4aInfo, err := os.Stat(m4aPath)
-			if err != nil {
-				t.Fatalf("stat: %v", err)
-			}
+m4aInfo, err := os.Stat(m4aPath)
+if err != nil {
+t.Fatalf("stat: %v", err)
+}
 
-			t.Logf("  M4A size: %.1f MB (%d bytes)", float64(m4aInfo.Size())/(1024*1024), m4aInfo.Size())
+t.Logf("  M4A size: %.1f MB (%d bytes)", float64(m4aInfo.Size())/(1024*1024), m4aInfo.Size())
 
-			// Benchmark saprobe decode.
-			encoded, err := os.ReadFile(m4aPath)
-			if err != nil {
-				t.Fatalf("read encoded: %v", err)
-			}
+// Benchmark saprobe decode.
+encoded, err := os.ReadFile(m4aPath)
+if err != nil {
+t.Fatalf("read encoded: %v", err)
+}
 
-			durations := make([]time.Duration, opts.Iterations)
+results = append(results, benchDecodeSaprobe(t, bf, opts, encoded))
 
-			for iter := range opts.Iterations {
-				start := time.Now()
+// Benchmark ffmpeg decode.
+ffmpegDurations := make([]time.Duration, opts.Iterations)
 
-				_, _, decErr := alac.Decode(bytes.NewReader(encoded))
-				if decErr != nil {
-					t.Fatalf("decode: %v", decErr)
-				}
+for iter := range opts.Iterations {
+start := time.Now()
 
-				durations[iter] = time.Since(start)
-			}
+agar.FFmpegDecode(t, agar.FFmpegDecodeOptions{
+Src:      m4aPath,
+BitDepth: bf.BitDepth,
+Channels: bf.Channels,
+Stdout:   io.Discard,
+})
 
-			results = append(results, agar.ComputeResult(bf, "saprobe", "decode", durations, len(encoded)))
+ffmpegDurations[iter] = time.Since(start)
+}
 
-			// Benchmark ffmpeg decode.
-			ffmpegDurations := make([]time.Duration, opts.Iterations)
+results = append(results, agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())))
 
-			for iter := range opts.Iterations {
-				start := time.Now()
+// Benchmark CoreAudio decode (CGO, in-process).
+results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
 
-				agar.FFmpegDecode(t, agar.FFmpegDecodeOptions{
-					Src:      m4aPath,
-					BitDepth: bf.BitDepth,
-					Channels: bf.Channels,
-					Stdout:   io.Discard,
-				})
+// Benchmark alacconvert decode (from CAF).
+if hasAlacconvert {
+cafPath := filepath.Join(
+tmpDir,
+fmt.Sprintf("enc_%d_%d_%ds.caf", bf.SampleRate, bf.BitDepth, durationSec),
+)
 
-				ffmpegDurations[iter] = time.Since(start)
-			}
+testutil.AlacConvert(t, testutil.AlacConvertOptions{
+Args: []string{wavPath, cafPath},
+})
 
-			results = append(results, agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())))
+results = append(results, testutil.BenchDecodeAlacconvert(t, bf, opts, cafPath))
+}
+}
+}
 
-			// Benchmark CoreAudio decode (CGO, in-process).
-			results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
-
-			// Benchmark alacconvert decode (from CAF).
-			if hasAlacconvert {
-				cafPath := filepath.Join(
-					tmpDir,
-					fmt.Sprintf("enc_%d_%d_%ds.caf", bf.SampleRate, bf.BitDepth, durationSec),
-				)
-
-				testutil.AlacConvert(t, testutil.AlacConvertOptions{
-					Args: []string{wavPath, cafPath},
-				})
-
-				results = append(results, testutil.BenchDecodeAlacconvert(t, bf, opts, cafPath))
-			}
-		}
-	}
-
-	agar.PrintResults(t, opts, results)
+agar.PrintResults(t, opts, results)
 }
 
 // TestBenchmarkDecodeFile benchmarks decoding a real M4A file.
@@ -166,108 +156,130 @@ func TestBenchmarkDecode(t *testing.T) {
 //
 //nolint:paralleltest // Benchmark must run sequentially for accurate timing.
 func TestBenchmarkDecodeFile(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping benchmark in short mode")
-	}
+if testing.Short() {
+t.Skip("skipping benchmark in short mode")
+}
 
-	filePath := os.Getenv("BENCH_FILE")
-	if filePath == "" {
-		t.Skip("set BENCH_FILE to run this benchmark")
-	}
+filePath := os.Getenv("BENCH_FILE")
+if filePath == "" {
+t.Skip("set BENCH_FILE to run this benchmark")
+}
 
-	opts := agar.BenchOptions{}.WithDefaults()
+opts := agar.BenchOptions{}.WithDefaults()
 
-	encoded, err := os.ReadFile(filePath)
-	if err != nil {
-		t.Fatalf("read file: %v", err)
-	}
+encoded, err := os.ReadFile(filePath)
+if err != nil {
+t.Fatalf("read file: %v", err)
+}
 
-	t.Logf("File: %s (%.1f MB)", filePath, float64(len(encoded))/(1024*1024))
+t.Logf("File: %s (%.1f MB)", filePath, float64(len(encoded))/(1024*1024))
 
-	tmpDir := t.TempDir()
+tmpDir := t.TempDir()
 
-	// Probe format with initial decode.
-	_, pcmFormat, err := alac.Decode(bytes.NewReader(encoded))
-	if err != nil {
-		t.Fatalf("probe decode: %v", err)
-	}
+// Probe format.
+probeDec, probeErr := alac.NewDecoder(bytes.NewReader(encoded))
+if probeErr != nil {
+t.Fatalf("probe decode: %v", probeErr)
+}
 
-	bf := agar.BenchFormat{
-		Name:       filepath.Base(filePath),
-		SampleRate: pcmFormat.SampleRate,
-		BitDepth:   pcmFormat.BitDepth,
-		Channels:   pcmFormat.Channels,
-	}
+pcmFormat := probeDec.Format()
 
-	var results []agar.BenchResult
+bf := agar.BenchFormat{
+Name:       filepath.Base(filePath),
+SampleRate: pcmFormat.SampleRate,
+BitDepth:   pcmFormat.BitDepth,
+Channels:   pcmFormat.Channels,
+}
 
-	// Benchmark saprobe decode.
-	durations := make([]time.Duration, opts.Iterations)
+var results []agar.BenchResult
 
-	for iter := range opts.Iterations {
-		start := time.Now()
+// Benchmark saprobe decode.
+results = append(results, benchDecodeSaprobe(t, bf, opts, encoded))
 
-		_, _, decErr := alac.Decode(bytes.NewReader(encoded))
-		if decErr != nil {
-			t.Fatalf("decode: %v", decErr)
-		}
+// Write M4A to temp for tool-based decoders.
+m4aPath := filepath.Join(tmpDir, "input.m4a")
+if err := os.WriteFile(m4aPath, encoded, 0o600); err != nil {
+t.Fatalf("write temp: %v", err)
+}
 
-		durations[iter] = time.Since(start)
-	}
+// Benchmark ffmpeg decode.
+m4aInfo, err := os.Stat(m4aPath)
+if err != nil {
+t.Fatalf("stat: %v", err)
+}
 
-	results = append(results, agar.ComputeResult(bf, "saprobe", "decode", durations, len(encoded)))
+ffmpegDurations := make([]time.Duration, opts.Iterations)
 
-	// Write M4A to temp for tool-based decoders.
-	m4aPath := filepath.Join(tmpDir, "input.m4a")
-	if err := os.WriteFile(m4aPath, encoded, 0o600); err != nil {
-		t.Fatalf("write temp: %v", err)
-	}
+for iter := range opts.Iterations {
+start := time.Now()
 
-	// Benchmark ffmpeg decode.
-	m4aInfo, err := os.Stat(m4aPath)
-	if err != nil {
-		t.Fatalf("stat: %v", err)
-	}
+agar.FFmpegDecode(t, agar.FFmpegDecodeOptions{
+Src:      m4aPath,
+BitDepth: bf.BitDepth,
+Channels: bf.Channels,
+Stdout:   io.Discard,
+})
 
-	ffmpegDurations := make([]time.Duration, opts.Iterations)
+ffmpegDurations[iter] = time.Since(start)
+}
 
-	for iter := range opts.Iterations {
-		start := time.Now()
+results = append(results, agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())))
 
-		agar.FFmpegDecode(t, agar.FFmpegDecodeOptions{
-			Src:      m4aPath,
-			BitDepth: bf.BitDepth,
-			Channels: bf.Channels,
-			Stdout:   io.Discard,
-		})
+// Benchmark CoreAudio decode (CGO, in-process).
+results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
 
-		ffmpegDurations[iter] = time.Since(start)
-	}
+// Benchmark alacconvert decode (from CAF).
+// Setup: saprobe decode → WAV → alacconvert encode → CAF.
+if testutil.AlacConvertPath(t) != "" {
+// Untimed setup: need PCM bytes to produce WAV for alacconvert.
+setupDec, setupErr := alac.NewDecoder(bytes.NewReader(encoded))
+if setupErr != nil {
+t.Fatalf("decode for CAF setup: %v", setupErr)
+}
 
-	results = append(results, agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())))
+pcm, readErr := io.ReadAll(setupDec)
+if readErr != nil {
+t.Fatalf("decode for CAF setup: %v", readErr)
+}
 
-	// Benchmark CoreAudio decode (CGO, in-process).
-	results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
+wavPath := filepath.Join(tmpDir, "input.wav")
+testutil.WriteWAV(t, wavPath, pcm, pcmFormat.BitDepth, pcmFormat.SampleRate, pcmFormat.Channels)
 
-	// Benchmark alacconvert decode (from CAF).
-	// Setup: saprobe decode → WAV → alacconvert encode → CAF.
-	if testutil.AlacConvertPath(t) != "" {
-		pcm, _, decErr := alac.Decode(bytes.NewReader(encoded))
-		if decErr != nil {
-			t.Fatalf("decode for CAF setup: %v", decErr)
-		}
+cafPath := filepath.Join(tmpDir, "input.caf")
 
-		wavPath := filepath.Join(tmpDir, "input.wav")
-		testutil.WriteWAV(t, wavPath, pcm, pcmFormat.BitDepth, pcmFormat.SampleRate, pcmFormat.Channels)
+testutil.AlacConvert(t, testutil.AlacConvertOptions{
+Args: []string{wavPath, cafPath},
+})
 
-		cafPath := filepath.Join(tmpDir, "input.caf")
+results = append(results, testutil.BenchDecodeAlacconvert(t, bf, opts, cafPath))
+}
 
-		testutil.AlacConvert(t, testutil.AlacConvertOptions{
-			Args: []string{wavPath, cafPath},
-		})
+agar.PrintResults(t, opts, results)
+}
 
-		results = append(results, testutil.BenchDecodeAlacconvert(t, bf, opts, cafPath))
-	}
+func benchDecodeSaprobe(t *testing.T, bf agar.BenchFormat, opts agar.BenchOptions, encoded []byte) agar.BenchResult {
+t.Helper()
 
-	agar.PrintResults(t, opts, results)
+durations := make([]time.Duration, opts.Iterations)
+outBuf := make([]byte, 64*1024)
+
+for iter := range opts.Iterations {
+start := time.Now()
+
+dec, decErr := alac.NewDecoder(bytes.NewReader(encoded))
+if decErr != nil {
+t.Fatalf("decode: %v", decErr)
+}
+
+for {
+_, readErr := dec.Read(outBuf)
+if readErr != nil {
+break
+}
+}
+
+durations[iter] = time.Since(start)
+}
+
+return agar.ComputeResult(bf, "saprobe", "decode", durations, len(encoded))
 }

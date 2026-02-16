@@ -17,96 +17,69 @@
 package testutil
 
 import (
-	"bytes"
-	"context"
-	"io"
-	"os/exec"
-	"testing"
+"os"
+"testing"
 
-	"github.com/mycophonic/agar/pkg/agar"
+"github.com/mycophonic/agar/pkg/agar"
+"github.com/mycophonic/agar/pkg/coreaudio"
 )
 
 const coreAudioBinary = "alac-coreaudio"
 
-// CoreAudioOptions configures an alac-coreaudio invocation.
-type CoreAudioOptions struct {
-	// Args are passed directly to the alac-coreaudio binary.
-	Args []string
-	// Stdin is connected to the command's standard input when non-nil.
-	Stdin io.Reader
-	// Stdout receives the command's standard output when non-nil.
-	// When nil, stdout is captured and returned in CoreAudioResult.Stdout.
-	Stdout io.Writer
-	// Stderr receives the command's standard error when non-nil.
-	// When nil, stderr is captured and returned in CoreAudioResult.Stderr.
-	Stderr io.Writer
-}
-
-// CoreAudioResult holds captured output from an alac-coreaudio invocation.
-type CoreAudioResult struct {
-	// Stdout contains captured standard output, populated only when
-	// CoreAudioOptions.Stdout was nil.
-	Stdout []byte
-	// Stderr contains captured standard error, populated only when
-	// CoreAudioOptions.Stderr was nil.
-	Stderr []byte
-}
-
 // CoreAudioPath returns the path to the alac-coreaudio binary, or an empty
 // string if it is not available. Build it with: make alac-coreaudio.
 func CoreAudioPath(t *testing.T) string {
-	t.Helper()
+t.Helper()
 
-	path, err := agar.LookFor(coreAudioBinary)
-	if err != nil {
-		t.Log("alac-coreaudio not found: run 'make alac-coreaudio' to enable CoreAudio tests")
+path, err := agar.LookFor(coreAudioBinary)
+if err != nil {
+t.Log("alac-coreaudio not found: run 'make alac-coreaudio' to enable CoreAudio tests")
 
-		return ""
-	}
-
-	return path
+return ""
 }
 
-// CoreAudio runs alac-coreaudio with the given options.
-// It fatals the test if alac-coreaudio cannot be found or the command returns an error.
-func CoreAudio(t *testing.T, opts CoreAudioOptions) CoreAudioResult {
-	t.Helper()
+return path
+}
 
-	bin, err := agar.LookFor(coreAudioBinary)
-	if err != nil {
-		t.Log(coreAudioBinary + ": " + err.Error())
-		t.FailNow()
-	}
+// CoreAudioBinary returns a coreaudio.Codec backed by the alac-coreaudio binary.
+// It fatals if the binary is not available.
+func CoreAudioBinary(t *testing.T) coreaudio.Codec {
+t.Helper()
 
-	//nolint:gosec // arguments are test-controlled
-	cmd := exec.CommandContext(context.Background(), bin, opts.Args...)
+path := CoreAudioPath(t)
+if path == "" {
+t.Fatal("alac-coreaudio binary not available")
+}
 
-	if opts.Stdin != nil {
-		cmd.Stdin = opts.Stdin
-	}
+return coreaudio.NewBinary(path)
+}
 
-	var stdoutBuf bytes.Buffer
+// CoreAudioCGO returns a coreaudio.Codec backed by CGO AudioToolbox.
+// It skips the test if CGO is not available.
+func CoreAudioCGO(t *testing.T) coreaudio.Codec {
+t.Helper()
 
-	if opts.Stdout != nil {
-		cmd.Stdout = opts.Stdout
-	} else {
-		cmd.Stdout = &stdoutBuf
-	}
+codec := coreaudio.NewCGO()
+if !codec.Available() {
+t.Skip("CoreAudio CGO not available on this platform")
+}
 
-	var stderrBuf bytes.Buffer
+return codec
+}
 
-	if opts.Stderr != nil {
-		cmd.Stderr = opts.Stderr
-	} else {
-		cmd.Stderr = &stderrBuf
-	}
+// CoreAudioEncode encodes PCM to ALAC M4A using the alac-coreaudio binary.
+// It writes the result to the specified output path.
+func CoreAudioEncode(t *testing.T, pcm []byte, format coreaudio.Format, outputPath string) {
+t.Helper()
 
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("alac-coreaudio: %v\n%s", err, stderrBuf.String())
-	}
+codec := CoreAudioBinary(t)
 
-	return CoreAudioResult{
-		Stdout: stdoutBuf.Bytes(),
-		Stderr: stderrBuf.Bytes(),
-	}
+m4a, err := codec.Encode(pcm, format)
+if err != nil {
+t.Fatalf("coreaudio encode: %v", err)
+}
+
+if err := os.WriteFile(outputPath, m4a, 0o600); err != nil {
+t.Fatalf("write encoded file: %v", err)
+}
 }

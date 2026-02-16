@@ -115,6 +115,27 @@ lint-go-all:
 	$(call footer, $@)
 endif
 
+lint-go-bce: ## Report bounds check elimination failures
+	$(call title, $@)
+	@cd $(PROJECT_DIR) \
+		&& echo "Bounds Check Elimination Report" \
+		&& echo "================================" \
+		&& echo "" \
+		&& output=$$(go build -gcflags='-d=ssa/check_bce/debug=1' ./... 2>&1 | grep -v '^#' || true); \
+		if [ -z "$$output" ]; then \
+			echo "No bounds checks detected (BCE fully eliminated)."; \
+		else \
+			total=$$(echo "$$output" | wc -l | tr -d ' '); \
+			echo "Total: $$total bounds checks"; \
+			echo ""; \
+			echo "By file:"; \
+			echo "$$output" | sed 's/:.*$$//' | sort | uniq -c | sort -rn; \
+			echo ""; \
+			echo "Details:"; \
+			echo "$$output" | sort; \
+		fi
+	$(call footer, $@)
+
 lint-yaml:
 	$(call title, $@)
 	@cd $(PROJECT_DIR) \
@@ -295,10 +316,17 @@ test-unit-bench:
 # with: runtime/cgo(.text): relocation target stderr not defined
 # Forcing -linkmode=external makes GCC perform the final link, resolving libc.
 #
+# Known warning (harmless): on macOS with Xcode 15+, Apple's ld-prime linker
+# emits "has malformed LC_DYSYMTAB" warnings during race builds. This is a
+# cosmetic issue in Go's Mach-O object generation — the produced binaries are
+# correct. The warning only appears with -race because the race detector
+# forces CGO and external linking.
+#
 # See:
 #   https://github.com/golang/go/issues/52690
 #   https://github.com/golang/go/issues/54313
 #   https://github.com/golang/go/issues/58619
+#   https://github.com/golang/go/issues/61229 (Apple ld-prime / LC_DYSYMTAB)
 test-unit-race:
 	$(call title, $@)
 	@CGO_ENABLED=1 go test $(VERBOSE_FLAG) -ldflags="-linkmode=external" $(PROJECT_DIR)/... -race
@@ -365,7 +393,7 @@ test-unit-cover: ## Run tests with coverage reporting
 	unit \
 	init-dev init-dev-system \
 	install-dev-tools install-dev-gotestsum \
-	lint-commits lint-go lint-go-all lint-headers lint-licenses lint-licenses-all lint-mod lint-shell lint-vuln lint-yaml \
+	lint-commits lint-go lint-go-all lint-go-bce lint-headers lint-licenses lint-licenses-all lint-mod lint-shell lint-vuln lint-yaml \
 	fix-go fix-go-all fix-headers fix-mod \
 	test-unit test-unit-race test-unit-bench test-unit-cover test-unit-profile \
 	build build-debug build-static install verify clean

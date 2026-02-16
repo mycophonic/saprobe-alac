@@ -23,8 +23,8 @@ import (
 	alacint "github.com/mycophonic/saprobe-alac/internal/alac"
 )
 
-// Config holds ALAC decoder configuration parsed from the magic cookie.
-type Config struct {
+// PacketConfig holds ALAC decoder configuration parsed from the magic cookie.
+type PacketConfig struct {
 	FrameLength   uint32
 	BitDepth      uint8
 	NumChannels   uint8
@@ -42,9 +42,9 @@ const (
 	atomHeaderSize = 12 // MPEG4 atom header: size (4) + type (4) + payload (4).
 )
 
-// ParseConfig reads an ALACSpecificConfig from a magic cookie byte slice.
+// ParseMagicCookie reads an ALACSpecificConfig from a magic cookie byte slice.
 // Handles legacy wrappers ('frma' and 'alac' atoms).
-func ParseConfig(cookie []byte) (Config, error) {
+func ParseMagicCookie(cookie []byte) (PacketConfig, error) {
 	data := cookie
 
 	// Skip 'frma' atom if present: [size:4][type:'frma'][format:'alac']
@@ -58,15 +58,15 @@ func ParseConfig(cookie []byte) (Config, error) {
 	}
 
 	if len(data) < configSize {
-		return Config{}, fmt.Errorf("%w: %w", ErrConfig, alacint.ErrInvalidCookie)
+		return PacketConfig{}, fmt.Errorf("%w: %w", ErrConfig, alacint.ErrInvalidCookie)
 	}
 
 	compatibleVersion := data[4]
 	if compatibleVersion > 0 {
-		return Config{}, fmt.Errorf("%w: %w: %d", ErrConfig, alacint.ErrUnsupportedVersion, compatibleVersion)
+		return PacketConfig{}, fmt.Errorf("%w: %w: %d", ErrConfig, alacint.ErrUnsupportedVersion, compatibleVersion)
 	}
 
-	return Config{
+	return PacketConfig{
 		FrameLength:   binary.BigEndian.Uint32(data[0:4]),
 		BitDepth:      data[5],
 		PB:            data[6],

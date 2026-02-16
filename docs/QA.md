@@ -5,13 +5,17 @@
 Build optional reference tools (macOS only):
 
 ```bash
-make alac-coreaudio   # CoreAudio ALAC encoder/decoder → bin/alac-coreaudio
-make alacconvert      # Apple reference ALAC converter → bin/alacconvert
+make alac-coreaudio   # CoreAudio ALAC encoder/decoder → tests/bin/alac-coreaudio
+make alacconvert      # Apple reference ALAC converter → tests/bin/alacconvert
 ```
 
-## Conformance (`TestConformance`)
+## Conformance Testing
 
-Round-trip encode/decode tests across all supported bit depth, sample rate, channel count, and encoder/decoder combinations. Subtests are named `{bitDepth}bit/{encoder}/{sampleRate}Hz_{channels}ch`.
+Round-trip encode/decode tests across all supported configurations. Both synthetic and natural files use the same unified verification logic (`verifyConformance`).
+
+### Synthetic (`TestConformance`)
+
+Tests all bit depth × encoder × sample rate × channel combinations using generated white noise. Subtests are named `{bitDepth}bit/{encoder}/{sampleRate}Hz_{channels}ch`.
 
 ```bash
 # Full suite (all tools)
@@ -30,33 +34,53 @@ go test ./tests/ -run TestConformance/16bit/ffmpeg/44100Hz_2ch -count=1 -v
 - **Sample rates:** 8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 176400, 192000
 - **Channels:** 1-8
 
-Each encoder produces an encoded file which is decoded by all compatible decoders. Decoded output is compared against the original source PCM and cross-compared across decoders.
+With all tools available: 11 sample rates × (16b: 8ch ffmpeg + 7ch coreaudio + 2ch alacconvert) + (24b: 8ch ffmpeg + 5ch coreaudio + 2ch alacconvert) = 352 subtests.
+With ffmpeg only: 2 × 11 × 8 = 176 subtests.
 
-**Encoder/decoder compatibility:**
+### Natural Files (`TestConformanceNatural`)
+
+Tests real ALAC files from a directory. Set `CONFORMANCE_NATURAL_DIR` to run.
+
+```bash
+CONFORMANCE_NATURAL_DIR=/path/to/m4a/files go test ./tests/ -run TestConformanceNatural -count=1 -v
+```
+
+Discovers all `.m4a` files in the directory, probes format via saprobe, and runs unified verification. No source comparison (original uncompressed audio unavailable).
+
+### Encoder/Decoder Compatibility
 
 | Encoder     | Container | Decoders                           | Channels (16-bit) | Channels (24-bit) |
 |-------------|-----------|------------------------------------|--------------------|--------------------|
 | ffmpeg      | M4A       | saprobe, ffmpeg, coreaudio         | 1-8                | 1-8                |
 | coreaudio   | M4A       | saprobe, ffmpeg, coreaudio         | 1-7                | 1-5                |
 | alacconvert | CAF       | ffmpeg, alacconvert                | 1-2                | 1-2                |
+| natural     | M4A       | saprobe, ffmpeg, coreaudio         | (as probed)        | (as probed)        |
 
-With all tools available: 11 sample rates x (16b: 8ch ffmpeg + 7ch coreaudio + 2ch alacconvert) + (24b: 8ch ffmpeg + 5ch coreaudio + 2ch alacconvert) = 352 subtests.
-With ffmpeg only: 2 x 11 x 8 = 176 subtests.
+CoreAudio's ALAC codec silently returns 0 frames (OSStatus 0) without error for channel counts beyond these limits.
 
-**Verification:**
+### Verification
 
-- Mono and stereo: bit-for-bit PCM match against source, plus cross-decoder comparison.
-- Multichannel (3-8ch): output length verified only. Byte comparison is skipped because encoders (ffmpeg, CoreAudio) apply channel layout remapping that reorders channels relative to the raw interleaved input.
+**Unified verification (all tests):**
 
-**Reference tools:**
+1. Decode with all compatible decoders
+2. Verify format metadata (saprobe decoder)
+3. If source PCM provided: bit-for-bit comparison against source
+4. Cross-decoder comparison: bit-for-bit between all decoder pairs
 
-| Tool        | Role            | Bit Depths     | Channels         | Container |
-|-------------|-----------------|----------------|------------------|-----------|
-| ffmpeg      | Encode + Decode | 16, 24         | 1-8              | M4A       |
-| alacconvert | Encode + Decode | 16, 24         | 1-2              | CAF       |
-| coreaudio   | Encode + Decode | 16, 20, 24, 32 | 1-7 (16b), 1-5 (24b) | M4A  |
+**Channel ordering and bit-for-bit comparison:**
 
-CoreAudio's ALAC codec silently returns 0 frames (without error) for channel counts beyond these limits. The test matrix excludes unsupported CoreAudio configurations.
+ALAC bitstreams use MPEG element order (e.g., 5.1: C, L, R, Ls, Rs, LFE). Saprobe and ffmpeg both remap to SMPTE standard order (L, R, C, LFE, Ls, Rs) during decoding.
+
+- **ffmpeg encoder + saprobe/ffmpeg decoders:** Full bit-for-bit comparison (all channels).
+- **CoreAudio encoder or decoder:** Skipped for multichannel (3-8ch). CoreAudio follows Apple's reference implementation which uses MPEG element order without remapping. Length verification still performed.
+
+### Reference Tools
+
+| Tool        | Role            | Bit Depths     | Channels         | Container | Channel Order |
+|-------------|-----------------|----------------|------------------|-----------|---------------|
+| ffmpeg      | Encode + Decode | 16, 24         | 1-8              | M4A       | SMPTE         |
+| alacconvert | Encode + Decode | 16, 24         | 1-2              | CAF       | SMPTE         |
+| coreaudio   | Encode + Decode | 16, 20, 24, 32 | 1-7 (16b), 1-5 (24b) | M4A  | MPEG element  |
 
 CoreAudio and alacconvert are optional; tests skip gracefully when unavailable.
 
@@ -93,36 +117,47 @@ go test ./tests/ -run TestBenchmarkDecode -count=1 -v
 - **Iterations:** 10 per configuration
 - **Statistics:** median, mean, stddev, min, max
 
-#### CPU Profile
+| Format | saprobe | ffmpeg | coreaudio | alacconvert |
+|--------|---------|--------|-----------|-------------|
+| CD 16bit 10s | 4ms | 34ms | 2ms | 9ms |
+| HiRes 24bit 10s | 12ms | 36ms | 9ms | 23ms |
+| CD 16bit 300s | 114ms | 89ms | 60ms | 182ms |
+| HiRes 24bit 300s | 346ms | 152ms | 237ms | 622ms |
+
+On short files (<30s), saprobe is faster than ffmpeg due to zero process-spawn overhead.
+On longer files, ffmpeg pulls ahead due to SIMD-optimized C.
+
+#### CPU Profile (`TestProfileDecode`)
+
+Profiling uses `TestProfileDecode` (saprobe-only) to avoid polluting pprof with CGO/ffmpeg/alacconvert noise. Comparative timing uses `TestBenchmarkDecode` (all decoders).
 
 ```bash
-make test-unit-profile
+hack/bench.sh TestProfileDecode
 ```
 
-Total: 23s, 7990ms in sampled functions (34.74%).
+Total: 9.07s, 4.68s in sampled functions (51.61%).
 
 | Function         | Flat  | Flat%  | Cum   | Cum%   |
 |------------------|-------|--------|-------|--------|
-| runtime.cgocall  | 2.39s | 29.91% | 2.39s | 29.91% |
-| BitBuffer.Read   | 1.83s | 22.90% | 1.89s | 23.65% |
-| decodeCPEEscape  | 1.03s | 12.89% | 2.65s | 33.17% |
-| WriteStereo24    | 0.25s | 3.13%  | 0.25s | 3.13%  |
+| BitBuffer.Read   | 2.33s | 49.79% | 2.41s | 51.50% |
+| decodeCPEEscape  | 1.13s | 24.15% | 3.59s | 76.71% |
+| WriteStereo24    | 0.30s | 6.41%  | 0.30s | 6.41%  |
+| WriteStereo16    | 0.08s | 1.71%  | 0.09s | 1.92%  |
 
-The CGO CoreAudio decoder (`runtime.cgocall`) appears at ~30% since it runs in-process. Among saprobe-only functions, bit reading dominates at 22.90%, followed by the CPE element decoder (12.89% flat, 33.17% cumulative). The synthetic profile is dominated by BitBuffer.Read because white noise maximizes entropy, exercising the bit reader more than the predictor.
+Bit reading dominates at 50%, followed by the CPE escape decoder (24% flat, 77% cumulative). The synthetic profile is dominated by BitBuffer.Read because white noise maximizes entropy, exercising the bit reader more than the predictor. Specialized predictors (`unpcBlock4/5/6/8`) do not appear in the top functions because entropy decoding overwhelms the predictor on random noise.
 
 #### Memory
 
-Decoder allocations are negligible. All significant allocations come from test infrastructure:
+Decoder allocations are zero. The saprobe profile uses a streaming `Read` loop with a pre-allocated buffer, producing no allocations. All significant allocations come from test setup (encoding source data):
 
 | Source             | Alloc      | Alloc% |
 |--------------------|------------|--------|
-| io.ReadAll         | 12,599 MB  | 80.07% |
-| CGO GoBytes        | 2,448 MB   | 15.56% |
-| generateWhiteNoise | 223 MB     | 1.41%  |
-| WriteWAV           | 223 MB     | 1.41%  |
-| os.ReadFile        | 223 MB     | 1.42%  |
+| os.ReadFile        | 223 MB     | 32.74% |
+| GenerateWhiteNoise | 223 MB     | 32.72% |
+| WriteWAV           | 223 MB     | 32.72% |
+| NewDecoder   | 5.7 MB     | 0.83%  |
 
-The `alac.Decode` path itself allocates no significant memory. The CGO `GoBytes` allocation (15.56%) is the CoreAudio benchmark copying decoded PCM from C to Go heap. `inuse_space` at exit: 4.6 KB.
+The `Decoder.Read` path itself allocates no memory. `inuse_space` at exit: 2.0 KB (runtime goroutine stacks only).
 
 ### Real Files (`TestBenchmarkDecodeFile`)
 
@@ -140,78 +175,75 @@ Ratio columns show saprobe time relative to each reference tool (>1x = saprobe s
 
 | File | Duration | Size | Comp. | saprobe | ffmpeg | vs ffmpeg | coreaudio | vs coreaudio | alacconvert | vs alacconvert | Character |
 |------|----------|------|-------|---------|--------|-----------|-----------|--------------|-------------|----------------|-----------|
-| Horace Silver — Song for My Father | 7:06 | 40.6 MB | 0.55 | 999ms | 278ms | 3.6x | 985ms | 1.01x | 851ms | 1.2x | Typical jazz combo |
-| Art Blakey — Ending With the Theme | 0:29 | 82 KB | 0.017 | 22ms | 34ms | 0.6x | 14ms | 1.6x | 21ms | 1.0x | Near-silence, extreme compressibility |
-| Charlie Parker — Estrellita (take 5) | 0:06 | 0.3 MB | 0.254 | 9ms | 29ms | 0.3x | 8ms | 1.1x | 12ms | 0.8x | Short take, sparse |
-| Cecil Taylor Unit — [untitled] | 1:09:50 | 341.7 MB | 0.485 | 9.159s | 2.307s | 4.0x | 9.249s | 0.99x | 8.177s | 1.1x | Long free jazz, moderate density |
-| Cecil Taylor — Calling It the 8th | 58:10 | 352.6 MB | 0.601 | 7.306s | 2.880s | 2.5x | 7.467s | 0.98x | 6.640s | 1.1x | Dense free piano, low compressibility |
-| John Coltrane — Ascension Ed. II | 40:57 | 287.7 MB | 0.696 | 4.678s | 1.163s | 4.0x | 4.707s | 0.99x | 4.609s | 1.01x | Dense ensemble, near-incompressible |
+| Cecil Taylor Unit — [untitled] | 1:09:50 | 341.7 MB | 0.485 | 11.37s | 3.78s | 3.0x | 11.72s | 0.97x | 10.23s | 1.11x | Long free jazz, moderate density |
+| John Coltrane — Ascension Ed. II | 40:57 | 287.7 MB | 0.696 | 5.61s | 1.87s | 3.0x | 7.04s | 0.80x | 5.87s | 0.96x | Dense ensemble, near-incompressible |
 
-On short files (<30s), saprobe is faster than ffmpeg (0.3-0.7x) due to zero process-spawn overhead, but slower than CGO CoreAudio (1.1-1.6x).
-On longer files, ffmpeg pulls ahead (2.5-4.0x faster) due to SIMD-optimized C.
-Saprobe has reached parity with CoreAudio (CGO, in-process) on long files, measuring 0.98-1.01x. Against alacconvert, the gap has narrowed to 1.01-1.2x. Specialized predictors for orders 5, 6, and 8 now cover ~95% of packets in real music files, leaving only residual orders for the generic path.
+On longer files, ffmpeg pulls ahead (3.0x faster) due to SIMD-optimized C.
+Saprobe is faster than CoreAudio (CGO, in-process) on long files, measuring 0.80-0.97x. Against alacconvert (Apple reference C), saprobe is at parity or faster on dense material (0.96-1.11x). Specialized predictors for orders 4, 5, 6, and 8 cover ~95% of packets in real music files, leaving only residual orders for the generic path.
 
 Full paths:
 
 ```
-/Volumes/Anisotope/gill/jazz.lossless/Silver, Horace, Quintet, The/1964 - Song for My Father/[1999-~Song for M~CD-Blue Note-84185-724349900226]/01-10 Song for My Father.m4a
-/Volumes/Anisotope/gill/jazz.lossless/Blakey, Art & Jazz Messengers, The/2006-05-13 - Au Club St Germain 1958/[]/2-2/06-06 - Ending With the Theme.m4a
-/Volumes/Anisotope/gill/jazz.lossless/Parker, Charlie/1988-09-19 - Bird_ The Complete Charlie Parker on Verve/[1988-09-19-CD-Verve-837 141-2-042283714120]/disc 7-10/12-19 Estrellita (take 5) (Wednesday January 23, 1952 - Charlie Parker Quintet).m4a
 /Volumes/Anisotope/gill/jazz.lossless/Cecil Taylor Unit, The/1988 - Live in Bologna/[1988-CD-Leo Records-CD LR 100]/01-01 - [untitled].m4a
-/Volumes/Anisotope/gill/jazz.lossless/Taylor, Cecil/2006 - The Eighth/[2006-CD-HatHut Records-hatOLOGY 622-752156062226]/01-02 Calling It the 8th.m4a
 /Volumes/Anisotope/gill/jazz.lossless/Coltrane, John/1965 - Ascension/[2009-CD-impulse!-B0012402-02-602517920248]/01-02 - Ascension_ Edition II.m4a
 ```
 
-#### CPU Profile (Real Files)
+#### CPU Profile (Real Files, `TestProfileDecodeFile`)
 
 ```bash
-hack/bench.sh TestBenchmarkDecodeFile '/path/to/file.m4a'
+hack/bench.sh TestProfileDecodeFile '/path/to/file.m4a'
 ```
 
 Profiled against two contrasting tracks: Cecil Taylor Unit — [untitled] (1:09:50, moderate density, compression ratio 0.485) and John Coltrane — Ascension Ed. II (40:57, dense ensemble, compression ratio 0.696).
 
 **Cecil Taylor Unit — [untitled] (1:09:50, 341.7 MB)**
 
-Total: 349.58s, 195.48s in sampled functions (55.92%).
+Total: 134.62s, 100.87s in sampled functions (74.93%).
 
 | Function         | Flat    | Flat%  | Cum     | Cum%   |
 |------------------|---------|--------|---------|--------|
-| runtime.cgocall  | 89.54s  | 45.81% | 89.54s  | 45.81% |
-| unpcBlock6       | 41.40s  | 21.18% | 54.28s  | 27.77% |
-| DynDecomp        | 26.48s  | 13.55% | 30.68s  | 15.69% |
-| signOfInt        | 11.20s  | 5.73%  | 11.74s  | 6.01%  |
-| unpcBlockGeneral | 7.63s   | 3.90%  | 8.15s   | 4.17%  |
+| unpcBlock6       | 42.80s  | 42.43% | 56.39s  | 55.90% |
+| DynDecomp        | 28.14s  | 27.90% | 32.18s  | 31.90% |
+| signOfInt        | 12.55s  | 12.44% | 13.11s  | 13.00% |
+| unpcBlock5       | 4.43s   | 4.39%  | 5.90s   | 5.85%  |
+| read32bit        | 2.88s   | 2.86%  | 3.06s   | 3.03%  |
+| WriteStereo16    | 1.63s   | 1.62%  | 1.64s   | 1.63%  |
+| unpcBlock4       | 1.11s   | 1.10%  | 1.44s   | 1.43%  |
 
 **John Coltrane — Ascension Ed. II (40:57, 287.7 MB)**
 
-Total: 185.29s, 99.38s in sampled functions (53.63%).
+Total: 75.44s, 49.59s in sampled functions (65.73%).
 
 | Function         | Flat    | Flat%  | Cum     | Cum%   |
 |------------------|---------|--------|---------|--------|
-| runtime.cgocall  | 45.32s  | 45.60% | 45.32s  | 45.60% |
-| unpcBlock6       | 17.07s  | 17.18% | 20.77s  | 20.90% |
-| DynDecomp        | 15.31s  | 15.41% | 17.32s  | 17.43% |
-| unpcBlockGeneral | 5.32s   | 5.35%  | 5.75s   | 5.79%  |
-| signOfInt        | 3.72s   | 3.74%  | 3.88s   | 3.90%  |
-| unpcBlock4       | 2.22s   | 2.23%  | 2.93s   | 2.95%  |
+| unpcBlock6       | 17.66s  | 35.61% | 21.20s  | 42.75% |
+| DynDecomp        | 15.62s  | 31.50% | 18.11s  | 36.52% |
+| signOfInt        | 3.64s   | 7.34%  | 3.86s   | 7.78%  |
+| unpcBlock5       | 2.86s   | 5.77%  | 3.54s   | 7.14%  |
+| unpcBlock4       | 2.32s   | 4.68%  | 3.07s   | 6.19%  |
+| read32bit        | 1.77s   | 3.57%  | 1.90s   | 3.83%  |
+| WriteStereo16    | 1.24s   | 2.50%  | 1.26s   | 2.54%  |
 
-The CGO CoreAudio decoder (`runtime.cgocall`) dominates at ~46% since it runs in-process. The new `unpcBlock6` specialization handles 70-85% of packets in real music and appears at 17-21% flat. `dynGet32Bit` has been manually inlined into `DynDecomp`, which now shows 13-15% flat (previously split across `DynDecomp` + `dynGet32Bit`). The generic predictor path `unpcBlockGeneral` dropped from 29-33% to 3.9-5.4%, now handling only the residual order-5 and order-7+ packets.
+The `unpcBlock6` specialization handles the majority of packets in real music and dominates at 36-42% flat. `DynDecomp` (with `dynGet32Bit` manually inlined) shows 28-32% flat. The generic predictor path `unpcBlockGeneral` does not appear in the top functions — specialized predictors for orders 4, 5, 6, and 8 handle effectively all packets.
 
-Compared to the synthetic profile (white noise) where `BitBuffer.Read` dominates at 23%, real music shifts the bottleneck to the linear predictor — random noise maximizes entropy and bit-reading overhead, while structured audio exercises the predictor reconstruction loop more heavily.
+Compared to the synthetic profile (white noise) where `BitBuffer.Read` dominates at 50%, real music shifts the bottleneck to the linear predictor — random noise maximizes entropy and bit-reading overhead, while structured audio exercises the predictor reconstruction loop more heavily.
 
 #### Memory (Real Files)
 
-Decoder allocations remain zero. The CGO `GoBytes` allocation is the CoreAudio benchmark copying decoded PCM from C to Go heap:
+Decoder allocations remain zero during steady-state decoding. The only allocations come from one-time setup and test infrastructure:
 
-| File | io.ReadAll | CGO GoBytes | WriteWAV | os.ReadFile | inuse_space |
-|------|-----------|-------------|----------|-------------|-------------|
-| Cecil Taylor Unit (341.7 MB) | 51.28 GB (85.56%) | 7.57 GB (12.63%) | 0.69 GB | 0.33 GB | 3.5 MB |
-| Coltrane Ascension (287.7 MB) | 26.25 GB (83.56%) | 4.44 GB (14.13%) | 0.40 GB | 0.28 GB | 4.1 MB |
+| Source | Cecil Taylor (341.7 MB) | Coltrane (287.7 MB) |
+|--------|------------------------|---------------------|
+| os.ReadFile (test infra) | 341.7 MB (94.02%) | 287.7 MB (93.74%) |
+| buildSampleTable (init) | 8.3 MB (2.29%) | 5.8 MB (1.90%) |
+| Decoder.Read | 2.5 MB (0.69%) | 3.5 MB (1.15%) |
+| BitBuffer.Reset (init) | — | 2.0 MB (0.66%) |
+| readStsz (init) | 4.8 MB (1.31%) | 1.7 MB (0.54%) |
 
-The `inuse_space` profile shows only 3.5-4.1 MB of live heap at program end — runtime goroutine stacks. The decoder holds no persistent allocations between packets.
+The `Decoder.Read` allocation is from `BitBuffer.Reset` growing its backing buffer on the first packets and from `packetBuf` growth in the `Read` loop. These stabilize after the first few packets. `inuse_space` at exit: 1.5-2.0 KB (runtime goroutine stacks only).
 
 ## Mass testing
 
-Comparative decoding is being done in Saprobe on a set of 8514 MP4A/ALAC files.
+Comparative decoding is being done in Saprobe on a set of 8409 MP4A/ALAC files.
 
 No failure or discrepancy has been found.

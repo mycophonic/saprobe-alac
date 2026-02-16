@@ -20,17 +20,18 @@ package alac
 import (
 	"fmt"
 	"io"
+	"time"
 
 	alacint "github.com/mycophonic/saprobe-alac/internal/alac"
 	mp4int "github.com/mycophonic/saprobe-alac/internal/mp4"
 )
 
-// StreamDecoder streams decoded PCM from an ALAC M4A/MP4 source.
+// Decoder streams decoded PCM from an ALAC M4A/MP4 source.
 // The MP4 container (sample table, config) is parsed upfront; packets are
 // decoded on demand via Read.
-type StreamDecoder struct {
+type Decoder struct {
 	reader    io.ReadSeeker
-	dec       *Decoder
+	dec       *PacketDecoder
 	samples   []mp4int.SampleInfo
 	sampleIdx int
 	packetBuf []byte
@@ -41,23 +42,23 @@ type StreamDecoder struct {
 	eof    bool
 }
 
-// NewStreamDecoder opens an M4A/MP4 stream containing ALAC audio and returns
+// NewDecoder opens an M4A/MP4 stream containing ALAC audio and returns
 // a streaming decoder. The container structure is parsed immediately; PCM data
 // is decoded packet-by-packet on demand via Read.
 //
 //nolint:varnamelen // rs is idiomatic for io.ReadSeeker
-func NewStreamDecoder(rs io.ReadSeeker) (*StreamDecoder, error) {
+func NewDecoder(rs io.ReadSeeker) (*Decoder, error) {
 	cookie, samples, err := mp4int.FindALACTrack(rs)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNoTrack, err)
 	}
 
-	config, err := ParseConfig(cookie)
+	config, err := ParseMagicCookie(cookie)
 	if err != nil {
 		return nil, fmt.Errorf("parsing ALAC config: %w", err)
 	}
 
-	dec, err := NewDecoder(config)
+	dec, err := NewPacketDecoder(config)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func NewStreamDecoder(rs io.ReadSeeker) (*StreamDecoder, error) {
 	bps := alacint.BytesPerSample(config.BitDepth)
 	frameBytes := int(config.FrameLength) * int(config.NumChannels) * bps
 
-	return &StreamDecoder{
+	return &Decoder{
 		reader:  rs,
 		dec:     dec,
 		samples: samples,
@@ -74,10 +75,56 @@ func NewStreamDecoder(rs io.ReadSeeker) (*StreamDecoder, error) {
 }
 
 // Format returns the PCM output format.
-func (s *StreamDecoder) Format() PCMFormat { return s.dec.Format() }
+func (s *Decoder) Format() PCMFormat { return s.dec.Format() }
+
+// Duration returns the total duration of the audio stream.
+// This is an approximation based on packet count and frame length.
+func (s *Decoder) Duration() time.Duration {
+	frameLength := int64(s.dec.config.FrameLength)
+	sampleRate := int64(s.dec.config.SampleRate)
+	totalFrames := int64(len(s.samples)) * frameLength
+
+	return time.Duration(totalFrames * int64(time.Second) / sampleRate)
+}
+
+// Position returns the current playback position in the audio stream.
+func (s *Decoder) Position() time.Duration {
+	frameLength := int64(s.dec.config.FrameLength)
+	sampleRate := int64(s.dec.config.SampleRate)
+	currentFrame := int64(s.sampleIdx) * frameLength
+
+	return time.Duration(currentFrame * int64(time.Second) / sampleRate)
+}
+
+// Seek seeks to the specified time position in the audio stream.
+// Returns the actual position seeked to, which is always at a packet boundary.
+// Seeking past the end positions at the end of the stream.
+// Seeking to a negative time positions at the start.
+func (s *Decoder) Seek(t time.Duration) (time.Duration, error) {
+	frameLength := int64(s.dec.config.FrameLength)
+	sampleRate := int64(s.dec.config.SampleRate)
+
+	// Convert time to frame number, then to sample (packet) index.
+	targetFrame := int64(t.Seconds() * float64(sampleRate))
+	targetSample := int(targetFrame / frameLength)
+
+	// Clamp to valid range.
+	targetSample = max(0, min(targetSample, len(s.samples)))
+
+	// Reset decoder state.
+	s.sampleIdx = targetSample
+	s.buf = s.buf[:0]
+	s.bufOff = 0
+	s.eof = targetSample >= len(s.samples)
+
+	// Return actual position.
+	actualFrame := int64(s.sampleIdx) * frameLength
+
+	return time.Duration(actualFrame * int64(time.Second) / sampleRate), nil
+}
 
 // Read reads decoded PCM bytes from the ALAC stream.
-func (s *StreamDecoder) Read(p []byte) (int, error) { //nolint:varnamelen // p is idiomatic for io.Reader.Read
+func (s *Decoder) Read(p []byte) (int, error) { //nolint:varnamelen // p is idiomatic for io.Reader.Read
 	total := 0
 
 	for len(p) > 0 {
@@ -140,20 +187,4 @@ func (s *StreamDecoder) Read(p []byte) (int, error) { //nolint:varnamelen // p i
 	}
 
 	return total, nil
-}
-
-// Decode reads an M4A/MP4 stream and decodes the first ALAC audio track
-// to interleaved little-endian signed PCM bytes.
-func Decode(reader io.ReadSeeker) ([]byte, PCMFormat, error) {
-	dec, err := NewStreamDecoder(reader)
-	if err != nil {
-		return nil, PCMFormat{}, err
-	}
-
-	pcm, err := io.ReadAll(dec)
-	if err != nil {
-		return nil, PCMFormat{}, fmt.Errorf("decoding alac: %w", err)
-	}
-
-	return pcm, dec.Format(), nil
 }
