@@ -148,7 +148,7 @@ func dynGet(input []byte, bitPos, golombM, golombK uint32) (result, newBitPos ui
 func DynDecomp(params *AGParams, bitBuf *BitBuffer, predCoefs []int32, numSamples, maxSize int) error {
 	input := bitBuf.Buf[bitBuf.Pos:]
 	startPos := bitBuf.BitIdx
-	maxPos := uint32(bitBuf.Size) * 8
+	maxPos := uint32(bitBuf.Size-bitBuf.Pos) * 8
 	bitPos := startPos
 
 	// BCE: reslice so compiler knows len(predCoefs) == numSamples.
