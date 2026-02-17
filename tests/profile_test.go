@@ -17,17 +17,17 @@
 package tests_test
 
 import (
-"bytes"
-"fmt"
-"os"
-"path/filepath"
-"testing"
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
 
-"github.com/mycophonic/agar/pkg/agar"
-"github.com/mycophonic/agar/pkg/coreaudio"
-alac "github.com/mycophonic/saprobe-alac"
+	"github.com/mycophonic/agar/pkg/agar"
+	"github.com/mycophonic/agar/pkg/coreaudio"
 
-"github.com/mycophonic/saprobe-alac/tests/testutil"
+	alac "github.com/mycophonic/saprobe-alac"
+	"github.com/mycophonic/saprobe-alac/tests/testutil"
 )
 
 // TestProfileDecode runs saprobe-only decoding for clean pprof profiling.
@@ -35,48 +35,48 @@ alac "github.com/mycophonic/saprobe-alac"
 //
 //nolint:paralleltest // Profile must run sequentially for accurate sampling.
 func TestProfileDecode(t *testing.T) {
-if testing.Short() {
-t.Skip("skipping profile in short mode")
-}
+	if testing.Short() {
+		t.Skip("skipping profile in short mode")
+	}
 
-if testutil.CoreAudioPath(t) == "" {
-t.Skip("alac-coreaudio required to encode test data: run 'make alac-coreaudio'")
-}
+	if testutil.CoreAudioPath(t) == "" {
+		t.Skip("alac-coreaudio required to encode test data: run 'make alac-coreaudio'")
+	}
 
-opts := agar.BenchOptions{}.WithDefaults()
-tmpDir := t.TempDir()
+	opts := agar.BenchOptions{}.WithDefaults()
+	tmpDir := t.TempDir()
 
-var results []agar.BenchResult
+	var results []agar.BenchResult
 
-for _, dur := range benchDurations {
-durationSec := int(dur.Seconds())
+	for _, dur := range benchDurations {
+		durationSec := int(dur.Seconds())
 
-for _, bf := range benchFormats {
-bf.Name = fmt.Sprintf("%s %ds", bf.Name, durationSec)
-t.Logf("=== %s ===", bf.Name)
+		for _, bf := range benchFormats {
+			bf.Name = fmt.Sprintf("%s %ds", bf.Name, durationSec)
+			t.Logf("=== %s ===", bf.Name)
 
-srcPCM := agar.GenerateWhiteNoise(bf.SampleRate, bf.BitDepth, bf.Channels, durationSec)
+			srcPCM := agar.GenerateWhiteNoise(bf.SampleRate, bf.BitDepth, bf.Channels, durationSec)
 
-m4aPath := filepath.Join(tmpDir, fmt.Sprintf("enc_%d_%d_%ds.m4a", bf.SampleRate, bf.BitDepth, durationSec))
+			m4aPath := filepath.Join(tmpDir, fmt.Sprintf("enc_%d_%d_%ds.m4a", bf.SampleRate, bf.BitDepth, durationSec))
 
-testutil.CoreAudioEncode(t, srcPCM, coreaudio.Format{
-SampleRate: bf.SampleRate,
-BitDepth:   bf.BitDepth,
-Channels:   bf.Channels,
-}, m4aPath)
+			testutil.CoreAudioEncode(t, srcPCM, coreaudio.Format{
+				SampleRate: bf.SampleRate,
+				BitDepth:   bf.BitDepth,
+				Channels:   bf.Channels,
+			}, m4aPath)
 
-encoded, err := os.ReadFile(m4aPath)
-if err != nil {
-t.Fatalf("read encoded: %v", err)
-}
+			encoded, err := os.ReadFile(m4aPath)
+			if err != nil {
+				t.Fatalf("read encoded: %v", err)
+			}
 
-t.Logf("  M4A size: %.1f MB (%d bytes)", float64(len(encoded))/(1024*1024), len(encoded))
+			t.Logf("  M4A size: %.1f MB (%d bytes)", float64(len(encoded))/(1024*1024), len(encoded))
 
-results = append(results, benchDecodeSaprobe(t, bf, opts, encoded))
-}
-}
+			results = append(results, benchDecodeSaprobe(t, bf, opts, encoded))
+		}
+	}
 
-agar.PrintResults(t, opts, results)
+	agar.PrintResults(t, opts, results)
 }
 
 // TestProfileDecodeFile runs saprobe-only decoding of a real file for clean pprof profiling.
@@ -85,41 +85,41 @@ agar.PrintResults(t, opts, results)
 //
 //nolint:paralleltest // Profile must run sequentially for accurate sampling.
 func TestProfileDecodeFile(t *testing.T) {
-if testing.Short() {
-t.Skip("skipping profile in short mode")
-}
+	if testing.Short() {
+		t.Skip("skipping profile in short mode")
+	}
 
-filePath := os.Getenv("BENCH_FILE")
-if filePath == "" {
-t.Skip("set BENCH_FILE to run this profile")
-}
+	filePath := os.Getenv("BENCH_FILE")
+	if filePath == "" {
+		t.Skip("set BENCH_FILE to run this profile")
+	}
 
-opts := agar.BenchOptions{}.WithDefaults()
+	opts := agar.BenchOptions{}.WithDefaults()
 
-encoded, err := os.ReadFile(filePath)
-if err != nil {
-t.Fatalf("read file: %v", err)
-}
+	encoded, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
 
-t.Logf("File: %s (%.1f MB)", filePath, float64(len(encoded))/(1024*1024))
+	t.Logf("File: %s (%.1f MB)", filePath, float64(len(encoded))/(1024*1024))
 
-probeDec, probeErr := alac.NewDecoder(bytes.NewReader(encoded))
-if probeErr != nil {
-t.Fatalf("probe decode: %v", probeErr)
-}
+	probeDec, probeErr := alac.NewDecoder(bytes.NewReader(encoded))
+	if probeErr != nil {
+		t.Fatalf("probe decode: %v", probeErr)
+	}
 
-pcmFormat := probeDec.Format()
+	pcmFormat := probeDec.Format()
 
-bf := agar.BenchFormat{
-Name:       filepath.Base(filePath),
-SampleRate: pcmFormat.SampleRate,
-BitDepth:   pcmFormat.BitDepth,
-Channels:   pcmFormat.Channels,
-}
+	bf := agar.BenchFormat{
+		Name:       filepath.Base(filePath),
+		SampleRate: pcmFormat.SampleRate,
+		BitDepth:   pcmFormat.BitDepth,
+		Channels:   pcmFormat.Channels,
+	}
 
-results := []agar.BenchResult{
-benchDecodeSaprobe(t, bf, opts, encoded),
-}
+	results := []agar.BenchResult{
+		benchDecodeSaprobe(t, bf, opts, encoded),
+	}
 
-agar.PrintResults(t, opts, results)
+	agar.PrintResults(t, opts, results)
 }

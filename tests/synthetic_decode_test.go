@@ -17,44 +17,44 @@
 package tests_test
 
 import (
-"io"
-"os"
+	"io"
+	"os"
 
-"github.com/mycophonic/saprobe-alac"
+	"github.com/mycophonic/saprobe-alac"
 )
 
 // decode decodes ALAC from an io.ReadSeeker using NewDecoder + io.ReadAll.
 func decode(reader io.ReadSeeker) ([]byte, alac.PCMFormat, error) {
-dec, err := alac.NewDecoder(reader)
-if err != nil {
-return nil, alac.PCMFormat{}, err
-}
+	dec, err := alac.NewDecoder(reader)
+	if err != nil {
+		return nil, alac.PCMFormat{}, err
+	}
 
-pcm, readErr := io.ReadAll(dec)
-if readErr != nil {
-return nil, alac.PCMFormat{}, readErr
-}
+	pcm, readErr := io.ReadAll(dec)
+	if readErr != nil {
+		return nil, alac.PCMFormat{}, readErr
+	}
 
-return pcm, dec.Format(), nil
+	return pcm, dec.Format(), nil
 }
 
 // decodeSaprobe decodes an encoded file using the saprobe (pure Go) decoder.
 func decodeSaprobe(path string) ([]byte, alac.PCMFormat, error) {
-f, err := os.Open(path)
-if err != nil {
-return nil, alac.PCMFormat{}, err
-}
-defer f.Close()
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, alac.PCMFormat{}, err
+	}
+	defer f.Close()
 
-dec, decErr := alac.NewDecoder(f)
-if decErr != nil {
-return nil, alac.PCMFormat{}, decErr
-}
+	dec, decErr := alac.NewDecoder(f)
+	if decErr != nil {
+		return nil, alac.PCMFormat{}, decErr
+	}
 
-pcm, readErr := io.ReadAll(dec)
-if readErr != nil {
-return nil, alac.PCMFormat{}, readErr
-}
+	pcm, readErr := io.ReadAll(dec)
+	if readErr != nil {
+		return nil, alac.PCMFormat{}, readErr
+	}
 
-return pcm, dec.Format(), nil
+	return pcm, dec.Format(), nil
 }

@@ -17,11 +17,12 @@
 package testutil
 
 import (
-"os"
-"testing"
+	"os"
+	"testing"
 
-"github.com/mycophonic/agar/pkg/agar"
-"github.com/mycophonic/agar/pkg/coreaudio"
+	"github.com/mycophonic/agar/pkg/agar"
+	"github.com/mycophonic/agar/pkg/coreaudio"
+	"github.com/mycophonic/primordium/filesystem"
 )
 
 const coreAudioBinary = "alac-coreaudio"
@@ -29,57 +30,57 @@ const coreAudioBinary = "alac-coreaudio"
 // CoreAudioPath returns the path to the alac-coreaudio binary, or an empty
 // string if it is not available. Build it with: make alac-coreaudio.
 func CoreAudioPath(t *testing.T) string {
-t.Helper()
+	t.Helper()
 
-path, err := agar.LookFor(coreAudioBinary)
-if err != nil {
-t.Log("alac-coreaudio not found: run 'make alac-coreaudio' to enable CoreAudio tests")
+	path, err := agar.LookFor(coreAudioBinary)
+	if err != nil {
+		t.Log("alac-coreaudio not found: run 'make alac-coreaudio' to enable CoreAudio tests")
 
-return ""
-}
+		return ""
+	}
 
-return path
+	return path
 }
 
 // CoreAudioBinary returns a coreaudio.Codec backed by the alac-coreaudio binary.
 // It fatals if the binary is not available.
 func CoreAudioBinary(t *testing.T) coreaudio.Codec {
-t.Helper()
+	t.Helper()
 
-path := CoreAudioPath(t)
-if path == "" {
-t.Fatal("alac-coreaudio binary not available")
-}
+	path := CoreAudioPath(t)
+	if path == "" {
+		t.Fatal("alac-coreaudio binary not available")
+	}
 
-return coreaudio.NewBinary(path)
+	return coreaudio.NewBinary(path)
 }
 
 // CoreAudioCGO returns a coreaudio.Codec backed by CGO AudioToolbox.
 // It skips the test if CGO is not available.
 func CoreAudioCGO(t *testing.T) coreaudio.Codec {
-t.Helper()
+	t.Helper()
 
-codec := coreaudio.NewCGO()
-if !codec.Available() {
-t.Skip("CoreAudio CGO not available on this platform")
-}
+	codec := coreaudio.NewCGO()
+	if !codec.Available() {
+		t.Skip("CoreAudio CGO not available on this platform")
+	}
 
-return codec
+	return codec
 }
 
 // CoreAudioEncode encodes PCM to ALAC M4A using the alac-coreaudio binary.
 // It writes the result to the specified output path.
 func CoreAudioEncode(t *testing.T, pcm []byte, format coreaudio.Format, outputPath string) {
-t.Helper()
+	t.Helper()
 
-codec := CoreAudioBinary(t)
+	codec := CoreAudioBinary(t)
 
-m4a, err := codec.Encode(pcm, format)
-if err != nil {
-t.Fatalf("coreaudio encode: %v", err)
-}
+	m4a, err := codec.Encode(pcm, format)
+	if err != nil {
+		t.Fatalf("coreaudio encode: %v", err)
+	}
 
-if err := os.WriteFile(outputPath, m4a, 0o600); err != nil {
-t.Fatalf("write encoded file: %v", err)
-}
+	if err := os.WriteFile(outputPath, m4a, filesystem.FilePermissionsPrivate); err != nil {
+		t.Fatalf("write encoded file: %v", err)
+	}
 }

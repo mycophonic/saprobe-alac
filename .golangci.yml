@@ -124,8 +124,6 @@ linters:
     # MAYBE disable revive file-header
 
   disable:
-    # Until we upstream patches on flac
-    - gomoddirectives
     # These are the linters that we know we do not want
     - copyloopvar       # no longer needed after go 1.22
     - errchkjson        # forces handling of json err (eg: prevents _), which is too much
@@ -262,9 +260,9 @@ linters:
             - $all
           allow:
             - $gostd
-            - github.com/mycophonic/saprobe-alac
-            - github.com/abema/go-mp4
             - github.com/mycophonic/agar
+            - github.com/mycophonic/primordium
+            - github.com/mycophonic/saprobe-alac
 
     staticcheck:
       checks:
