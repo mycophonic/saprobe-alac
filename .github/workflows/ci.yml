@@ -14,6 +14,7 @@ jobs:
   lint:
     name: Lint (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -44,6 +45,7 @@ jobs:
     if: always()
     needs: [lint]
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Check lint matrix results
         run: |
@@ -55,6 +57,7 @@ jobs:
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -91,6 +94,7 @@ jobs:
     if: always()
     needs: [test]
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Check test matrix results
         run: |
@@ -102,6 +106,7 @@ jobs:
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -127,6 +132,7 @@ jobs:
     if: always()
     needs: [build]
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Check build matrix results
         run: |
