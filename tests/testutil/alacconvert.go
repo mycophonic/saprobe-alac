@@ -18,7 +18,6 @@ package testutil
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -81,7 +80,7 @@ func AlacConvert(t *testing.T, opts AlacConvertOptions) AlacConvertResult {
 		t.FailNow()
 	}
 
-	cmd := exec.CommandContext(context.Background(), bin, opts.Args...) // #nosec G204 -- arguments are test-controlled
+	cmd := exec.CommandContext(t.Context(), bin, opts.Args...) // #nosec G204 -- arguments are test-controlled
 
 	if opts.Stdin != nil {
 		cmd.Stdin = opts.Stdin

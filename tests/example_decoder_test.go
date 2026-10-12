@@ -18,7 +18,6 @@ package tests_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,7 +43,7 @@ func TestExampleDecoder(t *testing.T) {
 	// Build the example decoder binary.
 	decoderBin := filepath.Join(tmpDir, "alac-example-decoder")
 
-	build := exec.CommandContext(context.Background(), "go", "build", "-o", decoderBin, "./cmd/alac-example-decoder")
+	build := exec.CommandContext(t.Context(), "go", "build", "-o", decoderBin, "./cmd/alac-example-decoder")
 	build.Dir = ".."
 
 	if out, err := build.CombinedOutput(); err != nil {
@@ -83,7 +82,7 @@ func TestExampleDecoder(t *testing.T) {
 	// Decode with example decoder in PCM mode.
 	var exStdout, exStderr bytes.Buffer
 
-	decCmd := exec.CommandContext(context.Background(), decoderBin, "-format", "pcm", m4aPath)
+	decCmd := exec.CommandContext(t.Context(), decoderBin, "-format", "pcm", m4aPath)
 	decCmd.Stdout = &exStdout
 	decCmd.Stderr = &exStderr
 
@@ -104,7 +103,7 @@ func TestExampleDecoder(t *testing.T) {
 	// Also verify WAV output mode produces valid output with correct size.
 	var wavStdout, wavStderr bytes.Buffer
 
-	wavCmd := exec.CommandContext(context.Background(), decoderBin, "-format", "wav", m4aPath)
+	wavCmd := exec.CommandContext(t.Context(), decoderBin, "-format", "wav", m4aPath)
 	wavCmd.Stdout = &wavStdout
 	wavCmd.Stderr = &wavStderr
 
