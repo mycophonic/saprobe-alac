@@ -32,9 +32,9 @@ const (
 
 // signOfInt returns +1 for positive, -1 for negative, 0 for zero.
 func signOfInt(val int32) int32 {
-	negiShift := int32(uint32(-val) >> 31)
+	negiShift := int32(uint32(-val) >> 31) //nolint:mnd // the 32-bit sign bit, as Apple's sign_of_int
 
-	return negiShift | (val >> 31)
+	return negiShift | (val >> 31) //nolint:mnd // the 32-bit sign bit, as Apple's sign_of_int
 }
 
 // UnpcBlock reverses the linear prediction encoding.

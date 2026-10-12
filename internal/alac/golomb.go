@@ -71,7 +71,7 @@ func lead(m int32) int32 {
 
 // lg3a computes floor(log2(x+3)).
 func lg3a(x int32) int32 {
-	return 31 - lead(x+3)
+	return 31 - lead(x+3) //nolint:mnd // the index of a 32-bit word's top bit, as Apple's lg3a counts it
 }
 
 // read32bit reads 4 bytes big-endian from a byte slice at the given offset.

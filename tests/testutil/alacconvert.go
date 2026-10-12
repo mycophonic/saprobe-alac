@@ -121,9 +121,9 @@ func ReadWAVPCMData(t *testing.T, path string) []byte {
 		t.Fatalf("read WAV %s: %v", path, err)
 	}
 
-	const wavHeaderSize = 12 // RIFF header + "WAVE" tag; chunks start after this.
+	const riffFormHeaderSize = 12 // RIFF chunk header + "WAVE" form tag; chunks start after this.
 
-	for i := wavHeaderSize; i+8 <= len(data); i++ {
+	for i := riffFormHeaderSize; i+8 <= len(data); i++ {
 		if string(data[i:i+4]) == "data" {
 			chunkSize := int(data[i+4]) | int(data[i+5])<<8 | int(data[i+6])<<16 | int(data[i+7])<<24
 			pcmStart := i + 8
@@ -141,6 +141,14 @@ func ReadWAVPCMData(t *testing.T, path string) []byte {
 	return nil
 }
 
+// The canonical PCM WAV header: the RIFF chunk header (8), the "WAVE" form
+// tag (4), the fmt chunk (24) and the data chunk header (8). The RIFF size
+// field counts the bytes after itself: the file minus the RIFF chunk header.
+const (
+	wavHeaderSize       = 44
+	riffChunkHeaderSize = 8
+)
+
 // WriteWAV writes a standard PCM WAV file from raw PCM data.
 // alacconvert requires WAV input for encoding (it cannot read raw PCM).
 func WriteWAV(t *testing.T, path string, pcm []byte, bitDepth, sampleRate, channels int) {
@@ -151,11 +159,11 @@ func WriteWAV(t *testing.T, path string, pcm []byte, bitDepth, sampleRate, chann
 	byteRate := sampleRate * blockAlign
 	dataSize := len(pcm)
 
-	buf := make([]byte, 44+dataSize)
+	buf := make([]byte, wavHeaderSize+dataSize)
 
 	// RIFF header.
 	copy(buf[0:4], "RIFF")
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(36+dataSize))
+	binary.LittleEndian.PutUint32(buf[4:8], uint32(wavHeaderSize-riffChunkHeaderSize+dataSize))
 	copy(buf[8:12], "WAVE")
 
 	// fmt chunk.
@@ -171,7 +179,7 @@ func WriteWAV(t *testing.T, path string, pcm []byte, bitDepth, sampleRate, chann
 	// data chunk.
 	copy(buf[36:40], "data")
 	binary.LittleEndian.PutUint32(buf[40:44], uint32(dataSize))
-	copy(buf[44:], pcm)
+	copy(buf[wavHeaderSize:], pcm)
 
 	if err := os.WriteFile(path, buf, filesystem.FilePermissionsPrivate); err != nil {
 		t.Fatalf("write WAV %s: %v", path, err)

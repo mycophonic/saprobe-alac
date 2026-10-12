@@ -130,6 +130,14 @@ func openInput(path string) (io.ReadSeeker, func(), error) {
 	return f, func() { _ = f.Close() }, nil
 }
 
+// The canonical PCM WAV header: the RIFF chunk header (8), the "WAVE" form
+// tag (4), the fmt chunk (24) and the data chunk header (8). The RIFF size
+// field counts the bytes after itself: the file minus the RIFF chunk header.
+const (
+	wavHeaderSize       = 44
+	riffChunkHeaderSize = 8
+)
+
 // writeWAV writes a standard PCM WAV to writer.
 func writeWAV(writer io.Writer, pcm []byte, format alac.PCMFormat) error {
 	bytesPerSample := format.BitDepth / 8
@@ -137,10 +145,10 @@ func writeWAV(writer io.Writer, pcm []byte, format alac.PCMFormat) error {
 	byteRate := format.SampleRate * blockAlign
 	dataSize := len(pcm)
 
-	var hdr [44]byte
+	var hdr [wavHeaderSize]byte
 
 	copy(hdr[0:4], "RIFF")
-	binary.LittleEndian.PutUint32(hdr[4:8], uint32(36+dataSize))
+	binary.LittleEndian.PutUint32(hdr[4:8], uint32(wavHeaderSize-riffChunkHeaderSize+dataSize))
 	copy(hdr[8:12], "WAVE")
 
 	copy(hdr[12:16], "fmt ")

@@ -41,32 +41,32 @@ golangci:
         # harness). The baseline wants each site named by its rule; until the
         # alignment pass does that, the file-level judgment is carried here.
         - path: ^cmd/alac-example-decoder/main\.go$
-          linters: [gosec, mnd]
-          text: G115|Magic number
+          linters: [gosec]
+          text: G115
         - path: ^decode\.go$
           linters: [gocognit, gosec]
           text: cognitive complexity|G115
         - path: ^decoder\.go$
-          linters: [gocognit, gosec, mnd]
-          text: cognitive complexity|G115|Magic number
+          linters: [gocognit, gosec]
+          text: cognitive complexity|G115
         - path: ^internal/alac/bitbuffer\.go$
-          linters: [gosec, mnd]
-          text: G115|Magic number
+          linters: [gosec]
+          text: G115
         - path: ^internal/alac/golomb\.go$
-          linters: [gocognit, gosec, mnd]
-          text: cognitive complexity|G115|Magic number
+          linters: [gocognit, gosec]
+          text: cognitive complexity|G115
         - path: ^internal/alac/matrix\.go$
           linters: [gosec]
           text: G115
         - path: ^internal/alac/predictor\.go$
-          linters: [gocognit, gosec, mnd]
-          text: cognitive complexity|G115|Magic number
+          linters: [gocognit, gosec]
+          text: cognitive complexity|G115
         - path: ^internal/mp4/mp4\.go$
           linters: [gocognit, gosec]
           text: cognitive complexity|G115
         - path: ^tests/testutil/alacconvert\.go$
-          linters: [gosec, mnd]
-          text: G115|Magic number
+          linters: [gosec]
+          text: G115
           # --- end of the onboarding backlog.
 licenses:
   ignore:
