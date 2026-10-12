@@ -71,6 +71,15 @@ export GOPROXY := 'https://proxy.golang.org,direct'
 export GOOS := ''
 export GOARCH := ''
 
+# git's transport is the configured one: a sandbox exports a GIT_SSH_COMMAND
+# that outranks the tracked core.sshCommand, and every git a recipe spawns
+# (the `go mod download` of a private module) would take it and fail where
+# the configured transport works. The variable is set to that configuration
+# where there is one, left as it is where there is none (a sandbox's proxy is
+# then the only route), and plain ssh last. Not `unexport` (it stops at the
+# module boundary) and not '' (git takes an empty command and cannot fork it).
+export GIT_SSH_COMMAND := `git config --get core.sshCommand 2>/dev/null || printf '%s' "${GIT_SSH_COMMAND:-${GIT_SSH:-ssh}}"`
+
 # Hermetic, per-project linter cache (same doctrine as PATH and GOROOT: no
 # shared mutable state across repos). Lives under build/ — gitignored, and
 # local runs behave like CI instead of diverging on cache state.
