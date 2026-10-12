@@ -91,7 +91,7 @@ _vulndb:
 # limen-lint-go embeds with the project's .lint-go.yaml applied, rendered on
 # every run into build/ (gitignored) — so an edit to the overlay is live at
 # the next `just do lint go`, and nothing at the root invites a hand edit
-# (book/per-language.md, "one baseline, per-project carve-outs"). First the
+# (book/linting-go.md, "one baseline, per-project carve-outs"). First the
 # floor: the baseline names linters, and a pinned golangci-lint older than the
 # release it is written for fails on a name it does not know; hence the
 # dependency on the golangci-lint build, whose binary it reads.

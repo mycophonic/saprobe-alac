@@ -8,7 +8,7 @@
 # carve-outs go in its root .lint-go.yaml, in the same shape as the sections
 # below; limen-lint-go, shipped with limen's release, reads this file from the
 # nearest .limen/ at or above the module it runs in and renders the two into
-# the golangci-lint configuration the lint recipes run (book/per-language.md,
+# the golangci-lint configuration the lint recipes run (book/linting-go.md,
 # "one baseline, per-project carve-outs").
 #
 # Two placeholders are filled from the project's go.mod at render time:
@@ -21,7 +21,7 @@
 # linters arrive enabled and are triaged, never missed. A linter is disabled
 # for one of three reasons, each stated on its line: deprecated; a duplicate of
 # a check another enabled tool already makes (one finding, reported once, by the
-# tool whose suppression is rule-level, see book/per-language.md "silencing a
+# tool whose suppression is rule-level, see book/linting-go.md "silencing a
 # finding"); or judged to carry no engineering value. Inside the bag linters
 # (revive, gocritic, staticcheck, govet, gosec) the same rule applies check by
 # check: revive owns style and naming, because its directives are per rule;
@@ -183,7 +183,7 @@ golangci:
             # Strict mode also reports a shadow whose outer variable is never
             # read again, which is the harmless case. A finding is fixed by
             # reusing the variable, `if err = f(); …`, never by a new name or
-            # a two-line split (book/per-language.md, "fixing a shadowed error").
+            # a two-line split (book/linting-go.md, "fixing a shadowed error").
             strict: false
 
       staticcheck:
@@ -512,7 +512,7 @@ golangci:
 
       gomoddirectives:
         # `replace` is refused by default, and no project loosens that: a
-        # replace is never committed (book/per-language.md, "no replace,
+        # replace is never committed (book/dependencies-go.md, "no replace,
         # ever"). `exclude` is refused too, being a replace by other means.
         exclude-forbidden: true
 

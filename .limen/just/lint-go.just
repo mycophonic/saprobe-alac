@@ -22,12 +22,12 @@ default: code vet mod licenses nilaway
 # them). Built with the toolchain it analyzes, it cannot skew from it — the
 # reason the prebuilt binary and its lockstep check are gone.
 # The formatter is build-graph-independent and runs once. The last step
-# enforces the suppression doctrine (book/per-language.md, "silencing a
+# enforces the suppression doctrine (book/linting-go.md, "silencing a
 # finding"): a finding is silenced by its rule, never by its linter.
 code: (_banner "lint go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform "build/tools/golangci-lint run -c build/golangci.yml") _suppression-check
     build/tools/golangci-lint fmt --diff -c build/golangci.yml
 
-# Polices the shape the book requires (per-language.md, "silencing a
+# Polices the shape the book requires (linting-go.md, "silencing a
 # finding"): nolintlint checks a directive's form, not which linter it names,
 # and bag linters (revive, gosec, staticcheck) must be silenced per rule.
 # Tracked Go files only.
