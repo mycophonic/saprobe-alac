@@ -64,8 +64,6 @@ golangci:
         - path: ^internal/mp4/mp4\.go$
           linters: [gocognit, gosec]
           text: cognitive complexity|G115
-        - path: ^tests/synthetic_decode_test\.go$
-          linters: [unparam]
         - path: ^tests/testutil/alacconvert\.go$
           linters: [gosec, mnd]
           text: G115|Magic number

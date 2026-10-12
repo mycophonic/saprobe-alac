@@ -24,18 +24,20 @@ import (
 )
 
 // decode decodes ALAC from an io.ReadSeeker using NewDecoder + io.ReadAll.
-func decode(reader io.ReadSeeker) ([]byte, alac.PCMFormat, error) {
+// The error tests only look at the PCM and the error; decodeSaprobe also
+// returns the format.
+func decode(reader io.ReadSeeker) ([]byte, error) {
 	dec, err := alac.NewDecoder(reader)
 	if err != nil {
-		return nil, alac.PCMFormat{}, err
+		return nil, err
 	}
 
 	pcm, readErr := io.ReadAll(dec)
 	if readErr != nil {
-		return nil, alac.PCMFormat{}, readErr
+		return nil, readErr
 	}
 
-	return pcm, dec.Format(), nil
+	return pcm, nil
 }
 
 // decodeSaprobe decodes an encoded file using the saprobe (pure Go) decoder.
