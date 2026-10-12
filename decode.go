@@ -123,6 +123,8 @@ func (s *Decoder) Seek(t time.Duration) (time.Duration, error) {
 }
 
 // Read reads decoded PCM bytes from the ALAC stream.
+//
+//nolint:gocognit // the io.Reader loop: drain the buffered packet, end at EOF, else decode the next, in one pass
 func (s *Decoder) Read(p []byte) (int, error) {
 	total := 0
 
