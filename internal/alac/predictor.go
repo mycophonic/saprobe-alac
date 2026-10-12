@@ -32,6 +32,7 @@ const (
 
 // signOfInt returns +1 for positive, -1 for negative, 0 for zero.
 func signOfInt(val int32) int32 {
+	// #nosec G115 -- -val reinterpreted unsigned so the shift brings its sign bit down (sign_of_int)
 	negiShift := int32(uint32(-val) >> 31) //nolint:mnd // the 32-bit sign bit, as Apple's sign_of_int
 
 	return negiShift | (val >> 31) //nolint:mnd // the 32-bit sign bit, as Apple's sign_of_int
@@ -130,7 +131,7 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 
 		if sign > 0 {
 			sgn := signOfInt(diff3)
-			coef3 -= int32(int16(sgn))
+			coef3 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 1 * ((sgn * diff3) >> denShift)
 			if del0 <= 0 {
@@ -138,7 +139,7 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff2)
-			coef2 -= int32(int16(sgn))
+			coef2 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 2 * ((sgn * diff2) >> denShift)
 			if del0 <= 0 {
@@ -146,17 +147,17 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff1)
-			coef1 -= int32(int16(sgn))
+			coef1 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 3 * ((sgn * diff1) >> denShift)
 			if del0 <= 0 {
 				goto store4
 			}
 
-			coef0 -= int32(int16(signOfInt(diff0)))
+			coef0 -= int32(int16(signOfInt(diff0))) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 		} else if sign < 0 {
 			sgn := -signOfInt(diff3)
-			coef3 -= int32(int16(sgn))
+			coef3 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 1 * ((sgn * diff3) >> denShift)
 			if del0 >= 0 {
@@ -164,7 +165,7 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff2)
-			coef2 -= int32(int16(sgn))
+			coef2 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 2 * ((sgn * diff2) >> denShift)
 			if del0 >= 0 {
@@ -172,23 +173,23 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff1)
-			coef1 -= int32(int16(sgn))
+			coef1 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 3 * ((sgn * diff1) >> denShift)
 			if del0 >= 0 {
 				goto store4
 			}
 
-			coef0 += int32(int16(signOfInt(diff0)))
+			coef0 += int32(int16(signOfInt(diff0))) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 		}
 
 	store4:
 	}
 
-	coefs[0] = int16(coef0)
-	coefs[1] = int16(coef1)
-	coefs[2] = int16(coef2)
-	coefs[3] = int16(coef3)
+	coefs[0] = int16(coef0) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[1] = int16(coef1) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[2] = int16(coef2) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[3] = int16(coef3) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
 }
 
 // unpcBlock5 is the optimized predictor for numActive == 5.
@@ -228,7 +229,7 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 
 		if sign > 0 {
 			sgn := signOfInt(diff4)
-			coef4 -= int32(int16(sgn))
+			coef4 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 1 * ((sgn * diff4) >> denShift)
 			if del0 <= 0 {
@@ -236,7 +237,7 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff3)
-			coef3 -= int32(int16(sgn))
+			coef3 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 2 * ((sgn * diff3) >> denShift)
 			if del0 <= 0 {
@@ -244,7 +245,7 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff2)
-			coef2 -= int32(int16(sgn))
+			coef2 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 3 * ((sgn * diff2) >> denShift)
 			if del0 <= 0 {
@@ -252,17 +253,17 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff1)
-			coef1 -= int32(int16(sgn))
+			coef1 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 4 * ((sgn * diff1) >> denShift)
 			if del0 <= 0 {
 				goto store5
 			}
 
-			coef0 -= int32(int16(signOfInt(diff0)))
+			coef0 -= int32(int16(signOfInt(diff0))) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 		} else if sign < 0 {
 			sgn := -signOfInt(diff4)
-			coef4 -= int32(int16(sgn))
+			coef4 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 1 * ((sgn * diff4) >> denShift)
 			if del0 >= 0 {
@@ -270,7 +271,7 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff3)
-			coef3 -= int32(int16(sgn))
+			coef3 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 2 * ((sgn * diff3) >> denShift)
 			if del0 >= 0 {
@@ -278,7 +279,7 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff2)
-			coef2 -= int32(int16(sgn))
+			coef2 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 3 * ((sgn * diff2) >> denShift)
 			if del0 >= 0 {
@@ -286,24 +287,24 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff1)
-			coef1 -= int32(int16(sgn))
+			coef1 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 4 * ((sgn * diff1) >> denShift)
 			if del0 >= 0 {
 				goto store5
 			}
 
-			coef0 += int32(int16(signOfInt(diff0)))
+			coef0 += int32(int16(signOfInt(diff0))) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 		}
 
 	store5:
 	}
 
-	coefs[0] = int16(coef0)
-	coefs[1] = int16(coef1)
-	coefs[2] = int16(coef2)
-	coefs[3] = int16(coef3)
-	coefs[4] = int16(coef4)
+	coefs[0] = int16(coef0) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[1] = int16(coef1) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[2] = int16(coef2) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[3] = int16(coef3) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[4] = int16(coef4) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
 }
 
 // unpcBlock6 is the optimized predictor for numActive == 6.
@@ -345,7 +346,7 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 
 		if sign > 0 {
 			sgn := signOfInt(diff5)
-			coef5 -= int32(int16(sgn))
+			coef5 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 1 * ((sgn * diff5) >> denShift)
 			if del0 <= 0 {
@@ -353,7 +354,7 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff4)
-			coef4 -= int32(int16(sgn))
+			coef4 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 2 * ((sgn * diff4) >> denShift)
 			if del0 <= 0 {
@@ -361,7 +362,7 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff3)
-			coef3 -= int32(int16(sgn))
+			coef3 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 3 * ((sgn * diff3) >> denShift)
 			if del0 <= 0 {
@@ -369,7 +370,7 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff2)
-			coef2 -= int32(int16(sgn))
+			coef2 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 4 * ((sgn * diff2) >> denShift)
 			if del0 <= 0 {
@@ -377,17 +378,17 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff1)
-			coef1 -= int32(int16(sgn))
+			coef1 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 5 * ((sgn * diff1) >> denShift)
 			if del0 <= 0 {
 				goto store6
 			}
 
-			coef0 -= int32(int16(signOfInt(diff0)))
+			coef0 -= int32(int16(signOfInt(diff0))) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 		} else if sign < 0 {
 			sgn := -signOfInt(diff5)
-			coef5 -= int32(int16(sgn))
+			coef5 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 1 * ((sgn * diff5) >> denShift)
 			if del0 >= 0 {
@@ -395,7 +396,7 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff4)
-			coef4 -= int32(int16(sgn))
+			coef4 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 2 * ((sgn * diff4) >> denShift)
 			if del0 >= 0 {
@@ -403,7 +404,7 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff3)
-			coef3 -= int32(int16(sgn))
+			coef3 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 3 * ((sgn * diff3) >> denShift)
 			if del0 >= 0 {
@@ -411,7 +412,7 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff2)
-			coef2 -= int32(int16(sgn))
+			coef2 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 4 * ((sgn * diff2) >> denShift)
 			if del0 >= 0 {
@@ -419,25 +420,25 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff1)
-			coef1 -= int32(int16(sgn))
+			coef1 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 5 * ((sgn * diff1) >> denShift)
 			if del0 >= 0 {
 				goto store6
 			}
 
-			coef0 += int32(int16(signOfInt(diff0)))
+			coef0 += int32(int16(signOfInt(diff0))) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 		}
 
 	store6:
 	}
 
-	coefs[0] = int16(coef0)
-	coefs[1] = int16(coef1)
-	coefs[2] = int16(coef2)
-	coefs[3] = int16(coef3)
-	coefs[4] = int16(coef4)
-	coefs[5] = int16(coef5)
+	coefs[0] = int16(coef0) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[1] = int16(coef1) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[2] = int16(coef2) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[3] = int16(coef3) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[4] = int16(coef4) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[5] = int16(coef5) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
 }
 
 func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
@@ -482,7 +483,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 
 		if sign > 0 {
 			sgn := signOfInt(diff7)
-			coef7 -= int32(int16(sgn))
+			coef7 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 1 * ((sgn * diff7) >> denShift)
 			if del0 <= 0 {
@@ -490,7 +491,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff6)
-			coef6 -= int32(int16(sgn))
+			coef6 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 2 * ((sgn * diff6) >> denShift)
 			if del0 <= 0 {
@@ -498,7 +499,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff5)
-			coef5 -= int32(int16(sgn))
+			coef5 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 3 * ((sgn * diff5) >> denShift)
 			if del0 <= 0 {
@@ -506,7 +507,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff4)
-			coef4 -= int32(int16(sgn))
+			coef4 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 4 * ((sgn * diff4) >> denShift)
 			if del0 <= 0 {
@@ -514,7 +515,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff3)
-			coef3 -= int32(int16(sgn))
+			coef3 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 5 * ((sgn * diff3) >> denShift)
 			if del0 <= 0 {
@@ -522,7 +523,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff2)
-			coef2 -= int32(int16(sgn))
+			coef2 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 6 * ((sgn * diff2) >> denShift)
 			if del0 <= 0 {
@@ -530,17 +531,17 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = signOfInt(diff1)
-			coef1 -= int32(int16(sgn))
+			coef1 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 7 * ((sgn * diff1) >> denShift)
 			if del0 <= 0 {
 				goto store8
 			}
 
-			coef0 -= int32(int16(signOfInt(diff0)))
+			coef0 -= int32(int16(signOfInt(diff0))) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 		} else if sign < 0 {
 			sgn := -signOfInt(diff7)
-			coef7 -= int32(int16(sgn))
+			coef7 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 1 * ((sgn * diff7) >> denShift)
 			if del0 >= 0 {
@@ -548,7 +549,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff6)
-			coef6 -= int32(int16(sgn))
+			coef6 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 2 * ((sgn * diff6) >> denShift)
 			if del0 >= 0 {
@@ -556,7 +557,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff5)
-			coef5 -= int32(int16(sgn))
+			coef5 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 3 * ((sgn * diff5) >> denShift)
 			if del0 >= 0 {
@@ -564,7 +565,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff4)
-			coef4 -= int32(int16(sgn))
+			coef4 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 4 * ((sgn * diff4) >> denShift)
 			if del0 >= 0 {
@@ -572,7 +573,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff3)
-			coef3 -= int32(int16(sgn))
+			coef3 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 5 * ((sgn * diff3) >> denShift)
 			if del0 >= 0 {
@@ -580,7 +581,7 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff2)
-			coef2 -= int32(int16(sgn))
+			coef2 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 6 * ((sgn * diff2) >> denShift)
 			if del0 >= 0 {
@@ -588,27 +589,27 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 			}
 
 			sgn = -signOfInt(diff1)
-			coef1 -= int32(int16(sgn))
+			coef1 -= int32(int16(sgn)) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 
 			del0 -= 7 * ((sgn * diff1) >> denShift)
 			if del0 >= 0 {
 				goto store8
 			}
 
-			coef0 += int32(int16(signOfInt(diff0)))
+			coef0 += int32(int16(signOfInt(diff0))) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
 		}
 
 	store8:
 	}
 
-	coefs[0] = int16(coef0)
-	coefs[1] = int16(coef1)
-	coefs[2] = int16(coef2)
-	coefs[3] = int16(coef3)
-	coefs[4] = int16(coef4)
-	coefs[5] = int16(coef5)
-	coefs[6] = int16(coef6)
-	coefs[7] = int16(coef7)
+	coefs[0] = int16(coef0) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[1] = int16(coef1) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[2] = int16(coef2) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[3] = int16(coef3) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[4] = int16(coef4) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[5] = int16(coef5) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[6] = int16(coef6) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
+	coefs[7] = int16(coef7) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
 }
 
 // unpcBlockGeneral is the general predictor for any numActive.
@@ -653,8 +654,8 @@ func unpcBlockGeneral(
 			for k := activeCount - 1; k >= 0; k-- {
 				dd := top - hist[activeCount-k]
 				sgn := signOfInt(dd)
-				coefsNA[k] -= int16(sgn)
-
+				coefsNA[k] -= int16(sgn) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
+				// #nosec G115 -- activeCount is the 5-bit numU field and denShift the 4-bit one (decodeSCECompressed)
 				del0 -= int32(activeCount-k) * ((sgn * dd) >> int32(denShift))
 				if del0 <= 0 {
 					break
@@ -664,8 +665,8 @@ func unpcBlockGeneral(
 			for k := activeCount - 1; k >= 0; k-- {
 				dd := top - hist[activeCount-k]
 				sgn := signOfInt(dd)
-				coefsNA[k] += int16(sgn)
-
+				coefsNA[k] += int16(sgn) // #nosec G115 -- sgn is -1, 0 or 1 (signOfInt)
+				// #nosec G115 -- activeCount is the 5-bit numU field and denShift the 4-bit one (decodeSCECompressed)
 				del0 -= int32(activeCount-k) * ((-sgn * dd) >> int32(denShift))
 				if del0 >= 0 {
 					break

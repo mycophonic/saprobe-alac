@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -159,26 +160,34 @@ func WriteWAV(t *testing.T, path string, pcm []byte, bitDepth, sampleRate, chann
 	byteRate := sampleRate * blockAlign
 	dataSize := len(pcm)
 
+	// The RIFF and data sizes and the byte rate are 32-bit fields.
+	if int64(dataSize) > math.MaxUint32-(wavHeaderSize-riffChunkHeaderSize) || int64(byteRate) > math.MaxUint32 {
+		t.Fatalf("write WAV %s: %d bytes at %d bytes/s exceed the WAV format's 4 GiB limit", path, dataSize, byteRate)
+	}
+
 	buf := make([]byte, wavHeaderSize+dataSize)
 
 	// RIFF header.
 	copy(buf[0:4], "RIFF")
+	// #nosec G115 -- checked above (t.Fatalf ends the test)
 	binary.LittleEndian.PutUint32(buf[4:8], uint32(wavHeaderSize-riffChunkHeaderSize+dataSize))
 	copy(buf[8:12], "WAVE")
 
-	// fmt chunk.
+	// The fmt chunk: the format is the fixture tables' (1 to 8 channels, 16 to 32 bits, up to 192 kHz)
+	// or a decoder's PCMFormat, that is the cookie's (NumChannels 8-bit, SampleRate 32-bit).
 	copy(buf[12:16], "fmt ")
 	binary.LittleEndian.PutUint32(buf[16:20], 16)
-	binary.LittleEndian.PutUint16(buf[20:22], 1) // PCM
-	binary.LittleEndian.PutUint16(buf[22:24], uint16(channels))
-	binary.LittleEndian.PutUint32(buf[24:28], uint32(sampleRate))
+	binary.LittleEndian.PutUint16(buf[20:22], 1)                  // PCM
+	binary.LittleEndian.PutUint16(buf[22:24], uint16(channels))   // #nosec G115 -- an 8-bit cookie field at most
+	binary.LittleEndian.PutUint32(buf[24:28], uint32(sampleRate)) // #nosec G115 -- a 32-bit cookie field at most
+	// #nosec G115 -- checked above (t.Fatalf ends the test)
 	binary.LittleEndian.PutUint32(buf[28:32], uint32(byteRate))
-	binary.LittleEndian.PutUint16(buf[32:34], uint16(blockAlign))
-	binary.LittleEndian.PutUint16(buf[34:36], uint16(bitDepth))
+	binary.LittleEndian.PutUint16(buf[32:34], uint16(blockAlign)) // #nosec G115 -- 8-bit channels × 4 bytes
+	binary.LittleEndian.PutUint16(buf[34:36], uint16(bitDepth))   // #nosec G115 -- 16, 20, 24 or 32
 
 	// data chunk.
 	copy(buf[36:40], "data")
-	binary.LittleEndian.PutUint32(buf[40:44], uint32(dataSize))
+	binary.LittleEndian.PutUint32(buf[40:44], uint32(dataSize)) // #nosec G115 -- checked above (t.Fatalf ends the test)
 	copy(buf[wavHeaderSize:], pcm)
 
 	if err := os.WriteFile(path, buf, filesystem.FilePermissionsPrivate); err != nil {

@@ -281,13 +281,14 @@ func (d *PacketDecoder) decodeSCECompressed(
 
 	var coefsU [alacint.MaxCoefs]int16
 	for i := range numU {
-		coefsU[i] = int16(bits.Read(16))
+		coefsU[i] = int16(bits.Read(16)) // #nosec G115 -- a 16-bit field; int16 keeps its sign (ALACDecoder.cpp)
 	}
 
 	// Save shift bits position, skip past them.
 	var shiftBits alacint.BitBuffer
 	if bytesShifted != 0 {
 		shiftBits = bits.Copy()
+		// #nosec G115 -- bytesShifted is 1 or 2 (decodeSCE); numSamples came in as a uint32
 		bits.Advance(uint32(bytesShifted) * 8 * uint32(numSamples))
 	}
 
@@ -295,6 +296,7 @@ func (d *PacketDecoder) decodeSCECompressed(
 	predBound := uint32(d.config.PB)
 
 	var agP alacint.AGParams
+	// #nosec G115 -- numSamples came in as a uint32 (decodeSCE)
 	alacint.SetAGParams(&agP, uint32(d.config.MB), (predBound*pbFactorU)/4, uint32(d.config.KB),
 		uint32(numSamples), uint32(numSamples), uint32(d.config.MaxRun))
 
@@ -311,11 +313,11 @@ func (d *PacketDecoder) decodeSCECompressed(
 
 	// Read shift buffer from saved position.
 	if bytesShifted != 0 {
-		shift := uint8(bytesShifted * 8)
+		shift := uint8(bytesShifted * 8) // #nosec G115 -- bytesShifted is 1 or 2: 8 or 16
 		sb := d.shiftBuffer[:numSamples:numSamples]
 
 		for i := range sb {
-			sb[i] = uint16(shiftBits.Read(shift))
+			sb[i] = uint16(shiftBits.Read(shift)) // #nosec G115 -- 8 or 16 bits read
 		}
 	}
 
@@ -328,7 +330,7 @@ func (d *PacketDecoder) decodeSCEEscape(bits *alacint.BitBuffer, chanBits uint32
 
 	if chanBits <= 16 {
 		for idx := range mixU {
-			val := int32(bits.Read(uint8(chanBits)))
+			val := int32(bits.Read(uint8(chanBits))) // #nosec G115 -- chanBits is at most 16 here
 			val = (val << shift) >> shift
 			mixU[idx] = val
 		}
@@ -336,8 +338,9 @@ func (d *PacketDecoder) decodeSCEEscape(bits *alacint.BitBuffer, chanBits uint32
 		extraBits := chanBits - 16
 
 		for idx := range mixU {
-			val := int32(bits.Read(16))
+			val := int32(bits.Read(16)) // #nosec G115 -- a 16-bit field
 			val = (val << 16) >> shift
+			// #nosec G115 -- extraBits is chanBits-16, at most 16 (a 32-bit depth)
 			mixU[idx] = val | int32(bits.Read(uint8(extraBits)))
 		}
 	}
@@ -417,8 +420,8 @@ func (d *PacketDecoder) decodeCPECompressed(
 	chanBits uint32,
 	bytesShifted, numSamples int,
 ) (int32, int32, error) { //revive:disable-line:confusing-results
-	mixBits := int32(bits.Read(8))
-	mixRes := int32(int8(bits.Read(8)))
+	mixBits := int32(bits.Read(8))      // #nosec G115 -- an 8-bit field
+	mixRes := int32(int8(bits.Read(8))) // #nosec G115 -- an 8-bit field; int8 keeps mixRes's sign (ALACDecoder.cpp)
 
 	// Read U channel predictor params.
 	headerByte := bits.Read(8)
@@ -431,7 +434,7 @@ func (d *PacketDecoder) decodeCPECompressed(
 
 	var coefsU [alacint.MaxCoefs]int16
 	for i := range numU {
-		coefsU[i] = int16(bits.Read(16))
+		coefsU[i] = int16(bits.Read(16)) // #nosec G115 -- a 16-bit field; int16 keeps its sign (ALACDecoder.cpp)
 	}
 
 	// Read V channel predictor params.
@@ -445,13 +448,14 @@ func (d *PacketDecoder) decodeCPECompressed(
 
 	var coefsV [alacint.MaxCoefs]int16
 	for i := range numV {
-		coefsV[i] = int16(bits.Read(16))
+		coefsV[i] = int16(bits.Read(16)) // #nosec G115 -- a 16-bit field; int16 keeps its sign (ALACDecoder.cpp)
 	}
 
 	// Save shift bits position, skip past interleaved shift data.
 	var shiftBits alacint.BitBuffer
 	if bytesShifted != 0 {
 		shiftBits = bits.Copy()
+		// #nosec G115 -- bytesShifted is 1 or 2 (decodeCPE); numSamples came in as a uint32
 		bits.Advance(uint32(bytesShifted) * 8 * 2 * uint32(numSamples))
 	}
 
@@ -460,6 +464,7 @@ func (d *PacketDecoder) decodeCPECompressed(
 	var agP alacint.AGParams
 
 	// Decompress and predict U channel.
+	// #nosec G115 -- numSamples came in as a uint32 (decodeCPE)
 	alacint.SetAGParams(&agP, uint32(d.config.MB), (predBound*pbFactorU)/4, uint32(d.config.KB),
 		uint32(numSamples), uint32(numSamples), uint32(d.config.MaxRun))
 
@@ -474,6 +479,7 @@ func (d *PacketDecoder) decodeCPECompressed(
 	alacint.UnpcBlock(d.predictor, d.mixBufferU, numSamples, coefsU[:numU], int32(numU), chanBits, denShiftU)
 
 	// Decompress and predict V channel.
+	// #nosec G115 -- numSamples came in as a uint32 (decodeCPE)
 	alacint.SetAGParams(&agP, uint32(d.config.MB), (predBound*pbFactorV)/4, uint32(d.config.KB),
 		uint32(numSamples), uint32(numSamples), uint32(d.config.MaxRun))
 
@@ -489,13 +495,13 @@ func (d *PacketDecoder) decodeCPECompressed(
 
 	// Read shift buffer from saved position.
 	if bytesShifted != 0 {
-		shift := uint8(bytesShifted * 8)
+		shift := uint8(bytesShifted * 8)                   // #nosec G115 -- bytesShifted is 1 or 2: 8 or 16
 		sb := d.shiftBuffer[: numSamples*2 : numSamples*2] //nolint:varnamelen // shift buffer sub-slice.
 
 		for len(sb) >= 2 {
 			pair := sb[:2:2]
-			pair[0] = uint16(shiftBits.Read(shift))
-			pair[1] = uint16(shiftBits.Read(shift))
+			pair[0] = uint16(shiftBits.Read(shift)) // #nosec G115 -- 8 or 16 bits read
+			pair[1] = uint16(shiftBits.Read(shift)) // #nosec G115 -- 8 or 16 bits read
 			sb = sb[2:]
 		}
 	}
@@ -510,11 +516,11 @@ func (d *PacketDecoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32
 
 	if chanBits <= 16 {
 		for idx := range mixU {
-			val := int32(bits.Read(uint8(chanBits)))
+			val := int32(bits.Read(uint8(chanBits))) // #nosec G115 -- chanBits is at most 16 here
 			val = (val << shift) >> shift
 			mixU[idx] = val
 
-			val = int32(bits.Read(uint8(chanBits)))
+			val = int32(bits.Read(uint8(chanBits))) // #nosec G115 -- chanBits is at most 16 here
 			val = (val << shift) >> shift
 			mixV[idx] = val
 		}
@@ -522,12 +528,14 @@ func (d *PacketDecoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32
 		extraBits := chanBits - 16
 
 		for idx := range mixU {
-			val := int32(bits.Read(16))
+			val := int32(bits.Read(16)) // #nosec G115 -- a 16-bit field
 			val = (val << 16) >> shift
+			// #nosec G115 -- extraBits is chanBits-16, at most 16 (the escape path reset chanBits to the depth)
 			mixU[idx] = val | int32(bits.Read(uint8(extraBits)))
 
-			val = int32(bits.Read(16))
+			val = int32(bits.Read(16)) // #nosec G115 -- a 16-bit field
 			val = (val << 16) >> shift
+			// #nosec G115 -- extraBits is chanBits-16, at most 16 (the escape path reset chanBits to the depth)
 			mixV[idx] = val | int32(bits.Read(uint8(extraBits)))
 		}
 	}
@@ -540,7 +548,7 @@ func (*PacketDecoder) skipFIL(bits *alacint.BitBuffer) error {
 		count += int16(bits.ReadSmall(8)) - 1
 	}
 
-	bits.Advance(uint32(count) * 8)
+	bits.Advance(uint32(count) * 8) // #nosec G115 -- count is a 4-bit field plus at most an 8-bit extension: 0 to 269
 
 	if bits.PastEnd() {
 		return alacint.ErrBitstreamOverrun

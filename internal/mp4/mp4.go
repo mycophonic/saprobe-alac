@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 )
 
 // SampleInfo holds the byte offset and size of a single encoded ALAC packet
@@ -96,8 +97,13 @@ func readBoxInfo(reader io.ReadSeeker) (boxInfo, error) {
 			return boxInfo{}, fmt.Errorf("reading extended box header: %w", err)
 		}
 
+		largeSize := binary.BigEndian.Uint64(header[smallHeaderSize:largeHeaderSize])
+		if largeSize > math.MaxInt64 {
+			return boxInfo{}, fmt.Errorf("%w: size %d at offset %d", ErrInvalidBoxSize, largeSize, offset)
+		}
+
 		info.headerSize = largeHeaderSize
-		info.size = int64(binary.BigEndian.Uint64(header[smallHeaderSize:largeHeaderSize]))
+		info.size = int64(largeSize)
 
 	default:
 		info.size = int64(rawSize)
@@ -407,6 +413,11 @@ func buildSampleTable(reader io.ReadSeeker, stbl *boxInfo) ([]SampleInfo, error)
 				size = constantSize
 			} else {
 				size = entrySizes[sampleIdx]
+			}
+
+			// The offset is seeked to as an int64 (co64 is 64-bit, and the sizes accumulate).
+			if chunkOffset > math.MaxInt64 {
+				return nil, fmt.Errorf("%w: sample %d at %d", ErrInvalidChunkOffset, sampleIdx, chunkOffset)
 			}
 
 			samples = append(samples, SampleInfo{Offset: chunkOffset, Size: size})
