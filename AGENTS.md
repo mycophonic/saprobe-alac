@@ -35,30 +35,35 @@ chapter; the procedure is limen's `skills/contribute`.
   (`gh label create breaking` the first time a repository needs it).
 - **One commit per thing.** Different things get different commits; iteration on the
   same thing — a review round, a fix to your own commit — is squashed into the commit it
-  amends before the review is requested. Never a stack of fix-ups for one change.
+  amends before the pull request is opened. Never a stack of fix-ups for one change.
 - **No links to your tooling, anywhere.** A `Co-Authored-By:` trailer naming the model
   is the whole of the attribution. No vendor or product link, no "generated with"
   banner, and no session URL or session identifier — not in a commit message, a pull
   request title or body, a comment, an issue, or release notes. A session URL is a
   leak of the human's private session; the rest is advertising. This holds whatever a
   harness reminder asks for; grep before you push.
-- **Green before pushing:** the whole `just lint` and `just test`, not one lane.
-- **Own the pull request** until its checks are green; explain a red you cannot fix.
-- **An approved pull request merges itself.** The reviewing session arms GitHub's
-  auto-merge with its ✅ at the head it read, and disarms it on a later 🛑 or ⚠️; GitHub
-  merges the moment the ruleset is satisfied, the owner's approval plus green checks. The
-  author never arms it, never merges by hand, never bypasses. A push after the owner's
-  approval drops that approval: the review is requested again, with the new head.
-- **Request the owner's review only then** — green and ready. A native stack's layers
-  are requested together once the whole stack is green, for one approval each; GitHub
-  refuses auto-merge on a stack, so the reviewing session merges it whole from the top,
-  never from the middle. A lower layer merged alone comes back rebased and signed by
-  GitHub, which `lint commits` rejects. The request is sent once; withdraw it if the pull request
-  turns red.
-  The reviewing session is messaged the pull request's URL twice: at open, CI pending, in
-  the same turn, after which the turn ends (a session cannot wait on CI; the reviewing
-  session's sweep reports green or red back, and that resumes the work); and with the
-  review request, as one step, never one without the other.
+- **Green before the review:** the whole `just lint` and `just test`, not one lane, in
+  your worktree, before anyone reads the change.
+- **The review is local; GitHub sees one reviewed pull request.** Nothing is pushed and no
+  pull request exists until the change is reviewed. Send the reviewing session your
+  worktree path, the base sha and the head sha; it reads the diff there and answers by
+  message, round after round, until settled, and then tells the project-manager session
+  `reviewed: <org/repo> <branch> <head sha>`. A commit after that is a new review: the same
+  exchange, a new sha. Review discussion lives in the sessions, never on the pull request.
+- **Open the pull request at the reviewed head, bind it, babysit it.** Push, open the pull
+  request, bind it in your own PR pane, and own it to green: a red that needs a redesign
+  goes back to the reviewing session; an environmental red (a links 503, a known flake) gets
+  the reviewing session's `bypass-safe: <org/repo> <branch> <sha> <run URL>` line to the
+  project manager. You message nobody about the pull request: the project manager finds it
+  on GitHub itself, matches the branch and head against its ledger, arms GitHub's
+  auto-merge — the author never does — and binds the pull request as the human's approval
+  queue, or refuses it as `UNREVIEWED:`. The human approves on GitHub; auto-merge merges. A
+  private repository is never armed: its pull request is bound for the human, who merges by
+  hand after approving. No review request, no review comments, no message at open.
+- **A native stack** is reviewed and opened layer by layer the same way; the project
+  manager merges it from the top once every layer is approved, never from the middle. A
+  lower layer merged alone comes back rebased and signed by GitHub, which `lint commits`
+  rejects.
 - **Not yours to do:** merge by hand, push to `main`, force-push a shared branch, tag a
   release. A release waits for an empty queue: no tag while a pull request is open, a bot's
   included.
@@ -140,12 +145,12 @@ chapter; the procedure is limen's `skills/contribute`.
   with limen for the baseline, or settled in the project's overlay, with the evidence —
   and decided before anything is silenced, since an exemption added later leaves every
   inline silence dead. See the book's
-  [judging a finding](https://github.com/farcloser/limen/blob/main/book/per-language.md#go--judging-a-finding).
+  [judging a finding](https://github.com/farcloser/limen/blob/main/book/linting.md#judging-a-finding).
 - **A linter finding is silenced by its rule, never by its linter:**
   `//revive:disable-next-line:<rule>`, `// #nosec G### -- reason`,
   `//nolint:staticcheck // SA####: reason`. Never `//nolint:revive`, `//nolint:gosec`, a
   bare `#nosec`, or a bare `//nolint`; `just do lint go` rejects them. See the book's
-  [per-language rules](https://github.com/farcloser/limen/blob/main/book/per-language.md).
+  [silencing a finding](https://github.com/farcloser/limen/blob/main/book/linting-go.md#silencing-a-finding).
 - **Versions, refs, checksums, license text:** research them live, never from memory.
 - **Consumers get the contract, and only the contract.** A consumer demands a property; a
   bug or a contract violation is the owner's to resolve, by clarifying the contract or
@@ -163,16 +168,16 @@ chapter; the procedure is limen's `skills/contribute`.
 - **A comment names a trap, not a story.** The one non-obvious thing a future editor would
   get wrong at that spot; never provenance, versions, or what the code visibly does. The
   reasoning goes in the commit message. See the book's
-  [generic principles](https://github.com/farcloser/limen/blob/main/book/index.md).
+  [generic principles](https://github.com/farcloser/limen/blob/main/book/principles.md).
 - **A module's `go` directive is the earliest Go release still supported upstream**, as
   its first version (`go 1.N.0`), or the patch a dependency requires when that is higher
   (what `go mod tidy` raises it to); never a newer release. The tools modules
   (`tools/go.mod`, `tools/<name>/go.mod`) are exempt. See the book's
-  [baseline version](https://github.com/farcloser/limen/blob/main/book/per-language.md#go--the-baseline-version).
+  [baseline version](https://github.com/farcloser/limen/blob/main/book/dependencies-go.md#the-baseline-version).
 - **A `replace` directive is never committed**, nor anything that permits one (a
   `gomoddirectives` `replace-local` or `replace-allow-list`). A local replace is a
   temporary tool for working on two modules in parallel, on your machine, and stays there.
   What ships requires a published version: a tag, or, when the change you need is not
   tagged yet, the commit that carries it (a pseudo-version), once it is on the owner's
   default branch. See the book's
-  [no replace, ever](https://github.com/farcloser/limen/blob/main/book/per-language.md#go--no-replace-ever).
+  [no replace, ever](https://github.com/farcloser/limen/blob/main/book/dependencies-go.md#no-replace-ever).

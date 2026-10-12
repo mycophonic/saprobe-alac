@@ -25,11 +25,12 @@ exclude = [
   # gnu.org: rate-limits aggressively, so the license-text links to it fail
   # intermittently.
   'https?://(www\.)?(fsf|gnu)\.org(/|$)',
-  # Our own repositories' pages on github.com (a file at blob/, a directory at
-  # tree/): github.com throttles those pages from Actions runners (503, then
-  # 503 again a minute later, four repositories in one morning while the same
-  # URLs answered 200 from a laptop), and fetching them proves nothing a
-  # relative link does not: the owning repository's own lane checks that file
-  # as a file. External pages stay checked; no status code is accepted.
-  'https://github\.com/(farcloser|forkcloser|mycophonic)/[^/]+/(blob|tree)/',
+  # github.com's pages for a file (blob/) or a directory (tree/), whoever owns
+  # the repository: github.com throttles them from Actions runners (503, then
+  # 503 again a minute later, while the same URLs answer 200 from a laptop),
+  # and the lane cannot tell a throttled page from a dead one. Our own files
+  # are checked as files by the owning repository's lane; a reference to
+  # someone else's file is pinned to a commit, which does not move. Every other
+  # page stays checked, github.com's included; no status code is accepted.
+  'https://github\.com/[^/]+/[^/]+/(blob|tree)/',
 ]

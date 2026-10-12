@@ -13,7 +13,7 @@
     "postUpdateOptions gomodTidy: a Go module bump rewrites go.mod; without tidy, go.sum keeps the old module's lines and `just do lint go mod` (go mod tidy, diffed) fails every gomod PR. gomodUpdateImportPaths is what keeps tidy running on a MAJOR bump: without it Renovate skips tidy on every major (its guard for the /vN import-path rewrite, which must precede tidy), and a v0 to v1 bump is major while changing no path, so the PR landed a go.sum with the new go.mod hash, no h1 line and the old pseudo-version lines still in it, green for Renovate and red on the tidy diff. With the option, v0 to v1 does no path rewrite and tidies; a real /vN bump rewrites the imports with marwan-at-work/mod (which Renovate go-installs at run time, no image support needed) and then tidies.",
     "constraints gomodMod: the version Renovate go-installs marwan-at-work/mod at for that rewrite; without it the install is @latest, a third-party binary that rewrites import paths across the tree fetched at whatever is newest the day a /vN bump lands. Pinned means by digest, and this lever takes only a v-prefixed tag, so this is the nearest the lever allows: a version pin, its content fixed and transparency-logged by the checksum database that go install verifies against. Named here as that exception rather than left implicit. Renovate's own config manager marks this constraint unsupported and never scans a preset, so limen's renovate.json watches the value with a custom manager and proposes its bumps there.",
     "packageRules, content-pinned files: the checksum-update workflow, the shared CI lanes (limen-verify.yaml), the security workflow, the setup-aqua and windows-cache-image actions and everything under .limen/ are limen's byte for byte; a bump Renovate makes inside one is drift the next `limen check` rejects. Their pins move in limen's own repository, the one place Renovate keeps touching them, and reach every other repository through a limen release.",
-    "packageRules, Go-built tools: the tool directives under tools/ (git-validation, godolint, dot, the Go-source analyzers deadcode, govulncheck, go-licenses, and golangci-lint in tools/golangci-lint/go.mod, a module of its own so its analyzers' dependencies stay upstream's), which Go lists as // indirect and the gomod manager would skip; re-enabled exactly, by module. dot is forkcloser's own tagged module (upstream's cmd/dot is a nested module without tags), so it moves like the others, and as one of ours it is proposed without the cooldown.",
+    "packageRules, Go-built tools: the tool directives under tools/ (git-validation, godolint, dot, the Go-source analyzers deadcode, govulncheck, go-licenses, and golangci-lint in tools/golangci-lint/go.mod, a module of its own so its analyzers' dependencies stay upstream's), which Go lists as // indirect and the gomod manager would skip; re-enabled exactly, by module. dot is forkcloser's own tagged module (upstream's cmd/dot is a nested module without tags), so it moves like the others, and as one of ours it is proposed without the cooldown. Two rules, by file: tools/go.mod for the shared tools, tools/*/go.mod for golangci-lint and nilaway only. One rule over every gomod file re-enabled golang.org/x/tools where it is a plain // indirect requirement of golangci-lint's and nilaway's own modules, and bumped it past the version each upstream pins (forkcloser/infra#10): the isolated module exists so that graph stays upstream's, so nothing in it moves but the tool itself.",
     "packageRules, groups: one pull request per repository per kind, not one per dependency — a registry ref that moves most days and a dozen tool pins were arriving as a dozen pull requests a month per repository, each reviewed alone. Three groups: `aqua tools` (every third-party pin in .aqua/aqua.yaml, the standard-registry ref and aqua itself included), `github actions`, and `go modules` (non-major gomod bumps, the tools/go.mod directives included). Renovate keeps the one open pull request current as further versions arrive instead of opening another. Grouped, not scheduled: a bump still arrives as soon as its cooldown ends. Outside the groups on purpose: our own releases (immediate and alone, so a limen bump is its own reviewed change), major Go bumps (code may have to move), pins.yaml entries (each a deliberate supply-chain change), and security fixes, which Renovate's vulnerabilityAlerts defaults keep ungrouped. A repository that wants a dependency out of a group adds a later packageRule with groupName null.",
     "packageRules, lychee: releases are tagged lychee-vX.Y.Z next to lychee-lib-vX.Y.Z and nightly; regex versioning that carries the prefix parses the pin and the candidates alike and excludes the others by construction.",
     "packageRules, git-for-windows: releases are tagged vX.Y.Z.windows.N, and the N moves on its own (a Git for Windows rebuild of the same Git); a semver reading drops it and would never propose that bump. The build group carries it, and release candidates (vX.Y.Z-rcN.windows.N) fall outside the pattern.",
@@ -89,13 +89,27 @@
       "matchManagers": [
         "gomod"
       ],
+      "matchFileNames": [
+        "tools/go.mod"
+      ],
       "matchDepNames": [
         "github.com/vbatts/git-validation",
         "github.com/forkcloser/godolint",
         "github.com/forkcloser/dot",
         "golang.org/x/tools",
         "golang.org/x/vuln",
-        "github.com/google/go-licenses/v2",
+        "github.com/google/go-licenses/v2"
+      ],
+      "enabled": true
+    },
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchFileNames": [
+        "tools/*/go.mod"
+      ],
+      "matchDepNames": [
         "github.com/golangci/golangci-lint/v2",
         "go.uber.org/nilaway"
       ],

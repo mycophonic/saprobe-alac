@@ -44,9 +44,12 @@ release *args:
             exit 1
         fi
     }
+    # A fourth segment is a fork's rebuild of the same upstream version
+    # (v10.6.1.2, book/forks.md): never a -suffix, which semver sorts before
+    # the release it rebuilds.
     require_version_tag() {
-        if ! printf '%s' "$1" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
-            echo "'$1' is not a version tag (vX.Y.Z or vX.Y.Z-prerelease, e.g. v0.0.0-test.1)." >&2
+        if ! printf '%s' "$1" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+            echo "'$1' is not a version tag (vX.Y.Z, vX.Y.Z-prerelease, or a fork's rebuild vX.Y.Z.N)." >&2
             exit 2
         fi
     }
@@ -260,8 +263,15 @@ release *args:
                     echo "tag $tag pushed — its release page already exists (a retry): nothing to build or publish."
                 else
                     opts=(--verify-tag --generate-notes)
+                    # The previous tag must exist on the remote: a tag deleted
+                    # there survives in a clone (pull prunes no tags), and gh
+                    # answers HTTP 400 to a start tag GitHub does not know.
                     if previous="$(git describe --tags --match "v*" --abbrev=0 "$tag^" 2>/dev/null)"; then
-                        opts+=(--notes-start-tag "$previous")
+                        if git ls-remote --exit-code --tags origin "refs/tags/$previous" >/dev/null 2>&1; then
+                            opts+=(--notes-start-tag "$previous")
+                        else
+                            echo "previous tag $previous is not on origin (deleted there, kept here): the notes start at GitHub's last published release." >&2
+                        fi
                     fi
                     case "$tag" in *-*) opts+=(--prerelease) ;; esac
                     gh release create "$tag" -R "$repo" "${opts[@]}"
