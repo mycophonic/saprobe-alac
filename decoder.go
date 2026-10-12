@@ -233,6 +233,11 @@ func (d *PacketDecoder) decodeSCE(
 	if partialFrame != 0 {
 		numSamples = bits.Read(16) << 16
 		numSamples |= bits.Read(16)
+
+		// The work buffers and the output hold one frame.
+		if numSamples > d.config.FrameLength {
+			return 0, alacint.ErrSampleOverrun
+		}
 	}
 
 	if escapeFlag == 0 {
@@ -240,7 +245,9 @@ func (d *PacketDecoder) decodeSCE(
 			return 0, err
 		}
 	} else {
-		d.decodeSCEEscape(bits, chanBits, int(numSamples))
+		if err := d.decodeSCEEscape(bits, chanBits, int(numSamples)); err != nil {
+			return 0, err
+		}
 
 		bytesShifted = 0
 	}
@@ -326,7 +333,12 @@ func (d *PacketDecoder) decodeSCECompressed(
 	return nil
 }
 
-func (d *PacketDecoder) decodeSCEEscape(bits *alacint.BitBuffer, chanBits uint32, numSamples int) {
+func (d *PacketDecoder) decodeSCEEscape(bits *alacint.BitBuffer, chanBits uint32, numSamples int) error {
+	// Uncompressed samples: the packet must hold numSamples of chanBits each.
+	if int64(numSamples)*int64(chanBits) > bits.BitsLeft() {
+		return alacint.ErrBitstreamOverrun
+	}
+
 	shift := uint32(32) - chanBits
 	mixU := d.mixBufferU[:numSamples:numSamples]
 
@@ -346,6 +358,8 @@ func (d *PacketDecoder) decodeSCEEscape(bits *alacint.BitBuffer, chanBits uint32
 			mixU[idx] = val | int32(bits.Read(uint8(extraBits)))
 		}
 	}
+
+	return nil
 }
 
 // decodeCPE decodes a Channel Pair Element (stereo).
@@ -377,6 +391,11 @@ func (d *PacketDecoder) decodeCPE(
 	if partialFrame != 0 {
 		numSamples = bits.Read(16) << 16
 		numSamples |= bits.Read(16)
+
+		// The work buffers and the output hold one frame.
+		if numSamples > d.config.FrameLength {
+			return 0, alacint.ErrSampleOverrun
+		}
 	}
 
 	var mixBits, mixRes int32
@@ -390,7 +409,10 @@ func (d *PacketDecoder) decodeCPE(
 		}
 	} else {
 		chanBits = uint32(d.config.BitDepth) // Reset for escape.
-		d.decodeCPEEscape(bits, chanBits, int(numSamples))
+
+		if err := d.decodeCPEEscape(bits, chanBits, int(numSamples)); err != nil {
+			return 0, err
+		}
 
 		bytesShifted = 0
 	}
@@ -511,7 +533,12 @@ func (d *PacketDecoder) decodeCPECompressed(
 	return mixBits, mixRes, nil
 }
 
-func (d *PacketDecoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32, numSamples int) {
+func (d *PacketDecoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32, numSamples int) error {
+	// Uncompressed sample pairs: the packet must hold 2*numSamples of chanBits each.
+	if 2*int64(numSamples)*int64(chanBits) > bits.BitsLeft() {
+		return alacint.ErrBitstreamOverrun
+	}
+
 	shift := uint32(32) - chanBits
 	mixU := d.mixBufferU[:numSamples:numSamples]
 	mixV := d.mixBufferV[:numSamples:numSamples]
@@ -541,6 +568,8 @@ func (d *PacketDecoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32
 			mixV[idx] = val | int32(bits.Read(uint8(extraBits)))
 		}
 	}
+
+	return nil
 }
 
 // skipFIL skips a Fill Element.

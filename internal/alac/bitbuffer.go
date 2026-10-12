@@ -51,9 +51,17 @@ func (b *BitBuffer) Reset(data []byte) {
 
 // Read reads up to 16 bits and returns them right-aligned.
 // Equivalent to BitBufferRead in the Apple implementation.
+//
+// A read at or past the end of the data (an overrun, which PastEnd reports)
+// returns zero bits and does not advance: the 4-byte padding covers a read
+// that starts inside the data and crosses its end, not one that starts beyond it.
 func (b *BitBuffer) Read(numBits uint8) uint32 {
+	if b.Pos >= b.Size {
+		return 0
+	}
+
 	// BCE: sub-slice with constant length 3; element indices 0,1,2 are provably in-bounds.
-	// Safety: 4-byte padding guarantees Pos+2 < len(Buf) for any valid position.
+	// Safety: 4-byte padding guarantees Pos+2 < len(Buf) for any position inside the data.
 	w := b.Buf[b.Pos : b.Pos+3 : b.Pos+3]
 	// Load 3 bytes starting at current position (24 bits available).
 	returnBits := uint32(w[0])<<16 | uint32(w[1])<<8 | uint32(w[2])
@@ -68,8 +76,12 @@ func (b *BitBuffer) Read(numBits uint8) uint32 {
 }
 
 // ReadSmall reads up to 8 bits.
-// Equivalent to BitBufferReadSmall.
+// Equivalent to BitBufferReadSmall. Past the end it behaves as Read does.
 func (b *BitBuffer) ReadSmall(numBits uint8) uint8 {
+	if b.Pos >= b.Size {
+		return 0
+	}
+
 	// BCE: sub-slice with constant length 2; element indices 0,1 are provably in-bounds.
 	w := b.Buf[b.Pos : b.Pos+2 : b.Pos+2]
 	returnBits := uint16(w[0])<<8 | uint16(w[1])
@@ -83,8 +95,12 @@ func (b *BitBuffer) ReadSmall(numBits uint8) uint8 {
 	return uint8(returnBits) // #nosec G115 -- numBits is 3, 4 or 8 at every call: 8 bits remain after the shift
 }
 
-// ReadOne reads a single bit.
+// ReadOne reads a single bit. Past the end it behaves as Read does.
 func (b *BitBuffer) ReadOne() uint8 {
+	if b.Pos >= b.Size {
+		return 0
+	}
+
 	returnBit := (b.Buf[b.Pos] >> (7 - b.BitIdx)) & 1
 
 	b.BitIdx++
@@ -113,6 +129,12 @@ func (b *BitBuffer) ByteAlign() {
 // PastEnd returns true if the read position is at or past the original data end.
 func (b *BitBuffer) PastEnd() bool {
 	return b.Pos >= b.Size
+}
+
+// BitsLeft returns the number of data bits from the read position to the end,
+// negative once the position has been advanced past the end.
+func (b *BitBuffer) BitsLeft() int64 {
+	return int64(b.Size-b.Pos)*8 - int64(b.BitIdx)
 }
 
 // Copy returns a snapshot of the current BitBuffer state.
