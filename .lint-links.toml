@@ -1,0 +1,11 @@
+# Project-local lychee exclusions, merged with the canonical .limen/lychee.toml
+# (limen neither pins nor checks this file — it is the project's own).
+
+exclude = [
+  # The README links the umbrella decoder, mycophonic/saprobe, which is a
+  # PRIVATE repository on purpose while it settles. lychee runs
+  # unauthenticated — the point, it sees what an anonymous visitor sees — so
+  # the link resolves as 404 and would fail the run. Remove this line the day
+  # saprobe goes public: an entry here silences a real check.
+  '^https://github\.com/mycophonic/saprobe$',
+]

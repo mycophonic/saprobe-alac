@@ -1,0 +1,91 @@
+# saprobe-alac's carve-outs from the Go lint baseline (.limen/lint-go.yaml),
+# rendered with it by `just do lint go` (limen's book/linting-go.md,
+# "one baseline, per-project carve-outs").
+golangci:
+  linters:
+    settings:
+      depguard:
+        rules:
+          main:
+            allow:
+              # The decoder's dependencies, each one a reviewed choice.
+              - github.com/mycophonic/primordium # filesystem: the buffered readers
+              - github.com/mycophonic/agar # tests: reference decoders, CoreAudio, defective audio
+    exclusions:
+      rules:
+        # Tests are black-box consumers: the rules about API hygiene and
+        # production robustness do not apply to them, the rules about
+        # correctness do (errcheck stays on).
+        - path: _test\.go
+          linters:
+            - dupl # test cases are meant to look alike
+            - dupword # test data
+            - err113 # dynamic errors are fine in fixtures
+            - dogsled # multiple-return helpers are exercised for one value at a time
+            - noctx # no cancellation to propagate
+            - perfsprint # readability over allocations
+            - mnd # fixture values
+
+        # --- ONBOARDING BACKLOG (book/mandatory-files.md, "Onboarding an
+        # existing repository"). Findings the baseline raised on enrolment and
+        # nobody has read yet: not decisions, exemptions to be emptied, one
+        # linter or one package per alignment pull request, each finding then
+        # fixed, silenced inline with its reason, or raised as a rule. The last
+        # alignment pull request deletes this block.
+        #
+        # gosec G115 (integer conversions), 187 sites: the tree carried one
+        # file-level `//nolint:gosec` per file, with the authors' reason that
+        # the conversions match Apple's reference C implementation's
+        # fixed-width arithmetic (the codec) or are bounded by the MP4 atom
+        # sizes and the audio format (the container, the command, the test
+        # harness). The baseline wants each site named by its rule; until the
+        # alignment pass does that, the file-level judgment is carried here.
+        - path: ^cmd/alac-example-decoder/main\.go$
+          linters: [gosec, mnd, reassign]
+          text: G115|Magic number|reassigning variable Usage
+        - path: ^decode\.go$
+          linters: [gocognit, gosec]
+          text: cognitive complexity|G115
+        - path: ^decoder\.go$
+          linters: [gocognit, gosec, mnd]
+          text: cognitive complexity|G115|Magic number
+        - path: ^internal/alac/bitbuffer\.go$
+          linters: [gosec, mnd]
+          text: G115|Magic number
+        - path: ^internal/alac/golomb\.go$
+          linters: [gocognit, gosec, mnd]
+          text: cognitive complexity|G115|Magic number
+        - path: ^internal/alac/matrix\.go$
+          linters: [gosec]
+          text: G115
+        - path: ^internal/alac/predictor\.go$
+          linters: [gocognit, gosec, mnd]
+          text: cognitive complexity|G115|Magic number
+        - path: ^internal/mp4/mp4\.go$
+          linters: [gocognit, gosec]
+          text: cognitive complexity|G115
+        - path: ^tests/benchmark_test\.go$
+          linters: [gocritic, govet]
+          text: appendCombine|shadow
+        - path: ^tests/conformance_test\.go$
+          linters: [errcheck]
+        - path: ^tests/example_decoder_test\.go$
+          linters: [usetesting]
+        - path: ^tests/synthetic_decode_test\.go$
+          linters: [errcheck, unparam]
+        - path: ^tests/testutil/alacconvert\.go$
+          linters: [gosec, mnd, usetesting]
+          text: G115|Magic number|t\.Context
+          # --- end of the onboarding backlog.
+licenses:
+  ignore:
+    # go-licenses cannot resolve the LICENSE of the gotest.tools/v3
+    # submodule (google/go-licenses#186).
+    - gotest.tools/v3
+nilaway:
+  # Onboarding backlog, as the golangci block above: NilAway reports two
+  # potential nil dereferences (internal/alac/predictor.go, internal/mp4/mp4.go)
+  # that nobody has read yet. They print without failing the lane until the
+  # alignment pass judges them; the last alignment pull request sets this
+  # back to blocking.
+  blocking: false

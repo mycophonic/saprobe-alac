@@ -1,0 +1,17 @@
+# DO NOT EDIT MANUALLY.
+# This file is common to all projects and managed by limen.
+# If you need local overrides for this project, you can use inline `# shellcheck disable=SCXXXX`.
+# Global configuration changes proposals can be discussed on https://github.com/farcloser/limen
+
+# .shellcheckrc — https://www.shellcheck.net/wiki/
+
+# Follow `source`/`.`-ed files so shellcheck checks across includes.
+# 'true' lets it follow even non-constant source paths (best for repos with libs).
+external-sources=true
+
+# Opt INTO the optional checks shellcheck ships but doesn't run by default.
+enable=quote-safe-variables   # flags unquoted vars that should be quoted
+# enable=require-variable-braces # enforce ${var} consistently (stylistic — deliberately off)
+enable=check-unassigned-uppercase
+enable=deprecate-which         # `which` → `command -v`
+enable=avoid-nullary-conditions

@@ -8,3 +8,10 @@
 # See https://github.com/golang/go/blob/master/.gitattributes
 
 * -text
+
+# Vendored diffs are exempt from git's whitespace check, which the commit lint
+# runs: a unified diff's context lines carry space-before-tab by construction
+# for any tab-indented source, and rebasing one cannot pass otherwise. Not a
+# line-ending rule; the line above still applies to them.
+*.patch -whitespace
+*.diff -whitespace

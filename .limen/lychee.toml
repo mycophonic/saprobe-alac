@@ -1,0 +1,35 @@
+# DO NOT EDIT MANUALLY.
+# Canonical lychee (link checker) configuration, identical in every repository.
+# A repository can add its own exclusions in a root .lint-links.toml — the `security links`
+# recipe passes both files and lychee merges them, concatenating the exclude
+# lists — so this baseline only carries exclusions that apply everywhere.
+
+# Traverse dotted directories: lychee skips hidden paths by default, which
+# silently drops every document under .github/ — the whole corpus in the org's
+# `.github` repository. Independent of .gitignore handling, so build artifacts
+# stay excluded and .git is not walked.
+hidden = true
+
+# lychee's default retry window spans seconds. Widened for what lychee does
+# retry: timeouts and 429 rate limits. A 5xx is never retried here, whatever
+# these say: lychee judges a rejected status retryable only for 429. The
+# `security links` recipe re-checks server errors once, a minute later, instead.
+# Never accept the codes: a server still erroring after a minute is a finding.
+max_retries = 6
+retry_wait_time = 5
+
+exclude = [
+  # fsf.org: verbatim (A)GPL license texts link to it, and its server (TLS 1.2
+  # with DHE-only key exchange) cannot complete a handshake with lychee's
+  # rustls, which implements neither. The links themselves are fine.
+  # gnu.org: rate-limits aggressively, so the license-text links to it fail
+  # intermittently.
+  'https?://(www\.)?(fsf|gnu)\.org(/|$)',
+  # Our own repositories' pages on github.com (a file at blob/, a directory at
+  # tree/): github.com throttles those pages from Actions runners (503, then
+  # 503 again a minute later, four repositories in one morning while the same
+  # URLs answered 200 from a laptop), and fetching them proves nothing a
+  # relative link does not: the owning repository's own lane checks that file
+  # as a file. External pages stay checked; no status code is accepted.
+  'https://github\.com/(farcloser|forkcloser|mycophonic)/[^/]+/(blob|tree)/',
+]

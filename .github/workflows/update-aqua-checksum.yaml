@@ -1,0 +1,197 @@
+# DO NOT EDIT MANUALLY.
+# Generic, no project content. Renovate's other half: on its branches,
+# regenerate .aqua/aqua-checksums.json (a bumped pin with a stale checksum breaks
+# every install) and, when the branch bumps farcloser/limen, run the branch's
+# own pinned `limen fix` so the canonical files move with the pin. One fix-up
+# commit.
+#
+# A WRITE workflow, hardened: `push:` on the branch prefix, never
+# pull_request_target; no credential kept by checkout and no secrets in the
+# update steps' environment beyond the job's own token where a verifier must
+# read from GitHub; nothing runs through `just` (a write job does not execute
+# recipe code the branch controls — what runs is aqua, and the limen release
+# the branch selects by checksum); the commit step uses runner tools only,
+# with the push token scoped to that step; the branch name reaches the shell
+# via env; no loop, since a default-token commit triggers no workflows.
+#
+# The commit goes through GraphQL createCommitOnBranch because GitHub signs
+# those and the main ruleset requires signatures (see the commit step). Its
+# author is the token's identity: github-actions[bot] by default, or the
+# App/PAT identity when UPDATE_AQUA_CHECKSUM_APP_ID (+ private key secret) or
+# UPDATE_AQUA_CHECKSUM_TOKEN is set — that identity must be in renovate.json's
+# gitIgnoredAuthors or Renovate stops rebasing. The App is worth it:
+# default-token commits get no CI run.
+name: update-aqua-checksum
+
+on:
+  push:
+    branches: ["renovate/**"]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Explicit bash: windows defaults to PowerShell, and bash brings -eo pipefail.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install aqua (pinned, checksum-verified)
+        uses: ./.github/actions/setup-aqua
+        with:
+          # No token for aqua here: this job's token carries contents:write and
+          # the steps below run a branch-declared binary. A rate-limit 403
+          # fails loudly and is rerun; a write token in branch-controlled code
+          # would not fail loudly.
+          github-token: ""
+
+      - name: Regenerate .aqua/aqua-checksums.json
+        # No tool install here: update-checksum only reads the manifest and
+        # hashes upstream artifacts — the smallest possible surface for a
+        # write job. Runs first: it is what makes the branch's limen pin
+        # installable for the converge step below.
+        run: aqua update-checksum --prune
+
+      - name: Link the pinned tools
+        # From here on every command the job runs — limen's verifiers (gh,
+        # cosign), the push's curl and jq — is the branch's own pin on the
+        # hermetic PATH, never the runner's copy. Linking fetches nothing: a
+        # tool is pulled when first run, and verified against the checksums
+        # regenerated above.
+        run: aqua install --only-link
+
+      - name: Converge the limen baseline
+        # `aqua exec` resolves the branch's own limen pin, verified with the
+        # checksums from the step above. A released limen leaves its own pin
+        # alone, and on a renovate/ branch (GITHUB_REF_NAME) it leaves
+        # .aqua/aqua.yaml alone too: Renovate renders that file on every run,
+        # so a line added here would be removed, added, removed, the branch
+        # force-pushed each time. What the manifest lacks, fix adds on main.
+        # Skipped in the limen repository: there the working tree IS the next
+        # baseline.
+        if: github.repository != 'farcloser/limen'
+        run: aqua exec -- limen fix .
+
+      - name: Refresh the digests of pinned artifacts, if the project declares any
+        # The same pinned release, on the project's pins.yaml: a version
+        # Renovate moved gets its digest recomputed through the verifier the
+        # entry declares (book/tooling.md, "Pinned artifacts"). The job's own
+        # token, read-only in use, is what `gh attestation verify` needs to
+        # ask GitHub for an attestation; the code holding it is the release
+        # the branch selects by checksum, never recipe text. The verifiers a
+        # method shells out to (gh, cosign) resolve on the PATH linked above.
+        if: github.repository != 'farcloser/limen' && hashFiles('pins.yaml') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: aqua exec -- limen pins refresh
+
+      - name: Mint a push token, if the App is configured
+        # After the update steps, so those run with no secrets. One-hour token,
+        # this repository only; the private key only mints.
+        if: vars.UPDATE_AQUA_CHECKSUM_APP_ID != ''
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.UPDATE_AQUA_CHECKSUM_APP_ID }}
+          private-key: ${{ secrets.UPDATE_AQUA_CHECKSUM_APP_PRIVATE_KEY }}
+          # Least privilege, but both: naming any permission scopes the token to
+          # exactly those, and the fix-up carries canonical workflow files whenever
+          # a limen bump changed one. GitHub refuses that commit from a token
+          # without workflows:write ("Resource not accessible by integration").
+          permission-contents: write
+          permission-workflows: write
+
+      - name: Commit the update through the API, if any
+        env:
+          BRANCH: ${{ github.ref_name }}
+          TOKEN: ${{ steps.app-token.outputs.token || secrets.UPDATE_AQUA_CHECKSUM_TOKEN || github.token }}
+        run: |
+          [ -z "$(git status --porcelain)" ] && { echo "checksums and baseline already in sync"; exit 0; }
+          # GraphQL createCommitOnBranch, not `git commit` + push: those commits
+          # are GitHub-signed, and the main ruleset requires signatures — an
+          # unsigned fix-up commit made every aqua-bump PR unmergeable
+          # (book/github.md).
+          #
+          # The whole dirty tree, on purpose: exactly three writers ran since
+          # checkout (update-checksum, the pinned limen's fix and pins refresh), and a path
+          # list baked into the older running workflow cannot know the new
+          # baseline's surface.
+          #
+          # Limit of the mutation, accepted: FileAddition carries no file
+          # mode, so an executable bit cannot travel — both writers here
+          # only ever produce plain configuration files.
+          # Every file the payload touches travels through a FILE, never a
+          # command line. A converged baseline is ~120 kB of configuration,
+          # ~160 kB once base64'd, and Linux caps a single argument at 128 kB
+          # (MAX_ARG_STRLEN): passing the accumulated array as `--argjson` died
+          # with "jq: Argument list too long" and left the branch with a bumped
+          # pin, no checksum, and a red pipeline that never reached its first
+          # recipe. `--rawfile` and `--slurpfile` read from disk; the request
+          # body is uploaded from disk too.
+          work="$(mktemp -d)"
+          trap 'rm -rf "${work}"' EXIT
+          printf '[]' > "${work}/additions.json"
+          printf '[]' > "${work}/deletions.json"
+          while IFS= read -r -d '' entry; do
+            path="${entry:3}"
+            if [ -f "${path}" ]; then
+              base64 -w0 "${path}" > "${work}/blob"
+              jq --arg path "${path}" --rawfile contents "${work}/blob" \
+                '. + [{path: $path, contents: ($contents | rtrimstr("\n"))}]' \
+                "${work}/additions.json" > "${work}/next"
+              mv "${work}/next" "${work}/additions.json"
+            else
+              jq --arg path "${path}" '. + [{path: $path}]' \
+                "${work}/deletions.json" > "${work}/next"
+              mv "${work}/next" "${work}/deletions.json"
+            fi
+          # --untracked-files=all: by default a new directory is ONE entry,
+          # `?? dir/`, which is not a file, would be sent as a deletion, and
+          # its files never committed — any directory the pinned limen fix
+          # seeds (tools/golangci-lint/ did) would be lost.
+          done < <(git status --porcelain -z --untracked-files=all)
+          # Signed-off-by: `just do lint commits` enforces DCO on the PR range,
+          # bot commits included.
+          jq -n \
+            --arg query 'mutation ($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }' \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg branch "${BRANCH}" \
+            --arg head "$(git rev-parse HEAD)" \
+            --slurpfile additions "${work}/additions.json" \
+            --slurpfile deletions "${work}/deletions.json" \
+            '{query: $query, variables: {input: {
+              branch: {repositoryNameWithOwner: $repository, branchName: $branch},
+              expectedHeadOid: $head,
+              message: {
+                headline: "chore: refresh checksums and converge the limen baseline",
+                body: "Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+              },
+              fileChanges: {additions: $additions[0], deletions: $deletions[0]}}}}' \
+            > "${work}/payload.json"
+          # GraphQL reports failure in-body over HTTP 200, so success is the
+          # presence of the new commit oid, never the HTTP status. No --retry
+          # and no -L, on purpose: this is a mutation guarded by
+          # expectedHeadOid — a retry after a success that timed out on the
+          # way back would fail on the moved head and report a commit that
+          # landed as an error, and a redirect must never replay the POST.
+          response="$(curl --proto '=https' --tlsv1.2 -fsS -X POST -H "Authorization: bearer ${TOKEN}" \
+            --data-binary "@${work}/payload.json" https://api.github.com/graphql)"
+          oid="$(jq -r '.data.createCommitOnBranch.commit.oid // empty' <<<"${response}")"
+          if [ -z "${oid}" ]; then
+            echo "${response}" >&2
+            exit 1
+          fi
+          echo "pushed ${oid}"

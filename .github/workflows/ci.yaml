@@ -1,0 +1,55 @@
+# Seeded once by `limen fix`, then the project's own: limen never updates it.
+# The shared lanes (verify on every platform, fuzz, tools) live in
+# limen-verify.yaml, content-pinned and kept current by `limen fix`; this file
+# calls them, adds the project's own jobs, and gates on all of them.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# No default token permissions: each job states what it needs. This workflow
+# only ever reads the repository — it cannot write code, releases, or
+# packages even if a step is compromised.
+permissions: {}
+
+# A superseded run (new push to the same branch/PR) is cancelled, not raced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  limen:
+    uses: ./.github/workflows/limen-verify.yaml
+    permissions:
+      contents: read
+      # A project that needs another runner set passes it here, e.g.
+      # with:
+      #   os: '["ubuntu-24.04", "macos-15"]'
+
+  # The ONE required status check (defaultRequiredChecks in
+  # internal/github/audit.go). Requiring the lanes by name would bake the
+  # runner list into every ruleset; this job collapses them to one stable
+  # name. A project job joins `needs` and the assertion below.
+  gate:
+    needs: [limen]
+    # always(), and the result asserted explicitly. Without always() a failed
+    # or cancelled dependency SKIPS this job instead of failing it, and a
+    # skipped required check does not block a merge — branch protection that
+    # quietly stops protecting. `needs.limen.result` is success only when
+    # every lane it ran succeeded: each verify leg, fuzz and tools.
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every lane succeeded
+        env:
+          # Via env, never interpolated into the script: the shell sees data,
+          # not something the expression layer can rewrite into code.
+          RESULT: ${{ needs.limen.result }}
+        shell: bash
+        run: |
+          printf 'limen: %s\n' "$RESULT"
+          [ "$RESULT" = "success" ]

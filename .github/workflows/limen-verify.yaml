@@ -1,0 +1,198 @@
+# DO NOT EDIT MANUALLY: content-pinned by limen, reset by `limen fix`.
+# The shared CI lanes every repository runs, called from its own ci.yaml
+# (`uses: ./.github/workflows/limen-verify.yaml`). A change here reaches every
+# repository with its limen bump; the project's own jobs live in its ci.yaml.
+#
+# Minimal glue: GitHub's own actions pinned by SHA, aqua at .aqua/aqua.yaml's
+# pins, `just` running the recipes a laptop runs. No third-party actions,
+# hence no egress-filtering action either.
+name: limen-verify
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        # Pinned images, never -latest. macOS is not redundant: its /bin/bash
+        # is 3.2, the floor the recipes target. Both windows legs run under
+        # git-bash. These names are NOT the ruleset's required contexts (the
+        # caller's `gate` is), so a project may trim or extend the list.
+        description: The verify matrix's runners, as a JSON list.
+        type: string
+        default: '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15", "windows-2025", "windows-11-arm"]'
+
+# No default token permissions: each job states what it needs, within what
+# the caller grants (contents: read).
+permissions: {}
+
+# Explicit bash everywhere: windows defaults to PowerShell and never sees
+# git-bash's environment; explicit bash also brings -eo pipefail.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os) }}
+    runs-on: ${{ matrix.os }}
+    # Generous for the windows legs, which are markedly slower.
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The token is not left behind in .git/config: nothing in this
+          # workflow talks to GitHub after checkout.
+          persist-credentials: false
+          # Full history and refs: `just do lint commits` validates the commit
+          # range against the PR's base branch, which a shallow clone lacks.
+          fetch-depth: 0
+
+      # Windows keeps every cache below in one disk image, cached as a single
+      # file: restored as files, they cost minutes of small-file writes there.
+      # Before setup-aqua, which takes the AQUA_ROOT_DIR it sets; the hash is
+      # taken here because hashFiles cannot walk into the attached image.
+      - id: image
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/windows-cache-image
+        with:
+          mode: attach
+          prefix: win-image-${{ runner.os }}-${{ runner.arch }}-
+          hash: ${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua.yaml', '.limen/aqua-registry.yaml', '**/go.sum') }}
+
+      - name: Install aqua (pinned, checksum-verified)
+        uses: ./.github/actions/setup-aqua
+
+      # aqua's package store, keyed on the exact pins and per architecture
+      # (the store holds native binaries). A warm store turns every lazy first
+      # use below into a link; the fallback key keeps the tools a pin bump did
+      # not touch, and the changed one downloads and verifies as before.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.AQUA_ROOT_DIR }}/pkgs
+          key: aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua-registry.yaml') }}
+          restore-keys: |
+            aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install pinned tools
+        # Link-only: tools download lazily on first use, checksum-verified; a
+        # job pays only for what its recipes run.
+        run: aqua install --only-link
+
+      # The Go build and module caches, plus the linter's (build/cache/, see
+      # main.just). The per-platform analysis legs compile the whole module
+      # graph five times, cold, on every run without this. Paths come from the
+      # pinned go itself — they differ per OS — and the key carries its version
+      # and every go.sum; a stale restore is harmless (the build cache is
+      # content-addressed, the module cache is checksum-verified), so the
+      # fallback key is always worth taking.
+      - id: gocache
+        if: runner.os != 'Windows'
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+      - if: runner.os != 'Windows'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.gocache.outputs.build }}
+            ${{ steps.gocache.outputs.mod }}
+            build/cache
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ steps.gocache.outputs.version }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ runner.arch }}-${{ steps.gocache.outputs.version }}-
+            go-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Lint
+        run: just lint
+
+      - name: Test
+        run: just test
+
+      # On a miss, the image this run filled becomes the key's; a hit needs no
+      # save, since a cache key is never overwritten.
+      - if: runner.os == 'Windows' && steps.image.outputs.cache-hit != 'true'
+        uses: ./.github/actions/windows-cache-image
+        with:
+          mode: save
+          key: ${{ steps.image.outputs.key }}
+
+  # One linux leg, not the matrix: fuzzing explores the same corpus wherever
+  # it runs, so more legs cost CPU and add nothing. The recipe passes on a
+  # tree with no targets or no Go module, so this job is safe in every
+  # repository.
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install aqua (pinned, checksum-verified)
+        uses: ./.github/actions/setup-aqua
+
+      - name: Install pinned tools
+        run: aqua install --only-link
+
+      # The cached corpus is what makes fuzzing cumulative across runs. Keyed
+      # on the fuzz sources so a changed target restarts its corpus;
+      # restore-keys keep the rest.
+      - id: fuzzdir
+        run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.fuzzdir.outputs.dir }}
+          key: fuzz-corpus-${{ runner.os }}-${{ hashFiles('**/*_fuzz_test.go', '**/fuzz_test.go') }}
+          restore-keys: |
+            fuzz-corpus-${{ runner.os }}-
+
+      - name: Fuzz
+        run: just do test go fuzz
+
+      # A crasher is a bug with a reproducer attached; the log names the
+      # target, the input file is what reproduces it locally. Uploaded only
+      # on failure, and only if any was written.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: fuzz-crashers
+          path: '**/testdata/fuzz/'
+          if-no-files-found: ignore
+
+  # Every pin resolves. The verify legs link only, and a link verifies
+  # nothing: an asset that is missing from a release, or that fails its
+  # checksum, would merge green and fail at first use. One linux leg pays for
+  # the real install; aqua's package store is cached on the exact pins, so a
+  # warm key costs seconds and a changed pin is always a real install. (The
+  # Go-built tools are tools/go.mod directives, built by the verify legs.)
+  tools:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install aqua (pinned, checksum-verified)
+        uses: ./.github/actions/setup-aqua
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.AQUA_ROOT_DIR }}/pkgs
+          # The same key as the verify legs', so this job and the linux leg
+          # share one store — and no fallback key here: a changed pin must be
+          # a real install, which is what this job exists to prove.
+          key: aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua-registry.yaml') }}
+
+      - name: Install every pinned tool
+        run: aqua install

@@ -5,8 +5,8 @@
 Build optional reference tools (macOS only):
 
 ```bash
-make alac-coreaudio   # CoreAudio ALAC encoder/decoder → tests/bin/alac-coreaudio
-make alacconvert      # Apple reference ALAC converter → tests/bin/alacconvert
+just alac-coreaudio   # CoreAudio ALAC encoder/decoder → tests/bin/alac-coreaudio
+just alacconvert      # Apple reference ALAC converter → tests/bin/alacconvert
 ```
 
 ## Conformance Testing
@@ -19,7 +19,7 @@ Tests all bit depth × encoder × sample rate × channel combinations using gene
 
 ```bash
 # Full suite (all tools)
-make test
+just test
 
 # Conformance only
 go test ./tests/ -run TestConformance -count=1 -v

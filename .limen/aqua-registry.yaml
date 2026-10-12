@@ -1,0 +1,615 @@
+# DO NOT EDIT MANUALLY.
+# This file is common to all projects and managed by limen.
+# Most tools can be installed directly from aqua registry without local overrides.
+# Addition of non-standard tools can be discussed on https://github.com/farcloser/limen
+
+packages:
+  # No go_install entries: every Go-built tool is a tool directive in
+  # tools/go.mod (book/tooling.md, "Go-built tools are go.mod tools").
+  # limen itself: every repo pins the version that enforces it, so the binary
+  # and the canonical files it embeds travel together (no version skew between
+  # the checker and the checked). Graduates to the standard registry once
+  # farcloser/limen is registered there.
+  - type: github_release
+    repo_owner: farcloser
+    repo_name: limen
+    description: Verify a repository against Farcloser engineering rules
+    asset: limen_{{trimV .Version}}_{{.OS}}_{{.Arch}}.tar.gz
+    format: tar.gz
+    # Two binaries per archive: limen, and limen-lint-go, the Go lint driver
+    # the lint recipes run (book/per-language.md). Releases before it shipped
+    # carry limen alone; the override keeps those installable. The top-level
+    # constraint is what makes aqua consult the overrides at all.
+    files:
+      - name: limen
+      - name: limen-lint-go
+    version_constraint: semver("> 0.5.2")
+    version_overrides:
+      - version_constraint: semver("<= 0.5.2")
+        files:
+          - name: limen
+    checksum:
+      type: github_release
+      asset: checksums.txt
+      algorithm: sha256
+      # Signed keyless from CI: the bundle over checksums.txt transitively
+      # covers every listed asset, and the identity IS the release workflow at
+      # the exact tag — anything else fails the install.
+      cosign:
+        bundle:
+          type: github_release
+          asset: checksums.txt.sigstore.json
+        opts:
+          - --certificate-identity
+          - https://github.com/farcloser/limen/.github/workflows/release.yaml@refs/tags/{{.Version}}
+          - --certificate-oidc-issuer
+          - https://token.actions.githubusercontent.com
+    supported_envs:
+      - darwin/arm64
+      - linux
+      - windows
+  # uutils/coreutils under every name it provides: the binary dispatches on
+  # argv[0], so each applet links to it and a bare `sort`, `date` or `mktemp`
+  # on the hermetic PATH is the pin on every platform — the same coreutils on
+  # macOS as on Linux, not BSD here and GNU there. The list is the multicall
+  # binary's own (`coreutils --list`, `[` excluded). Not on Windows: the build
+  # there is a native program inside git-bash, so every path it prints is a
+  # Windows path the MSYS2 tools beside it misread (`mktemp -d` handed to tar
+  # fails to open) — Windows gets git-for-windows/git below instead. Carried
+  # locally until the names land upstream; when upstream's asset naming
+  # changes, this copy needs the same edit. Upstream publishes no checksum file
+  # and no provenance: verify each asset against GitHub's release attestation
+  # at every bump (`gh release verify-asset <tag> <asset> -R uutils/coreutils`),
+  # which aqua cannot check itself.
+  - type: github_release
+    repo_owner: uutils
+    repo_name: coreutils
+    description: Cross-platform Rust rewrite of the GNU coreutils
+    asset: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}.{{.Format}}
+    format: tar.gz
+    replacements:
+      amd64: x86_64
+      arm64: aarch64
+      darwin: apple-darwin
+      linux: unknown-linux-musl
+    files:
+      - name: coreutils
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: arch
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: b2sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: base32
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: base64
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: basename
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: basenc
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: cat
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: chgrp
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: chmod
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: chown
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: chroot
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: cksum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: comm
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: cp
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: csplit
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: cut
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: date
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: dd
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: df
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: dir
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: dircolors
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: dirname
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: du
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: echo
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: env
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: expand
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: expr
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: factor
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: false
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: fmt
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: fold
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: groups
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: head
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: hostid
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: hostname
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: id
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: install
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: join
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: kill
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: link
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: ln
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: logname
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: ls
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: md5sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: mkdir
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: mkfifo
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: mknod
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: mktemp
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: more
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: mv
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: nice
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: nl
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: nohup
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: nproc
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: numfmt
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: od
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: paste
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: pathchk
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: pinky
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: pr
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: printenv
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: printf
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: ptx
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: pwd
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: readlink
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: realpath
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: rm
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: rmdir
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: seq
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sha1sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sha224sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sha256sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sha384sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sha512sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: shred
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: shuf
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sleep
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sort
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: split
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: stat
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: stdbuf
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: stty
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sync
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: tac
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: tail
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: tee
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: test
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: timeout
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: touch
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: tr
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: true
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: truncate
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: tsort
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: tty
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: uname
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: unexpand
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: uniq
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: unlink
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: uptime
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: users
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: vdir
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: wc
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: who
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: whoami
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: yes
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+    supported_envs:
+      - darwin/arm64
+      - linux
+  # Git for Windows' GNU coreutils, the Windows counterpart of the entry above,
+  # under the same names uutils provides elsewhere (all but `more` and
+  # `uptime`, which it does not ship): MSYS2 programs like the git-bash the
+  # recipes run in, so a path one prints is a path the next reads. Never
+  # `bash`, `sh` or `cygpath`: the Actions runner resolves `shell: bash` by
+  # PATH, finds the aqua link as `bash.EXE`, and aqua-proxy, matching `.exe`
+  # case-sensitively, asks aqua for `bash.EXE`, which then finds the proxy
+  # again on PATH — an unbounded recursion. The shell stays the runner's
+  # git-bash.
+  # Linked straight to usr/bin, never through bin/bash.exe, whose PATH
+  # prepending would let Git's own curl shadow the pin. The runtime is x86_64
+  # even in the arm64 tarball. The release tag is vX.Y.Z.windows.N; the asset
+  # name carries X.Y.Z for the first build and X.Y.Z.N for a rebuild
+  # (v2.56.0.windows.2 ships Git-2.56.0.2-64-bit.tar.bz2). Upstream lists each
+  # asset's SHA-256 in the release notes: check the recorded checksums against
+  # that table at every bump.
+  - type: github_release
+    repo_owner: git-for-windows
+    repo_name: git
+    description: Git for Windows, for its MSYS2 GNU coreutils
+    asset: Git-{{ regexReplaceAll "\\.windows\\.([0-9]+)$" (regexReplaceAll "\\.windows\\.1$" (trimV .Version) "") ".${1}" }}-{{.Arch}}.tar.bz2
+    format: tar.bz2
+    replacements:
+      amd64: 64-bit
+    files:
+      - name: arch
+        src: usr/bin/arch.exe
+      - name: b2sum
+        src: usr/bin/b2sum.exe
+      - name: base32
+        src: usr/bin/base32.exe
+      - name: base64
+        src: usr/bin/base64.exe
+      - name: basename
+        src: usr/bin/basename.exe
+      - name: basenc
+        src: usr/bin/basenc.exe
+      - name: cat
+        src: usr/bin/cat.exe
+      - name: chgrp
+        src: usr/bin/chgrp.exe
+      - name: chmod
+        src: usr/bin/chmod.exe
+      - name: chown
+        src: usr/bin/chown.exe
+      - name: chroot
+        src: usr/bin/chroot.exe
+      - name: cksum
+        src: usr/bin/cksum.exe
+      - name: comm
+        src: usr/bin/comm.exe
+      - name: cp
+        src: usr/bin/cp.exe
+      - name: csplit
+        src: usr/bin/csplit.exe
+      - name: cut
+        src: usr/bin/cut.exe
+      - name: date
+        src: usr/bin/date.exe
+      - name: dd
+        src: usr/bin/dd.exe
+      - name: df
+        src: usr/bin/df.exe
+      - name: dir
+        src: usr/bin/dir.exe
+      - name: dircolors
+        src: usr/bin/dircolors.exe
+      - name: dirname
+        src: usr/bin/dirname.exe
+      - name: du
+        src: usr/bin/du.exe
+      - name: echo
+        src: usr/bin/echo.exe
+      - name: env
+        src: usr/bin/env.exe
+      - name: expand
+        src: usr/bin/expand.exe
+      - name: expr
+        src: usr/bin/expr.exe
+      - name: factor
+        src: usr/bin/factor.exe
+      - name: false
+        src: usr/bin/false.exe
+      - name: fmt
+        src: usr/bin/fmt.exe
+      - name: fold
+        src: usr/bin/fold.exe
+      - name: groups
+        src: usr/bin/groups.exe
+      - name: head
+        src: usr/bin/head.exe
+      - name: hostid
+        src: usr/bin/hostid.exe
+      - name: hostname
+        src: usr/bin/hostname.exe
+      - name: id
+        src: usr/bin/id.exe
+      - name: install
+        src: usr/bin/install.exe
+      - name: join
+        src: usr/bin/join.exe
+      - name: kill
+        src: usr/bin/kill.exe
+      - name: link
+        src: usr/bin/link.exe
+      - name: ln
+        src: usr/bin/ln.exe
+      - name: logname
+        src: usr/bin/logname.exe
+      - name: ls
+        src: usr/bin/ls.exe
+      - name: md5sum
+        src: usr/bin/md5sum.exe
+      - name: mkdir
+        src: usr/bin/mkdir.exe
+      - name: mkfifo
+        src: usr/bin/mkfifo.exe
+      - name: mknod
+        src: usr/bin/mknod.exe
+      - name: mktemp
+        src: usr/bin/mktemp.exe
+      - name: mv
+        src: usr/bin/mv.exe
+      - name: nice
+        src: usr/bin/nice.exe
+      - name: nl
+        src: usr/bin/nl.exe
+      - name: nohup
+        src: usr/bin/nohup.exe
+      - name: nproc
+        src: usr/bin/nproc.exe
+      - name: numfmt
+        src: usr/bin/numfmt.exe
+      - name: od
+        src: usr/bin/od.exe
+      - name: paste
+        src: usr/bin/paste.exe
+      - name: pathchk
+        src: usr/bin/pathchk.exe
+      - name: pinky
+        src: usr/bin/pinky.exe
+      - name: pr
+        src: usr/bin/pr.exe
+      - name: printenv
+        src: usr/bin/printenv.exe
+      - name: printf
+        src: usr/bin/printf.exe
+      - name: ptx
+        src: usr/bin/ptx.exe
+      - name: pwd
+        src: usr/bin/pwd.exe
+      - name: readlink
+        src: usr/bin/readlink.exe
+      - name: realpath
+        src: usr/bin/realpath.exe
+      - name: rm
+        src: usr/bin/rm.exe
+      - name: rmdir
+        src: usr/bin/rmdir.exe
+      - name: seq
+        src: usr/bin/seq.exe
+      - name: sha1sum
+        src: usr/bin/sha1sum.exe
+      - name: sha224sum
+        src: usr/bin/sha224sum.exe
+      - name: sha256sum
+        src: usr/bin/sha256sum.exe
+      - name: sha384sum
+        src: usr/bin/sha384sum.exe
+      - name: sha512sum
+        src: usr/bin/sha512sum.exe
+      - name: shred
+        src: usr/bin/shred.exe
+      - name: shuf
+        src: usr/bin/shuf.exe
+      - name: sleep
+        src: usr/bin/sleep.exe
+      - name: sort
+        src: usr/bin/sort.exe
+      - name: split
+        src: usr/bin/split.exe
+      - name: stat
+        src: usr/bin/stat.exe
+      - name: stdbuf
+        src: usr/bin/stdbuf.exe
+      - name: stty
+        src: usr/bin/stty.exe
+      - name: sum
+        src: usr/bin/sum.exe
+      - name: sync
+        src: usr/bin/sync.exe
+      - name: tac
+        src: usr/bin/tac.exe
+      - name: tail
+        src: usr/bin/tail.exe
+      - name: tee
+        src: usr/bin/tee.exe
+      - name: test
+        src: usr/bin/test.exe
+      - name: timeout
+        src: usr/bin/timeout.exe
+      - name: touch
+        src: usr/bin/touch.exe
+      - name: tr
+        src: usr/bin/tr.exe
+      - name: true
+        src: usr/bin/true.exe
+      - name: truncate
+        src: usr/bin/truncate.exe
+      - name: tsort
+        src: usr/bin/tsort.exe
+      - name: tty
+        src: usr/bin/tty.exe
+      - name: uname
+        src: usr/bin/uname.exe
+      - name: unexpand
+        src: usr/bin/unexpand.exe
+      - name: uniq
+        src: usr/bin/uniq.exe
+      - name: unlink
+        src: usr/bin/unlink.exe
+      - name: users
+        src: usr/bin/users.exe
+      - name: vdir
+        src: usr/bin/vdir.exe
+      - name: wc
+        src: usr/bin/wc.exe
+      - name: who
+        src: usr/bin/who.exe
+      - name: whoami
+        src: usr/bin/whoami.exe
+      - name: yes
+        src: usr/bin/yes.exe
+    supported_envs:
+      - windows
+  # Quint (quint.sh): executable formal specifications, the model language of
+  # the spec-driven testing experiment (traces in ITF, replayed against the
+  # implementation). Upstream ships one bare Node-bundled binary per platform,
+  # with no checksums, signatures, or attestations: sourcing-ladder rung 1 on
+  # trust-on-first-use — aqua pins the checksum on first fetch. No
+  # windows/arm64 asset upstream. The repo also tags `evaluator/vX.Y.Z`
+  # releases (the Rust simulator that `quint run` downloads at run time into
+  # $QUINT_HOME unless told `--backend=typescript`); they are a different
+  # artifact and are filtered out of version resolution here.
+  - type: github_release
+    repo_owner: quint-co
+    repo_name: quint
+    description: Executable formal specifications (TLA+ semantics, ITF traces)
+    asset: quint-{{.OS}}-{{.Arch}}
+    format: raw
+    replacements:
+      darwin: macos
+      windows: pc
+    version_filter: not (Version startsWith "evaluator/")
+    supported_envs:
+      - darwin
+      - linux
+      - windows/amd64
+  # ossein: microVM containers on macOS. The `docker` file puts a command named
+  # docker on the hermetic PATH ahead of any Docker the machine has, on purpose,
+  # for the repositories that pin it: build scripts type `docker`, and get
+  # ossein-docker, which execs the ossein beside it — both from this archive.
+  # Elsewhere aqua's proxy falls through to the machine's own docker. Signed
+  # keyless from CI like limen; darwin/arm64 only, since ossein links
+  # Virtualization.framework, and aqua skips the package on every other env.
+  - type: github_release
+    repo_owner: farcloser
+    repo_name: ossein
+    description: microVM containers on macOS, with a docker-shaped front
+    asset: ossein_{{trimV .Version}}_{{.OS}}_{{.Arch}}.tar.gz
+    format: tar.gz
+    files:
+      - name: ossein
+      - name: ossein-docker
+      - name: docker
+        src: ossein-docker
+    checksum:
+      type: github_release
+      asset: checksums.txt
+      algorithm: sha256
+      cosign:
+        bundle:
+          type: github_release
+          asset: checksums.txt.sigstore.json
+        opts:
+          - --certificate-identity
+          - https://github.com/farcloser/ossein/.github/workflows/release.yaml@refs/tags/{{.Version}}
+          - --certificate-oidc-issuer
+          - https://token.actions.githubusercontent.com
+    supported_envs:
+      - darwin/arm64
+  # curl: forkcloser's first-party build with dependable TLS 1.3, so a recipe
+  # or script that fetches by hand runs the pinned curl from the hermetic PATH
+  # instead of whatever the machine or runner ships. Verified two ways on
+  # install: the committed checksum, and GitHub's artifact attestation for the
+  # release workflow — a plain checksum pin would discard the guarantee this
+  # build exists to give. The binary sits in a versioned directory inside the
+  # archive; on windows it is curl.exe with curl-ca-bundle.crt beside it. No
+  # darwin/amd64: Intel Mac support was dropped upstream.
+  - type: github_release
+    repo_owner: forkcloser
+    repo_name: curl
+    description: curl with dependable TLS 1.3, first-party build (forkcloser/curl)
+    asset: curl_{{trimV .Version}}_{{.OS}}_{{.Arch}}.tar.gz
+    format: tar.gz
+    files:
+      - name: curl
+        src: curl_{{trimV .Version}}_{{.OS}}_{{.Arch}}/curl
+    overrides:
+      - goos: windows
+        files:
+          - name: curl
+            src: curl_{{trimV .Version}}_{{.OS}}_{{.Arch}}/curl.exe
+    checksum:
+      type: github_release
+      asset: checksums.txt
+      algorithm: sha256
+    github_artifact_attestations:
+      signer_workflow: forkcloser/curl/.github/workflows/release.yaml
+    supported_envs:
+      - darwin/arm64
+      - linux
+      - windows
