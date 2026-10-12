@@ -681,7 +681,10 @@ func TestConformanceNatural(t *testing.T) {
 			}
 
 			dec, err := alac.NewDecoder(f)
-			f.Close()
+
+			if closeErr := f.Close(); closeErr != nil {
+				t.Errorf("close file: %v", closeErr)
+			}
 
 			if err != nil {
 				t.Fatalf("probe format: %v", err)
