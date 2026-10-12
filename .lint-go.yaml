@@ -25,16 +25,16 @@ golangci:
             - noctx # no cancellation to propagate
             - perfsprint # readability over allocations
             - mnd # fixture values
-
 licenses:
   ignore:
     # go-licenses cannot resolve the LICENSE of the gotest.tools/v3
     # submodule (google/go-licenses#186).
     - gotest.tools/v3
 nilaway:
-  # Onboarding backlog, as the golangci block above: NilAway reports two
-  # potential nil dereferences (internal/alac/predictor.go, internal/mp4/mp4.go)
-  # that nobody has read yet. They print without failing the lane until the
-  # alignment pass judges them; the last alignment pull request sets this
-  # back to blocking.
-  blocking: false
+  exclude-errors-in-files:
+    # A false positive on the predictor's coefficient store: UnpcBlock takes
+    # a nil coefs for the first-order delta mode (numActive == NumActiveDelta,
+    # as unpc_block takes NULL for 31 in dp_dec.c) and returns from that
+    # branch before the unrolled paths index coefs. NilAway tracks the nil
+    # argument but not that numActive selects the branch.
+    - internal/alac/predictor.go

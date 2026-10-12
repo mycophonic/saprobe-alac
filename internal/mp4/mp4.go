@@ -412,10 +412,9 @@ func buildSampleTable(reader io.ReadSeeker, stbl *boxInfo) ([]SampleInfo, error)
 		chunkOffset := chunkOffsets[chunkIdx]
 
 		for iter := uint32(0); iter < samplesInChunk && sampleIdx < int(sampleCount); iter++ {
-			var size uint32
-			if constantSize != 0 {
-				size = constantSize
-			} else {
+			// readStsz returns the per-sample sizes, or none and the constant size.
+			size := constantSize
+			if entrySizes != nil {
 				size = entrySizes[sampleIdx]
 			}
 
