@@ -41,8 +41,8 @@ golangci:
         # harness). The baseline wants each site named by its rule; until the
         # alignment pass does that, the file-level judgment is carried here.
         - path: ^cmd/alac-example-decoder/main\.go$
-          linters: [gosec, mnd, reassign]
-          text: G115|Magic number|reassigning variable Usage
+          linters: [gosec, mnd]
+          text: G115|Magic number
         - path: ^decode\.go$
           linters: [gocognit, gosec]
           text: cognitive complexity|G115

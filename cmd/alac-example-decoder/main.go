@@ -39,7 +39,7 @@ func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	format := flag.String("format", formatWAV, "output format: wav or pcm")
 
-	flag.Usage = func() {
+	flag.Usage = func() { //nolint:reassign // flag.Usage is the package's documented hook for a custom usage message
 		fmt.Fprintf(os.Stderr, "Usage: %s [-format wav|pcm] <input.m4a | ->\n", os.Args[0])
 		flag.PrintDefaults()
 	}
