@@ -1,0 +1,13 @@
+# DO NOT EDIT MANUALLY.
+# This file is common to all projects and managed by limen.
+# Global configuration changes proposals can be discussed on https://github.com/farcloser/limen
+
+registries:
+  - type: standard
+    ref: semver(">= 4.0.0")
+  - name: local
+    type: local
+    path: ../.limen/aqua-registry.yaml
+packages:
+  - registry: standard
+  - registry: local

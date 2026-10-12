@@ -1,0 +1,597 @@
+# DO NOT EDIT MANUALLY.
+# This file is common to all projects and managed by limen.
+# Global configuration changes proposals can be discussed on https://github.com/farcloser/limen
+#
+# The Go lint baseline of every farcloser repository, content-pinned like the
+# other files under .limen/: a project never edits it, and a change to the
+# policy arrives as the diff of the pull request that bumps limen. A project's
+# carve-outs go in its root .lint-go.yaml, in the same shape as the sections
+# below; limen-lint-go, shipped with limen's release, reads this file from the
+# nearest .limen/ at or above the module it runs in and renders the two into
+# the golangci-lint configuration the lint recipes run (book/per-language.md,
+# "one baseline, per-project carve-outs").
+#
+# Two placeholders are filled from the project's go.mod at render time:
+# ${MODULE_PATH} is the module path, ${MODULE_PREFIX} its first two elements
+# (the host and the owner: github.com/farcloser), the sibling modules gci
+# groups together.
+#
+# Selection doctrine. `default: all` makes the baseline the ceiling: every
+# linter golangci-lint ships is on unless named below, so a new release's
+# linters arrive enabled and are triaged, never missed. A linter is disabled
+# for one of three reasons, each stated on its line: deprecated; a duplicate of
+# a check another enabled tool already makes (one finding, reported once, by the
+# tool whose suppression is rule-level, see book/per-language.md "silencing a
+# finding"); or judged to carry no engineering value. Inside the bag linters
+# (revive, gocritic, staticcheck, govet, gosec) the same rule applies check by
+# check: revive owns style and naming, because its directives are per rule;
+# the single-purpose linters own the measures (gocognit for complexity, mnd
+# and goconst for literals), because their settings are richer and
+# `//nolint:<linter>` is already rule-level; govet and staticcheck own
+# correctness, because their analyzers are stronger; the modernizers with an
+# auto-fix (modernize, perfsprint, staticcheck S/QF) own rewrites.
+
+lint-go:
+  # The oldest golangci-lint release every linter name below exists in: a
+  # renamed or new linter moves this floor with it, and `limen-lint-go check`
+  # refuses an older binary, which would fail on the unknown name.
+  golangci-lint: v2.14.0
+
+licenses:
+  # What go-licenses accepts in the dependency graph; a project's .lint-go.yaml
+  # `allowed` replaces the list, its `ignore` names modules to skip.
+  allowed:
+    - Apache-2.0
+    - BSD-2-Clause
+    - BSD-3-Clause
+    - MIT
+
+nilaway:
+  # NilAway (go.uber.org/nilaway) is not a golangci-lint linter and will not
+  # become one; it runs as its own lane, bounded to the module by the
+  # placeholder (without it the whole dependency graph is analyzed). It has
+  # no per-line suppression: a false positive is carried by a file prefix in
+  # exclude-errors-in-files, a package prefix in exclude-pkgs, and a backlog
+  # by blocking: false in the project's .lint-go.yaml, until it is worked off.
+  blocking: true
+  exclude-pkgs: []
+  exclude-errors-in-files: []
+
+golangci:
+  version: "2"
+
+  run:
+    # Paths in exclusions are relative to the module root, not to the rendered
+    # file under build/ (golangci defaults to the config file's directory).
+    relative-path-mode: gomod
+    issues-exit-code: 2
+    modules-download-mode: readonly
+    allow-parallel-runners: true
+    allow-serial-runners: true
+
+  issues:
+    max-issues-per-linter: 0
+    max-same-issues: 0
+    # Every finding on a line, not the first: err113 and errorlint both report
+    # an `err == target`, and the default keeps whichever came first, so the
+    # other waits for the next run.
+    uniq-by-line: false
+
+  linters:
+    default: all
+
+    disable:
+      # Deprecated: each has a successor, named on the successor's line.
+      - exhaustruct # superseded by exhaustruct_v5, itself disabled below
+      - gomodguard # superseded by gomodguard_v2, itself disabled below
+      - wsl # superseded by wsl_v5
+
+      # Duplicates. The check stays on, made once, by the tool named.
+      - cyclop # cyclomatic complexity, plus a package average nobody acts on; see gocyclo
+      - maintidx # a blend of cyclomatic complexity and length; see gocyclo and funlen
+      # Measured across the enrolled repositories: every gocyclo finding sat
+      # on a function gocognit also reported, and gocyclo alone flags the flat
+      # dispatch switch gocognit rightly passes.
+      - gocyclo # gocognit
+      # Nearly every funlen finding shared its function with gocognit; the
+      # rest were long, flat, deliberate code. Length alone is not a defect.
+      - funlen # gocognit
+      - nestif # gocognit, and revive max-control-nesting
+      - nakedret # revive bare-return
+      - predeclared # revive redefines-builtin-id
+      - forcetypeassert # revive unchecked-type-assertion
+      - lll # golines reflows long lines instead of reporting them
+      - loggercheck # govet's slog analyzer checks slog key/value pairs; no other supported logger is allowed in
+      - nlreturn # wsl_v5's `return` check
+      - whitespace # wsl_v5's leading-whitespace and trailing-whitespace checks
+      - gomodguard_v2 # depguard, which also checks import paths, not just modules
+
+      # No engineering value, or a policy this organization does not hold.
+      - decorder # a fixed type/const/var/func file order is ceremony; funcorder covers what matters (methods after their type)
+      - grouper # requires single import/const/var blocks; gci already owns import layout
+      - goheader # no file-header policy; a project that has one enables it in its overlay
+      - importas # nothing without an alias list; a project with aliases to enforce enables it in its overlay
+      - errchkjson # forces handling json errors that cannot occur; SA1026 already catches the unmarshalable types
+      - exhaustruct_v5 # listing every field is noise on option structs and specs, the common case here
+      - ginkgolinter # ginkgo is not an allowed dependency
+      - testifylint # testify is not an allowed dependency
+      - godox # a TODO is a tracked decision, not a lint failure
+      - ireturn # "return concrete types" is a guideline with too many legitimate exceptions; iface's opaque check reports the harmful case
+      - noinlineerr # `if err := f(); err != nil` is idiomatic
+      - nonamedreturns # named returns are occasionally the clearest form; revive confusing-results reports the ambiguous case
+      - prealloc # premature optimization
+
+    exclusions:
+      # Tests are held to the production bar except for the five linters
+      # every enrolled repository found to be noise there: decided here,
+      # before a project silences a single test finding, because a silence
+      # written first and an exemption added later leaves every silence dead.
+      # Anything else a project tolerates in _test.go is its own, in its
+      # .lint-go.yaml.
+      rules:
+        - path: _test\.go
+          linters:
+            - gocognit # a table-driven test is one long, flat function by design
+            - goconst # fixture values repeat on purpose
+            - gosec # file and command handling on test fixtures
+            - varnamelen # tt, tc and friends
+            - wrapcheck # a test returns what it asserts on
+      # On although this rule matches nothing in a repository whose tests are
+      # clean of all five: the warning then says so, and a project's own dead
+      # rule still gets reported.
+      warn-unused: true
+
+    settings:
+      errcheck:
+        # revive's unhandled-error visits expression statements only: a
+        # `defer f.Close()` or `go f()` whose error is dropped is invisible to
+        # it. errcheck sees both, so errcheck owns the check.
+        # Type assertions are revive unchecked-type-assertion's (rule-level
+        # suppression). `_ = f()` and `_, _ = w.Write(b)` are the codebase's
+        # idiom for a reviewed discard: turning check-blank on makes every one
+        # of those lines a finding.
+        check-type-assertions: false
+        check-blank: false
+        # errcheck's built-in list already excludes fmt.Print* and
+        # fmt.Fprint*(os.Stderr). The Fprint family is excluded whatever the
+        # writer, the scope revive's unhandled-error had: standard output is
+        # the CLI's contract with a pipe, and a writer passed in for
+        # testability is a buffer or a recorder; a failure on either has no
+        # better handler than the exit.
+        exclude-functions:
+          - fmt.Fprint
+          - fmt.Fprintf
+          - fmt.Fprintln
+
+      errorlint:
+        # On although err113 reports `err == target` too, so that line shows
+        # twice: only this check catches a switch on an error, and io.EOF from
+        # a function that may wrap it. Silencing err113's copy instead takes a
+        # baseline exclusion, which warn-unused flags on every clean project.
+        comparison: true
+
+      govet:
+        # Every analyzer, including the ten vet leaves off by default:
+        # nilness, shadow, unusedwrite, deepequalerrors and friends are real
+        # bug classes. fieldalignment is the one exception: reordering struct
+        # fields for padding is safe but the finding is noise.
+        enable-all: true
+        disable:
+          - fieldalignment
+        settings:
+          shadow:
+            # Strict mode also reports a shadow whose outer variable is never
+            # read again, which is the harmless case. A finding is fixed by
+            # reusing the variable, `if err = f(); …`, never by a new name or
+            # a two-line split (book/per-language.md, "fixing a shadowed error").
+            strict: false
+
+      staticcheck:
+        # All SA (bugs), S (simplifications) and QF (quick fixes). The ST
+        # (style) checks that revive also makes are off here, so a finding is
+        # reported once and silenced per rule; the remaining ST checks have no
+        # revive twin.
+        checks:
+          - all
+          - -ST1000 # revive package-comments
+          - -ST1001 # revive dot-imports
+          - -ST1003 # revive var-naming
+          - -ST1005 # revive error-strings
+          - -ST1006 # revive receiver-naming
+          - -ST1008 # revive error-return
+          - -ST1011 # revive time-naming
+          - -ST1012 # revive error-naming
+          - -ST1013 # usestdlibvars http-status-code
+          - -ST1015 # revive enforce-switch-style
+          - -ST1016 # revive receiver-naming
+          - -ST1019 # revive duplicated-imports
+          - -ST1020 # revive exported
+          - -ST1021 # revive exported
+          - -ST1022 # revive exported
+          - -ST1023 # revive var-declaration
+          - -QF1009 # revive time-equal
+          - -QF1011 # revive var-declaration
+          # De Morgan's rewrite turns a range check, `!(lo <= x && x <= hi)`,
+          # into `x < lo || x > hi`, no clearer, and its fix writes Yoda
+          # conditions.
+          - -QF1001
+
+      gosec:
+        excludes:
+          - G104 # unchecked errors are errcheck's
+
+      gocritic:
+        # Every checker, experimental ones included: measured across the
+        # enrolled repositories they report next to nothing and what they
+        # report is real. Off: the duplicates of checks made elsewhere, and
+        # three "performance" heuristics that push pointer passing without a
+        # profile.
+        enable-all: true
+        disabled-checks:
+          - whyNoLint # nolintlint require-explanation
+          - paramTypeCombine # gofumpt group-params rewrites it
+          - octalLiteral # gofumpt rewrites 0755 to 0o755
+          - importShadow # revive import-shadowing
+          - builtinShadow # revive redefines-builtin-id
+          - builtinShadowDecl # revive redefines-builtin-id
+          - dupImport # revive duplicated-imports
+          - commentFormatting # revive comment-spacings
+          - defaultCaseOrder # revive enforce-switch-style
+          - tooManyResultsChecker # revive function-result-limit
+          - unnamedResult # revive confusing-results
+          - nestingReduce # revive early-return, indent-error-flow, superfluous-else
+          - externalErrorReassign # reassign
+          - redundantSprint # perfsprint
+          - yodaStyleExpr # staticcheck ST1017
+          - exposedSyncMutex # embeddedstructfieldcheck forbid-mutex
+          - hugeParam # by-value passing of a large struct is a design choice, not a defect
+          - rangeValCopy # same
+          - ruleguard # no rule files
+          - todoCommentWithoutDetail # see godox
+          # Its fix, filepath.Join, cleans the path: it drops a trailing
+          # separator and collapses "..", so the rewrite changes behavior,
+          # while code that spells os.PathSeparator is already portable.
+          - preferFilepathJoin
+          # It asks for `if err := f(); ...` where a named err is reassigned,
+          # and govet's shadow reports exactly that form: the two cannot both
+          # pass, and shadow is the one that catches a bug.
+          - sloppyReassign
+
+      revive:
+        # revive is the one style bag because `//revive:disable-next-line:<rule>`
+        # is per rule. Every rule is on; the ones below are off because another
+        # tool makes the same check with a stronger analysis or an auto-fix, or
+        # because the rule is obsolete.
+        enable-all-rules: true
+        rules:
+          # Obsolete since Go 1.22 loop-variable semantics (revive's own note).
+          - name: range-val-address
+            disabled: true
+          - name: range-val-in-closure
+            disabled: true
+          # Correctness twins of govet and staticcheck analyzers, which are
+          # flow-sensitive where revive matches syntax.
+          - name: unhandled-error
+            disabled: true # errcheck, see errcheck above
+          - name: constant-logical-expr
+            disabled: true # staticcheck SA4000
+          - name: unconditional-recursion
+            disabled: true # staticcheck SA5007
+          - name: unreachable-code
+            disabled: true # govet unreachable
+          - name: atomic
+            disabled: true # govet atomic
+          - name: waitgroup-by-value
+            disabled: true # govet copylocks
+          - name: string-of-int
+            disabled: true # govet stringintconv
+          # Rewrites with an auto-fix elsewhere.
+          - name: use-any
+            disabled: true # modernize any
+          - name: use-waitgroup-go
+            disabled: true # modernize waitgroupgo
+          - name: use-slices-sort
+            disabled: true # modernize slicessort
+          - name: redundant-build-tag
+            disabled: true # modernize plusbuild
+          - name: use-errors-new
+            disabled: true # perfsprint errorf
+          - name: errorf
+            disabled: true # staticcheck S1028
+          - name: bool-literal-in-expr
+            disabled: true # staticcheck S1002
+          - name: identical-branches
+            disabled: true # gocritic dupBranchBody
+          - name: empty-lines
+            disabled: true # wsl_v5 leading-whitespace, trailing-whitespace
+          - name: line-length-limit
+            disabled: true # golines
+          - name: useless-break
+            disabled: true # unnecessary-stmt reports the same break
+          # Measures owned by the single-purpose linters (see the doctrine at
+          # the top): their settings are richer and their suppression is
+          # already per linter.
+          - name: cognitive-complexity
+            disabled: true # gocognit
+          - name: cyclomatic
+            disabled: true # gocognit (see gocyclo in the disable list)
+          - name: function-length
+            disabled: true # gocognit (see funlen in the disable list)
+          - name: add-constant
+            disabled: true # mnd for numbers, goconst for strings
+          # A boolean parameter that selects behaviour is a design choice this
+          # codebase makes on purpose: 31 suppressions of this rule say so.
+          - name: flag-parameter
+            disabled: true
+          # golines wraps a long if-init into exactly the shape this rejects,
+          # with no auto-fix to undo it, so fix and lint never converge; the
+          # hoist it demands widens the error's scope. No bug class.
+          - name: multiline-if-init
+            disabled: true
+          # goimports names a package explicitly when its import path ends in
+          # a version element (`v1 ".../pkg/v1"`), and this rule then calls
+          # that name redundant: the two cannot both be satisfied, and a
+          # directive does not settle it (gci and goimports fight over the
+          # comment's blank line). goimports owns the import form.
+          - name: redundant-import-alias
+            disabled: true
+
+          - name: max-public-structs
+            arguments: [10]
+          # A public interface's methods are the contract; document them.
+          - name: exported
+            arguments: [checkPublicInterface]
+          # A switch may omit default; when present it is the last clause.
+          - name: enforce-switch-style
+            arguments: [allowNoDefault]
+
+      # Complexity: gocognit alone, at Sonar's default of 15 (gocyclo and
+      # funlen are off, see the disable list), production code only (see
+      # exclusions).
+      gocognit:
+        min-complexity: 15
+
+      # Go's own short names, by declaration: the name only these types carry
+      # (`w io.Writer`, `wg sync.WaitGroup`) says as much as a long one. A
+      # short name of any other type is still reported.
+      varnamelen:
+        ignore-type-assert-ok: true
+        ignore-map-index-ok: true
+        ignore-chan-recv-ok: true
+        ignore-decls:
+          - w io.Writer
+          - r io.Reader
+          - p []byte
+          - b []byte
+          - n int
+          - n int64
+          - i int
+          - f *os.File
+          - t *testing.T
+          - b *testing.B
+          - f *testing.F
+          - tb testing.TB
+          - wg sync.WaitGroup
+          - mu sync.Mutex
+          - ok bool
+
+      # Literals. mnd reports a bare number where a named constant would say
+      # what it means; the list below is what the codebase treats as
+      # self-evident (0 and 1 always are). goconst reports a string repeated
+      # three times or more; format strings are exempt, they are patterns,
+      # not values.
+      mnd:
+        ignored-numbers:
+          - "2"
+          - "3"
+          - "4"
+          - "5"
+          - "6"
+          - "7"
+          - "8"
+          - "9"
+          - "16"
+          - "20"
+          - "24"
+          - "32"
+          - "0xf"
+          - "0x1f"
+          - "0x3"
+          - "0xFF"
+          - "0xE0"
+          - "0x03"
+          - "0x0F"
+      goconst:
+        min-occurrences: 3
+        ignore-string-values:
+          - '^%'
+
+      nolintlint:
+        # The book's rule: a suppression names its linter and its reason.
+        require-explanation: true
+        require-specific: true
+        allow-unused: false
+
+      # An import must pass every rule whose files match its file, so main
+      # leaves the tests out: were it to cover them, a test-only dependency
+      # would have to be allowed in production code too. A project lists its
+      # reviewed dependencies under main; tests may import any module go.mod
+      # carries (lax), minus the same bans.
+      depguard:
+        rules:
+          main:
+            files:
+              - $all
+              - "!$test"
+            allow:
+              - $gostd
+              - ${MODULE_PATH}
+            # Standard-library packages the allow list would otherwise admit.
+            deny:
+              - pkg: log$
+                desc: logging is log/slog
+              - pkg: math/rand$
+                desc: use math/rand/v2
+              - pkg: io/ioutil$
+                desc: deprecated since Go 1.16; the functions moved to io and os
+          test:
+            files:
+              - $test
+            list-mode: lax
+            deny:
+              - pkg: log$
+                desc: logging is log/slog
+              - pkg: math/rand$
+                desc: use math/rand/v2
+              - pkg: io/ioutil$
+                desc: deprecated since Go 1.16; the functions moved to io and os
+
+      forbidigo:
+        forbid:
+          - pattern: '^fmt\.Print(ln|f)?$'
+            msg: "use structured logging instead"
+        exclude-godoc-examples: true
+        analyze-types: true
+
+      sloglint:
+        # Static messages with lowercase style and snake_case keys make logs
+        # queryable; a call with a context in scope passes it on.
+        static-msg: true
+        msg-style: lowercased
+        key-naming-case: snake
+        context: scope
+
+      usetesting:
+        # Beyond the defaults (t.TempDir, t.Setenv, t.Chdir): os.TempDir and
+        # the Go 1.24 t.Context.
+        os-temp-dir: true
+        context-background: true
+        context-todo: true
+
+      usestdlibvars:
+        # Every constant the standard library names, not only http. Not
+        # crypto-hash: it rewrites a displayed "SHA-256" to
+        # crypto.SHA256.String(), how a user-facing string is spelled, which
+        # is a judgment call and not a modernization. Not constant-kind: it
+        # takes any "Bool", "Int" or "String" for a go/constant kind, flag-set
+        # labels included, and asks to couple them to a compiler package.
+        time-date-month: true
+        time-month: true
+        time-layout: true
+        default-rpc-path: true
+        sql-isolation-level: true
+        tls-signature-scheme: true
+
+      iface:
+        enable:
+          - identical # two interfaces with the same method set in one package
+          - opaque # a function that returns an interface but only ever one concrete type
+          - unexported # an unexported interface in an exported signature
+
+      godoclint:
+        # revive exported and package-comments own the shape of a godoc; these
+        # are the two checks nothing else makes.
+        default: none
+        enable:
+          - single-pkg-doc
+          - no-unused-link
+
+      gochecksumtype:
+        # Same posture as exhaustive: a default clause does not excuse a
+        # missing variant.
+        default-signifies-exhaustive: false
+
+      embeddedstructfieldcheck:
+        # An embedded sync.Mutex exports Lock and Unlock on the parent type.
+        forbid-mutex: true
+
+      interfacebloat:
+        # The bigger the interface, the weaker the abstraction. No enrolled
+        # interface exceeds this.
+        max: 5
+
+      gomoddirectives:
+        # `replace` is refused by default, and no project loosens that: a
+        # replace is never committed (book/per-language.md, "no replace,
+        # ever"). `exclude` is refused too, being a replace by other means.
+        exclude-forbidden: true
+
+      reassign:
+        # Every package variable, not only EOF and Err*: another package
+        # overwriting any of them is the same hidden side effect. It sees an
+        # assignment to the whole variable from outside its package, never a
+        # write inside it or to an element of it.
+        patterns:
+          - ".*"
+
+      wsl_v5:
+        allow-first-in-block: true # Allow cuddling if variable used first in following block
+        allow-whole-block: false # Allow cuddling if variable used anywhere in block
+        branch-max-lines: 2 # Max lines before branch needs whitespace separation
+        case-max-lines: 0 # Max lines for case blocks (0 = off, 1 = always require)
+        default: ""
+        enable:
+          - append # Re-assign with append only if value exists above
+          - assign # Assignments cuddle only with other assignments/inc-dec
+          - branch # break/continue/fallthrough/goto separation rules
+          - decl # Declarations never cuddled
+          - defer # Defer cuddles with other defer, after error check, or single var
+          - err # Error check must follow immediately after error assignment
+          - expr # Function calls/index expr cuddle with var used above
+          - for # For loops cuddle with single var used above
+          - go # Go cuddles with other go or single var above
+          - if # If cuddles with single var used above
+          - inc-dec # ++/-- same rules as assign
+          - label # Labels never cuddled
+          - range # Range cuddles with single var used above
+          - return # Return separation based on branch-max-lines
+          - select # Select cuddles with single var above
+          - send # Send cuddles with single var above
+          - switch # Switch cuddles with single var above
+          - type-switch # Type switch cuddles with single var above
+          - leading-whitespace # No leading empty lines in blocks
+          - trailing-whitespace # No trailing empty lines in blocks
+        disable:
+          - assign-exclusive # Only allow cuddling new OR existing variables, not both
+          - assign-expr # Don't allow assignments cuddled with expressions
+
+  formatters:
+    enable:
+      - gci
+      - gofumpt
+      - golines
+      # The one formatter that edits the import list: an edit that drops a
+      # package's last use or introduces one leaves the tree not compiling,
+      # and the fmt pass the fix recipe runs to convergence is where goimports
+      # repairs it. gci keeps the grouping.
+      - goimports
+    settings:
+      gci:
+        sections:
+          - standard
+          - default
+          - prefix(${MODULE_PREFIX})
+          - localmodule
+        no-inline-comments: true
+        no-prefix-comments: true
+        custom-order: true
+      gofumpt:
+        # `extra-rules: true` is deprecated. golangci-lint's warning names
+        # `extra.group-params` as the replacement, which is a third of it:
+        # gofumpt's ExtraRules calls Extra.Set("true"), and that enables all
+        # three. Taking the warning at its word would silently stop clothing
+        # naked returns and balancing multi-line calls.
+        extra:
+          group-params: true
+          clothe-returns: true
+          balance-calls: true
+      golines:
+        max-len: 120
+        tab-len: 4
+        shorten-comments: true
+        # tagalign (a linter) owns struct tags: it aligns and sorts them under
+        # `run --fix`, and golines running after it would re-break them, so
+        # the fix pipeline never converges with both on.
+        reformat-tags: false
+    exclusions:
+      generated: disable

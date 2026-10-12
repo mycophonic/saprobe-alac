@@ -40,7 +40,7 @@ func TestProfileDecode(t *testing.T) {
 	}
 
 	if testutil.CoreAudioPath(t) == "" {
-		t.Skip("alac-coreaudio required to encode test data: run 'make alac-coreaudio'")
+		t.Skip("alac-coreaudio required to encode test data: run 'just alac-coreaudio'")
 	}
 
 	opts := agar.BenchOptions{}.WithDefaults()

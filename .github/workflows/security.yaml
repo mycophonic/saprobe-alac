@@ -1,0 +1,87 @@
+# DO NOT EDIT MANUALLY: content-pinned by limen, reset on drift. A project's
+# own scans go in its `security` recipe in the root .justfile, which this runs.
+#
+# The security lane, apart from ci: a scan's verdict moves with the
+# vulnerability database, not with the tree, so this runs on a schedule as
+# well as on every push and pull request, and its check stands alone — a new
+# advisory reddens `security`, never `gate`, and the answer is a dependency
+# bump, never a code change. Same glue as ci: GitHub's own actions pinned by
+# SHA, aqua at .aqua/aqua.yaml's pins, `just` running the recipe a laptop runs. No
+# third-party actions.
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Daily: an advisory lands without a push, and this is how main learns.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+# No default token permissions: the job states what it needs. This workflow
+# only ever reads the repository.
+permissions: {}
+
+# A superseded run (new push to the same branch/PR) is cancelled, not raced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # One linux leg: the scan loops over every supported platform itself
+  # (_per-platform in lib.just), so more legs would repeat one verdict.
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The token is not left behind in .git/config: nothing in this
+          # workflow talks to GitHub after checkout.
+          persist-credentials: false
+
+      - name: Install aqua (pinned, checksum-verified)
+        uses: ./.github/actions/setup-aqua
+
+      # aqua's package store, keyed on the exact pins (see limen-verify.yaml).
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.AQUA_ROOT_DIR }}/pkgs
+          key: aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua-registry.yaml') }}
+          restore-keys: |
+            aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install pinned tools
+        # Link-only: tools download lazily on first use, checksum-verified.
+        run: aqua install --only-link
+
+      # The Go build and module caches: the scan compiles the module graph
+      # once per supported platform, cold without this (see limen-verify.yaml).
+      - id: gocache
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.gocache.outputs.build }}
+            ${{ steps.gocache.outputs.mod }}
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ steps.gocache.outputs.version }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ runner.arch }}-${{ steps.gocache.outputs.version }}-
+            go-${{ runner.os }}-${{ runner.arch }}-
+
+      # The project's `security`, like ci's `lint` and `test`: the root
+      # .justfile names the shared scans and adds its own (a cgo project scans
+      # the packages the native leg cannot load). The shared scans pass on a
+      # tree with no Go module, so this job is safe in every repository.
+      - name: Scan
+        run: just security

@@ -1,0 +1,84 @@
+name: Windows cache image
+description: >
+  Windows only. Holds the Go build and module caches, aqua's root and the linter cache in one NTFS disk image (VHDX), cached as a single file. Restoring that file and attaching it costs under a minute; restoring the same caches as files writes 100,000+ small files, which costs several on the Windows runners. mode attach (before setup-aqua) restores or creates the image, attaches it at C:\vcache, points GOCACHE, GOMODCACHE and AQUA_ROOT_DIR into it, and excludes it from Defender's real-time scan; mode save (last, on a cache miss) detaches it and saves it.
+inputs:
+  mode:
+    description: attach or save.
+    required: true
+  prefix:
+    description: The cache key's prefix, also the restore fallback (attach).
+    required: false
+    default: ''
+  hash:
+    description: What the key varies on, hashed before attach (attach).
+    required: false
+    default: ''
+  key:
+    description: The key attach reported (save).
+    required: false
+    default: ''
+outputs:
+  key:
+    description: The exact cache key.
+    value: ${{ steps.attach.outputs.key }}
+  cache-hit:
+    description: true when the exact key was restored.
+    value: ${{ steps.restore.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    - id: restore
+      if: inputs.mode == 'attach'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: C:\vhd\cache.vhdx
+        key: ${{ inputs.prefix }}${{ inputs.hash }}
+        restore-keys: ${{ inputs.prefix }}
+
+    - name: Attach the image
+      id: attach
+      if: inputs.mode == 'attach'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        "key=${{ inputs.prefix }}${{ inputs.hash }}" >> $env:GITHUB_OUTPUT
+        $vhd = 'C:\vhd\cache.vhdx'
+        New-Item -ItemType Directory -Force -Path C:\vhd, C:\vcache | Out-Null
+        if (Test-Path $vhd) {
+          $disk = Mount-DiskImage -ImagePath $vhd -NoDriveLetter -PassThru | Get-Disk
+          $part = Get-Partition -DiskNumber $disk.Number | Where-Object Type -eq 'Basic'
+        } else {
+          # Expandable: the file holds only what is written, so 40 GB is a ceiling.
+          "create vdisk file=`"$vhd`" maximum=40960 type=expandable`nselect vdisk file=`"$vhd`"`nattach vdisk" |
+            Set-Content -Encoding ascii C:\vhd\create.txt
+          diskpart /s C:\vhd\create.txt | Out-Null
+          $disk = Get-DiskImage -ImagePath $vhd | Get-Disk
+          Initialize-Disk -Number $disk.Number -PartitionStyle GPT
+          $part = New-Partition -DiskNumber $disk.Number -UseMaximumSize
+          # NTFS, not a Dev Drive: ReFS measured slower here.
+          Format-Volume -Partition $part -FileSystem NTFS -Confirm:$false -Force | Out-Null
+        }
+        Add-PartitionAccessPath -DiskNumber $disk.Number -PartitionNumber $part.PartitionNumber -AccessPath 'C:\vcache\'
+        # Without it, Defender scans every file on its first read from the
+        # image, and lint pays what the restore saved.
+        Add-MpPreference -ExclusionPath 'C:\vcache', 'C:\vhd'
+        # The linter cache lives under the workspace (main.just pins it there).
+        New-Item -ItemType Directory -Force -Path C:\vcache\golangci, "$env:GITHUB_WORKSPACE\build" | Out-Null
+        New-Item -ItemType Junction -Path "$env:GITHUB_WORKSPACE\build\cache" -Target C:\vcache\golangci | Out-Null
+        "GOCACHE=C:\vcache\go-build" >> $env:GITHUB_ENV
+        "GOMODCACHE=C:\vcache\mod" >> $env:GITHUB_ENV
+        "AQUA_ROOT_DIR=C:/vcache/aqua" >> $env:GITHUB_ENV
+
+    - name: Detach the image
+      if: inputs.mode == 'save'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        Remove-Item "$env:GITHUB_WORKSPACE\build\cache" -Force
+        Dismount-DiskImage -ImagePath C:\vhd\cache.vhdx | Out-Null
+
+    - if: inputs.mode == 'save'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: C:\vhd\cache.vhdx
+        key: ${{ inputs.key }}

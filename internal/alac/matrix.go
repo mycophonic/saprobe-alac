@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//nolint:gosec // Integer conversions match Apple reference C implementation's fixed-width arithmetic.
 package alac
 
 import "encoding/binary"

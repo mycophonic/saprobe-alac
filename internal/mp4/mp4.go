@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//nolint:gosec // Integer conversions are bounded by MP4 atom sizes.
 package mp4
 
 import (

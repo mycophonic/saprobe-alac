@@ -20,7 +20,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/mycophonic/saprobe-alac"
+	alac "github.com/mycophonic/saprobe-alac"
 )
 
 // decode decodes ALAC from an io.ReadSeeker using NewDecoder + io.ReadAll.

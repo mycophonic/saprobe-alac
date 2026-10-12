@@ -26,7 +26,7 @@ import (
 
 	"github.com/mycophonic/agar/pkg/agar"
 
-	"github.com/mycophonic/saprobe-alac"
+	alac "github.com/mycophonic/saprobe-alac"
 )
 
 // encodeTestM4A generates a short M4A file for corruption tests.

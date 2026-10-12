@@ -1,0 +1,108 @@
+name: Setup aqua
+description: >
+  Install aqua (pinned, checksum-verified), put its bin directory on PATH, and authorize the repository's committed policy. aqua itself is the one tool aqua cannot pin. Same pins as limen-install: the installer script is fetched at an exact tag and checksum-verified, and it installs an exact aqua version.
+inputs:
+  github-token:
+    description: >
+      Token for aqua's GitHub API calls (exported as AQUA_GITHUB_TOKEN). Unauthenticated calls are limited per runner IP, shared with every tenant: a "403 API rate limit exceeded" on the first tool is that limit. Default: the job's token. Pass "" to opt out — the write-capable checksum workflow does.
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - name: Install aqua (pinned, checksum-verified)
+      shell: bash
+      env:
+        # Bumped manually, as a pair: Renovate cannot recompute the sha256
+        # that must change with the installer version.
+        AQUA_INSTALLER_VERSION: v4.0.2
+        AQUA_INSTALLER_SHA256: 98b883756cdd0a6807a8c7623404bfc3bc169275ad9064dc23a6e24ad398f43d
+        # renovate: depName=aquaproj/aqua
+        AQUA_VERSION: v2.64.0
+      run: |
+        # Pin the root explicitly: aqua's Windows build defaults it to
+        # %LOCALAPPDATA%, the installer and the .justfile compute ~/.local/share,
+        # and the layers must agree.
+        AQUA_ROOT_DIR="${AQUA_ROOT_DIR:-$HOME/.local/share/aquaproj-aqua}"
+        # Native form on windows: git-bash's POSIX $HOME (/c/Users/…) is misread
+        # by native binaries as drive-relative; cygpath -m yields C:/Users/…,
+        # which every layer reads.
+        if command -v cygpath >/dev/null 2>&1; then
+          AQUA_ROOT_DIR="$(cygpath -m "$AQUA_ROOT_DIR")"
+        fi
+        export AQUA_ROOT_DIR
+        echo "AQUA_ROOT_DIR=${AQUA_ROOT_DIR}" >>"$GITHUB_ENV"
+        tmp="$(mktemp -d)"
+        # Retries for transient runner failures. Windows curl (schannel) refuses
+        # a handshake when the CA's revocation server is unreachable (exit 35,
+        # seen repeatedly): best-effort revocation still rejects a known-revoked
+        # certificate, and the sha256 below is the real guard. schannel-only
+        # flag, so windows-only.
+        revoke=()
+        [ "${RUNNER_OS:-}" != "Windows" ] || revoke=(--ssl-revoke-best-effort)
+        curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors "${revoke[@]}" \
+          -o "${tmp}/aqua-installer" \
+          "https://raw.githubusercontent.com/aquaproj/aqua-installer/${AQUA_INSTALLER_VERSION}/aqua-installer"
+        # No single digest tool exists everywhere: linux and windows git-bash
+        # ship coreutils sha256sum, macOS ships perl shasum. (Nothing
+        # aqua-managed can help here — this checksum guards the aqua
+        # installer itself.)
+        if command -v sha256sum >/dev/null 2>&1; then
+          echo "${AQUA_INSTALLER_SHA256}  ${tmp}/aqua-installer" | sha256sum -c -
+        else
+          echo "${AQUA_INSTALLER_SHA256}  ${tmp}/aqua-installer" | shasum -a 256 -c -
+        fi
+        chmod +x "${tmp}/aqua-installer"
+        # The installer fetches the aqua binary with a bare `curl --retry 5
+        # --fail -L`, so the schannel failure guarded above reaches it too
+        # (exit 35 is a handshake failure, which --retry never covers). The
+        # flag goes to it through a .curlrc under CURL_HOME, windows only,
+        # for the rest of this step: the installer verifies the download
+        # against its own pinned sha256 list, so the guard costs nothing.
+        if [ "${RUNNER_OS:-}" = "Windows" ]; then
+          mkdir -p "${tmp}/curl"
+          echo 'ssl-revoke-best-effort' >"${tmp}/curl/.curlrc"
+          export CURL_HOME="${tmp}/curl"
+        fi
+        # Git for Windows' arm64 build ships an x86_64 bash, so `uname -m` lies
+        # and the installer would fetch amd64 aqua, which then resolves EVERY
+        # package emulated. RUNNER_ARCH is the truth: a uname shim for the
+        # installer's process only steers it, every byte still
+        # checksum-verified. Self-retiring once the shell's uname is honest.
+        if [ "${RUNNER_OS:-}" = "Windows" ] && [ "${RUNNER_ARCH:-}" = "ARM64" ] && [ "$(uname -m)" != "aarch64" ]; then
+          echo "windows/arm64 runner under an emulated shell (uname -m: $(uname -m)); steering the installer to arm64"
+          mkdir -p "${tmp}/shim"
+          real_uname="$(command -v uname)"
+          printf '#!/usr/bin/env bash\nif [ "${1:-}" = "-m" ]; then echo aarch64; else exec "%s" "$@"; fi\n' "${real_uname}" >"${tmp}/shim/uname"
+          chmod +x "${tmp}/shim/uname"
+          PATH="${tmp}/shim:${PATH}" "${tmp}/aqua-installer" -v "${AQUA_VERSION}"
+          # Assert, do not assume: read the PE machine field of the installed
+          # binary (0xAA64 = ARM64, 0x8664 = AMD64). If this ever fails, the
+          # leg is silently emulated again — better red than slow and false.
+          exe="${AQUA_ROOT_DIR}/bin/aqua.exe"
+          pe_offset="$(od -An -tu4 -j 60 -N 4 "${exe}" | tr -d ' ')"
+          machine="$(od -An -tx2 -j "$((pe_offset + 4))" -N 2 "${exe}" | tr -d ' ')"
+          if [ "${machine}" != "aa64" ]; then
+            echo "installed aqua is not an arm64 binary (PE machine 0x${machine}); the windows/arm64 leg would run emulated amd64 tooling" >&2
+            exit 1
+          fi
+          echo "aqua: native windows/arm64 (PE machine 0x${machine})"
+        else
+          "${tmp}/aqua-installer" -v "${AQUA_VERSION}"
+        fi
+        rm -rf "${tmp}"
+        echo "${AQUA_ROOT_DIR}/bin" >>"$GITHUB_PATH"
+    - name: Authorize the committed aqua policy
+      # Before aqua will read the repo's local registry, the committed policy
+      # must be allowed — every caller needs this, whatever it runs next.
+      shell: bash
+      run: aqua policy allow .aqua/aqua-policy.yaml
+    - name: Authenticate aqua's GitHub API calls
+      # GITHUB_ENV so every later step's aqua and its shims see it (downloads
+      # happen lazily, on first use). AQUA_GITHUB_TOKEN, not GITHUB_TOKEN: only
+      # aqua reads it.
+      if: inputs.github-token != ''
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.github-token }}
+      run: echo "AQUA_GITHUB_TOKEN=${TOKEN}" >>"$GITHUB_ENV"
