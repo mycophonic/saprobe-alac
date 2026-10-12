@@ -128,10 +128,11 @@ func TestBenchmarkDecode(t *testing.T) {
 				ffmpegDurations[iter] = time.Since(start)
 			}
 
-			results = append(results, agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())))
-
-			// Benchmark CoreAudio decode (CGO, in-process).
-			results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
+			// The ffmpeg result, then the CoreAudio decode (CGO, in-process).
+			results = append(results,
+				agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())),
+				agar.BenchDecodeCoreAudio(t, bf, opts, encoded),
+			)
 
 			// Benchmark alacconvert decode (from CAF).
 			if hasAlacconvert {
@@ -199,7 +200,7 @@ func TestBenchmarkDecodeFile(t *testing.T) {
 
 	// Write M4A to temp for tool-based decoders.
 	m4aPath := filepath.Join(tmpDir, "input.m4a")
-	if err := os.WriteFile(m4aPath, encoded, filesystem.FilePermissionsPrivate); err != nil {
+	if err = os.WriteFile(m4aPath, encoded, filesystem.FilePermissionsPrivate); err != nil {
 		t.Fatalf("write temp: %v", err)
 	}
 
@@ -224,10 +225,11 @@ func TestBenchmarkDecodeFile(t *testing.T) {
 		ffmpegDurations[iter] = time.Since(start)
 	}
 
-	results = append(results, agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())))
-
-	// Benchmark CoreAudio decode (CGO, in-process).
-	results = append(results, agar.BenchDecodeCoreAudio(t, bf, opts, encoded))
+	// The ffmpeg result, then the CoreAudio decode (CGO, in-process).
+	results = append(results,
+		agar.ComputeResult(bf, "ffmpeg", "decode", ffmpegDurations, int(m4aInfo.Size())),
+		agar.BenchDecodeCoreAudio(t, bf, opts, encoded),
+	)
 
 	// Benchmark alacconvert decode (from CAF).
 	// Setup: saprobe decode → WAV → alacconvert encode → CAF.
