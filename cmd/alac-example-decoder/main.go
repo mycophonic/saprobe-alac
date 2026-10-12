@@ -32,10 +32,14 @@ import (
 	"os"
 
 	alac "github.com/mycophonic/saprobe-alac"
-	"github.com/mycophonic/saprobe-alac/version"
 )
 
 const formatWAV = "wav"
+
+// version is the build's stamp: the shared build recipe sets it from `git describe`
+// through -X main.version; a plain `go build` leaves "dev". gochecknoglobals
+// exempts the name for this use.
+var version = "dev"
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
@@ -49,7 +53,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Fprintln(os.Stdout, version.String())
+		fmt.Fprintln(os.Stdout, "alac-example-decoder", version)
 		os.Exit(0)
 	}
 
