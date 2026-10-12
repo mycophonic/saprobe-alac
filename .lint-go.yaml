@@ -67,12 +67,10 @@ golangci:
         - path: ^tests/benchmark_test\.go$
           linters: [gocritic, govet]
           text: appendCombine|shadow
-        - path: ^tests/conformance_test\.go$
-          linters: [errcheck]
         - path: ^tests/example_decoder_test\.go$
           linters: [usetesting]
         - path: ^tests/synthetic_decode_test\.go$
-          linters: [errcheck, unparam]
+          linters: [unparam]
         - path: ^tests/testutil/alacconvert\.go$
           linters: [gosec, mnd, usetesting]
           text: G115|Magic number|t\.Context

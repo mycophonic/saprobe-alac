@@ -44,7 +44,7 @@ func decodeSaprobe(path string) ([]byte, alac.PCMFormat, error) {
 	if err != nil {
 		return nil, alac.PCMFormat{}, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // opened read-only: Close has nothing to flush and nothing to report
 
 	dec, decErr := alac.NewDecoder(f)
 	if decErr != nil {
