@@ -17,7 +17,7 @@
 // Package version holds build-time metadata injected via ldflags.
 package version
 
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // stamped by the linker (-X) at build time
 var (
 	name    = "unknown"
 	version = "unknown"

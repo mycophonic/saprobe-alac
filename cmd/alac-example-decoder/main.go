@@ -19,8 +19,6 @@
 // Usage:
 //
 //	alac-example-decoder [-format wav|pcm] <input.m4a | ->
-//
-//nolint:gosec // Integer conversions are bounded by audio format constraints; file paths from CLI args.
 package main
 
 import (
@@ -31,7 +29,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/mycophonic/saprobe-alac"
+	alac "github.com/mycophonic/saprobe-alac"
 	"github.com/mycophonic/saprobe-alac/version"
 )
 
@@ -124,7 +122,7 @@ func openInput(path string) (io.ReadSeeker, func(), error) {
 		return bytes.NewReader(data), func() {}, nil
 	}
 
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- the path is the command line's argument
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("opening %s: %w", path, err)
 	}

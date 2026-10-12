@@ -29,13 +29,13 @@ import (
 	"github.com/mycophonic/agar/pkg/coreaudio"
 	"github.com/mycophonic/primordium/filesystem"
 
-	"github.com/mycophonic/saprobe-alac"
+	alac "github.com/mycophonic/saprobe-alac"
 	"github.com/mycophonic/saprobe-alac/tests/testutil"
 )
 
 // Audio formats to benchmark.
 //
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // the benchmark matrix, read-only test data
 var benchFormats = []agar.BenchFormat{
 	{Name: "CD 44.1kHz/16bit", SampleRate: 44100, BitDepth: 16, Channels: 2},
 	{Name: "HiRes 96kHz/24bit", SampleRate: 96000, BitDepth: 24, Channels: 2},
@@ -44,7 +44,7 @@ var benchFormats = []agar.BenchFormat{
 // Audio durations to benchmark: short captures decoder overhead,
 // long measures sustained throughput.
 //
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // the benchmark matrix, read-only test data
 var benchDurations = []time.Duration{
 	10 * time.Second,
 	5 * time.Minute,
@@ -62,7 +62,7 @@ func TestBenchmarkDecode(t *testing.T) {
 	}
 
 	if testutil.CoreAudioPath(t) == "" {
-		t.Skip("alac-coreaudio required for benchmarks: run 'make alac-coreaudio'")
+		t.Skip("alac-coreaudio required for benchmarks: run 'just alac-coreaudio'")
 	}
 
 	opts := agar.BenchOptions{}.WithDefaults()

@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//nolint:gosec // Integer conversions bounded by audio format constraints; file paths from test harness.
 package testutil
 
 import (
@@ -36,13 +35,13 @@ import (
 const alacConvertBinary = "alacconvert"
 
 // AlacConvertPath returns the path to the alacconvert binary, or an empty
-// string if it is not available. Build it with: make alacconvert.
+// string if it is not available. Build it with: just alacconvert.
 func AlacConvertPath(t *testing.T) string {
 	t.Helper()
 
 	path, err := agar.LookFor(alacConvertBinary)
 	if err != nil {
-		t.Log("alacconvert not found: run 'make alacconvert' to enable Apple reference tests")
+		t.Log("alacconvert not found: run 'just alacconvert' to enable Apple reference tests")
 
 		return ""
 	}
@@ -82,8 +81,7 @@ func AlacConvert(t *testing.T, opts AlacConvertOptions) AlacConvertResult {
 		t.FailNow()
 	}
 
-	//nolint:gosec // arguments are test-controlled
-	cmd := exec.CommandContext(context.Background(), bin, opts.Args...)
+	cmd := exec.CommandContext(context.Background(), bin, opts.Args...) // #nosec G204 -- arguments are test-controlled
 
 	if opts.Stdin != nil {
 		cmd.Stdin = opts.Stdin
@@ -119,7 +117,7 @@ func AlacConvert(t *testing.T, opts AlacConvertOptions) AlacConvertResult {
 func ReadWAVPCMData(t *testing.T, path string) []byte {
 	t.Helper()
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- the path is the test harness's
 	if err != nil {
 		t.Fatalf("read WAV %s: %v", path, err)
 	}
@@ -154,7 +152,7 @@ func WriteWAV(t *testing.T, path string, pcm []byte, bitDepth, sampleRate, chann
 	byteRate := sampleRate * blockAlign
 	dataSize := len(pcm)
 
-	buf := make([]byte, 44+dataSize) //nolint:mnd // WAV header is always 44 bytes.
+	buf := make([]byte, 44+dataSize)
 
 	// RIFF header.
 	copy(buf[0:4], "RIFF")

@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//nolint:gosec // Integer conversions are bounded by MP4 atom sizes.
 package alac
 
 import (
@@ -124,7 +123,7 @@ func (s *Decoder) Seek(t time.Duration) (time.Duration, error) {
 }
 
 // Read reads decoded PCM bytes from the ALAC stream.
-func (s *Decoder) Read(p []byte) (int, error) { //nolint:varnamelen // p is idiomatic for io.Reader.Read
+func (s *Decoder) Read(p []byte) (int, error) {
 	total := 0
 
 	for len(p) > 0 {

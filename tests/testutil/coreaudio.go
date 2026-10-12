@@ -28,13 +28,13 @@ import (
 const coreAudioBinary = "alac-coreaudio"
 
 // CoreAudioPath returns the path to the alac-coreaudio binary, or an empty
-// string if it is not available. Build it with: make alac-coreaudio.
+// string if it is not available. Build it with: just alac-coreaudio.
 func CoreAudioPath(t *testing.T) string {
 	t.Helper()
 
 	path, err := agar.LookFor(coreAudioBinary)
 	if err != nil {
-		t.Log("alac-coreaudio not found: run 'make alac-coreaudio' to enable CoreAudio tests")
+		t.Log("alac-coreaudio not found: run 'just alac-coreaudio' to enable CoreAudio tests")
 
 		return ""
 	}

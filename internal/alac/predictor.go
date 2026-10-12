@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//nolint:gosec // Integer conversions match Apple reference C implementation's fixed-width arithmetic.
 package alac
 
 // Dynamic predictor (inverse linear prediction).
@@ -35,7 +34,7 @@ const (
 func signOfInt(val int32) int32 {
 	negiShift := int32(uint32(-val) >> 31)
 
-	return negiShift | (val >> 31) //revive:disable-line:add-constant
+	return negiShift | (val >> 31)
 }
 
 // UnpcBlock reverses the linear prediction encoding.
@@ -193,8 +192,6 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 }
 
 // unpcBlock5 is the optimized predictor for numActive == 5.
-//
-//revive:disable-next-line:cognitive-complexity
 func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
 	const lim = 6 // numActive(5) + 1
 
@@ -310,8 +307,6 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 }
 
 // unpcBlock6 is the optimized predictor for numActive == 6.
-//
-//revive:disable-next-line:cognitive-complexity
 func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
 	const lim = 7 // numActive(6) + 1
 
@@ -445,7 +440,6 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 	coefs[5] = int16(coef5)
 }
 
-//revive:disable-next-line:cognitive-complexity
 func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
 	const lim = 9 // numActive(8) + 1
 
@@ -618,8 +612,6 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 }
 
 // unpcBlockGeneral is the general predictor for any numActive.
-//
-//revive:disable:cognitive-complexity
 func unpcBlockGeneral(
 	pc1, out []int32,
 	num int,

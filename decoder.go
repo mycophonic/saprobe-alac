@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//nolint:gosec // Integer conversions match Apple reference C implementation's fixed-width arithmetic.
 package alac
 
 import (
@@ -24,7 +23,7 @@ import (
 	alacint "github.com/mycophonic/saprobe-alac/internal/alac"
 )
 
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // the bit depths ALAC encodes, read-only
 var alacBitDepths = []uint8{
 	16,
 	20,
@@ -51,7 +50,7 @@ var alacBitDepths = []uint8{
 //
 // This matches FFmpeg's ff_alac_channel_layout_offsets.
 //
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // the channel layout table, read-only
 var channelLayoutOffsets = [8][8]int{
 	{0},                      // 1ch: mono (no change)
 	{0, 1},                   // 2ch: stereo (no change)
@@ -537,7 +536,7 @@ func (d *PacketDecoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32
 // skipFIL skips a Fill Element.
 func (*PacketDecoder) skipFIL(bits *alacint.BitBuffer) error {
 	count := int16(bits.ReadSmall(4))
-	if count == 15 { //revive:disable-line:add-constant
+	if count == 15 {
 		count += int16(bits.ReadSmall(8)) - 1
 	}
 
@@ -556,7 +555,7 @@ func (*PacketDecoder) skipDSE(bits *alacint.BitBuffer) error {
 	dataByteAlignFlag := bits.ReadOne()
 
 	count := uint16(bits.ReadSmall(8))
-	if count == 255 { //revive:disable-line:add-constant
+	if count == 255 {
 		count += uint16(bits.ReadSmall(8))
 	}
 

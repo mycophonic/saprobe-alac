@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//nolint:gosec // Integer conversions match Apple reference C implementation's fixed-width arithmetic.
 package alac
 
 import (
@@ -72,7 +71,7 @@ func lead(m int32) int32 {
 
 // lg3a computes floor(log2(x+3)).
 func lg3a(x int32) int32 {
-	return 31 - lead(x+3) //revive:disable-line:add-constant
+	return 31 - lead(x+3)
 }
 
 // read32bit reads 4 bytes big-endian from a byte slice at the given offset.

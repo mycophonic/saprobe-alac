@@ -28,7 +28,7 @@ import (
 	"github.com/mycophonic/agar/pkg/agar"
 	"github.com/mycophonic/agar/pkg/coreaudio"
 
-	"github.com/mycophonic/saprobe-alac"
+	alac "github.com/mycophonic/saprobe-alac"
 	"github.com/mycophonic/saprobe-alac/tests/testutil"
 )
 
@@ -240,7 +240,7 @@ type conformanceInput struct {
 // in multichannel mode, byte comparison is skipped due to different channel
 // ordering conventions. Length verification is still performed.
 //
-//nolint:cyclop // Test orchestration requires many steps.
+
 func verifyConformance(t *testing.T, input conformanceInput) {
 	t.Helper()
 
@@ -434,7 +434,7 @@ func runEncode(
 ) string {
 	t.Helper()
 
-	//nolint:exhaustive
+	//nolint:exhaustive // encoderNone is the absent encoder, never an input here
 	switch enc {
 	case encoderFFmpeg:
 		srcPath := filepath.Join(tmpDir, "source.raw")
@@ -564,19 +564,19 @@ func runDecode(
 // Bit depths testable via ffmpeg and CoreAudio encoders (only s16p and s32p supported).
 // The spec also defines 20-bit and 32-bit, but no available encoder produces them.
 //
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // the test matrix, read-only test data
 var bitDepths = []int{16, 24}
 
 // sampleRates covers the full range of commonly used sample rates.
 //
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // the test matrix, read-only test data
 var sampleRates = []int{
 	8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 176400, 192000,
 }
 
 // channelCounts covers all supported channel counts (1 through 8).
 //
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // the test matrix, read-only test data
 var channelCounts = []int{1, 2, 3, 4, 5, 6, 7, 8}
 
 // TestConformance tests all bit depth × encoder × sample rate × channel combinations.

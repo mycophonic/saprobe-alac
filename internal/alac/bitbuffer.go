@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//nolint:gosec // Integer conversions match Apple reference C implementation's fixed-width arithmetic.
 package alac
 
 // BitBuffer provides bit-level reading from a byte buffer.
@@ -58,7 +57,7 @@ func (b *BitBuffer) Read(numBits uint8) uint32 {
 	w := b.Buf[b.Pos : b.Pos+3 : b.Pos+3]
 	// Load 3 bytes starting at current position (24 bits available).
 	returnBits := uint32(w[0])<<16 | uint32(w[1])<<8 | uint32(w[2])
-	returnBits = (returnBits << b.BitIdx) & 0x00FFFFFF //revive:disable-line:add-constant
+	returnBits = (returnBits << b.BitIdx) & 0x00FFFFFF
 	returnBits >>= 24 - uint32(numBits)
 
 	b.BitIdx += uint32(numBits)
