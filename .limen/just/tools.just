@@ -19,6 +19,13 @@ import 'lib.just'
 # commands only, never exported to a recipe's other children.
 aqua_api := 'AQUA_GITHUB_TOKEN="${AQUA_GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}" aqua'
 
+# Inside a Claude Code session the installer sets LIMEN_AGENT_HOME, the home of
+# the sessions' tool root: slsa-verifier keeps its TUF cache under
+# $HOME/.sigstore and reads no other variable (book/upstream.md), and the
+# sandbox denies the human's. For a human the variable is unset and this
+# expands to nothing.
+agent_home := '${LIMEN_AGENT_HOME:+HOME="$LIMEN_AGENT_HOME"}'
+
 # --- Project tooling (see book/tooling.md). Every recipe takes the tool as it
 #     is pinned: an aqua slug exactly as in .aqua/aqua.yaml (goreleaser/goreleaser),
 #     or a Go package path exactly as in tools/go.mod
@@ -109,7 +116,7 @@ add pkg version="": (_banner "tools" "add")
     fi
     mv "$tmp" .aqua/aqua.yaml
     {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # record its checksum (and drop stale ones)
-    aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
+    {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Set an existing tool to an exact version, e.g. `just do tools set goreleaser/goreleaser v2.0.0`.
 set pkg version: (_banner "tools" "set")
@@ -149,7 +156,7 @@ set pkg version: (_banner "tools" "set")
     sed -E "s#(^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc})@[^[:space:]]*#\1@{{ version }}#" .aqua/aqua.yaml > "$tmp"
     mv "$tmp" .aqua/aqua.yaml
     {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksum in, replaced version's out
-    aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
+    {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Takes the COMMAND name (`just`, `limen`, `deadcode`), not the package: `aqua
 # update` resolves a command to the project's pin, local registry included,
@@ -198,7 +205,7 @@ update command="": (_banner "tools" "update")
     if [ -z '{{ command }}' ]; then
         project_aqua update               # every project pin and the registries, to the latest
         {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksums in, replaced versions' out
-        aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
+        {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
         if [ ${#pkgs[@]} -gt 0 ]; then
             go -C tools get -tool "${pkgs[@]/%/@latest}"   # one solve for all of them
             go -C tools mod tidy
@@ -227,7 +234,7 @@ update command="": (_banner "tools" "update")
         exit 1
     fi
     {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksum in, replaced version's out
-    aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
+    {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Remove a tool entirely, e.g. `just do tools remove junegunn/fzf`.
 remove pkg: (_banner "tools" "remove")
