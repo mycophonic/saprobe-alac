@@ -57,7 +57,7 @@ func (b *BitBuffer) Read(numBits uint8) uint32 {
 	w := b.Buf[b.Pos : b.Pos+3 : b.Pos+3]
 	// Load 3 bytes starting at current position (24 bits available).
 	returnBits := uint32(w[0])<<16 | uint32(w[1])<<8 | uint32(w[2])
-	returnBits = (returnBits << b.BitIdx) & 0x00FFFFFF
+	returnBits = (returnBits << b.BitIdx) & 0x00FFFFFF //nolint:mnd // the 24-bit window the three loaded bytes fill
 	returnBits >>= 24 - uint32(numBits)
 
 	b.BitIdx += uint32(numBits)

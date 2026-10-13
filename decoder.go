@@ -225,7 +225,7 @@ func (d *PacketDecoder) decodeSCE(
 		return 0, alacint.ErrInvalidShift
 	}
 
-	escapeFlag := headerByte & 0x1
+	escapeFlag := headerByte & 0x1 //nolint:mnd // bit 0 of the element header, as ALACDecoder.cpp reads it
 	chanBits := uint32(d.config.BitDepth) - uint32(bytesShifted)*8
 
 	if partialFrame != 0 {
@@ -365,7 +365,7 @@ func (d *PacketDecoder) decodeCPE(
 		return 0, alacint.ErrInvalidShift
 	}
 
-	escapeFlag := headerByte & 0x1
+	escapeFlag := headerByte & 0x1 //nolint:mnd // bit 0 of the element header, as ALACDecoder.cpp reads it
 	// CPE has +1 bit for decorrelation.
 	chanBits := uint32(d.config.BitDepth) - uint32(bytesShifted)*8 + 1
 
@@ -536,7 +536,7 @@ func (d *PacketDecoder) decodeCPEEscape(bits *alacint.BitBuffer, chanBits uint32
 // skipFIL skips a Fill Element.
 func (*PacketDecoder) skipFIL(bits *alacint.BitBuffer) error {
 	count := int16(bits.ReadSmall(4))
-	if count == 15 {
+	if count == 15 { //nolint:mnd // the 4-bit count's escape value: an 8-bit extension follows (ALACDecoder.cpp)
 		count += int16(bits.ReadSmall(8)) - 1
 	}
 
@@ -555,7 +555,7 @@ func (*PacketDecoder) skipDSE(bits *alacint.BitBuffer) error {
 	dataByteAlignFlag := bits.ReadOne()
 
 	count := uint16(bits.ReadSmall(8))
-	if count == 255 {
+	if count == 255 { //nolint:mnd // the 8-bit count's escape value: a second byte follows (ALACDecoder.cpp)
 		count += uint16(bits.ReadSmall(8))
 	}
 
