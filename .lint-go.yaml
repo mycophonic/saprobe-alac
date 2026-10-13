@@ -26,28 +26,6 @@ golangci:
             - perfsprint # readability over allocations
             - mnd # fixture values
 
-        # --- ONBOARDING BACKLOG (book/mandatory-files.md, "Onboarding an
-        # existing repository"). Findings the baseline raised on enrolment and
-        # nobody has read yet: not decisions, exemptions to be emptied, one
-        # linter or one package per alignment pull request, each finding then
-        # fixed, silenced inline with its reason, or raised as a rule. The last
-        # alignment pull request deletes this block.
-        - path: ^decode\.go$
-          linters: [gocognit]
-          text: cognitive complexity
-        - path: ^decoder\.go$
-          linters: [gocognit]
-          text: cognitive complexity
-        - path: ^internal/alac/golomb\.go$
-          linters: [gocognit]
-          text: cognitive complexity
-        - path: ^internal/alac/predictor\.go$
-          linters: [gocognit]
-          text: cognitive complexity
-        - path: ^internal/mp4/mp4\.go$
-          linters: [gocognit]
-          text: cognitive complexity
-          # --- end of the onboarding backlog.
 licenses:
   ignore:
     # go-licenses cannot resolve the LICENSE of the gotest.tools/v3

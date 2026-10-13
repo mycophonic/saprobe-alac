@@ -129,6 +129,8 @@ func (d *PacketDecoder) DecodePacket(packet []byte) ([]byte, error) {
 // decodePacketInto decodes a single ALAC packet into the provided output buffer.
 // Returns the number of bytes written. The output buffer must be large enough
 // to hold one full frame (FrameLength * NumChannels * BytesPerSample).
+//
+//nolint:gocognit // the element loop of ALACDecoder::Decode: one case per element tag, as the bitstream lays them out
 func (d *PacketDecoder) decodePacketInto(packet, output []byte) (int, error) {
 	d.bits.Reset(packet)
 	bits := &d.bits

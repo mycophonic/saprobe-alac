@@ -148,6 +148,8 @@ func dynGet(input []byte, bitPos, golombM, golombK uint32) (result, newBitPos ui
 
 // DynDecomp performs adaptive Golomb-Rice entropy decoding of a sample block.
 // Writes decoded prediction residuals into predCoefs.
+//
+//nolint:gocognit // dyn_decomp with dyn_get_32bit inlined: the entropy decoder's hot loop, ~7% of decode time
 func DynDecomp(params *AGParams, bitBuf *BitBuffer, predCoefs []int32, numSamples, maxSize int) error {
 	// The bit cursor is 32-bit, as in ag_dec.c: refuse a read position past the
 	// packet (a header's shift-byte count can advance it there) and a packet it

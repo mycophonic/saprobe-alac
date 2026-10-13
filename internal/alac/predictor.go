@@ -96,6 +96,7 @@ func UnpcBlock(pc1, out []int32, num int, coefs []int16, numActive int32, chanBi
 // unpcBlock4 is the optimized predictor for numActive == 4.
 //
 //revive:disable:argument-limit
+//nolint:gocognit // unpc_block's unrolled numActive == 4 path (dp_dec.c): the adaptive predictor's own branching
 func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
 	const lim = 5 // numActive(4) + 1
 
@@ -193,6 +194,8 @@ func unpcBlock4(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 }
 
 // unpcBlock5 is the optimized predictor for numActive == 5.
+//
+//nolint:gocognit // unpc_block's unrolled numActive == 5 path (dp_dec.c): the adaptive predictor's own branching
 func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
 	const lim = 6 // numActive(5) + 1
 
@@ -308,6 +311,8 @@ func unpcBlock5(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 }
 
 // unpcBlock6 is the optimized predictor for numActive == 6.
+//
+//nolint:gocognit // unpc_block's unrolled numActive == 6 path (dp_dec.c): the adaptive predictor's own branching
 func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
 	const lim = 7 // numActive(6) + 1
 
@@ -441,6 +446,9 @@ func unpcBlock6(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 	coefs[5] = int16(coef5) // #nosec G115 -- the 16-bit field decodeSCECompressed read, +-1 a sample; unread after
 }
 
+// unpcBlock8 is the optimized predictor for numActive == 8.
+//
+//nolint:gocognit // unpc_block's unrolled numActive == 8 path (dp_dec.c): the adaptive predictor's own branching
 func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift uint32, denHalf int32) {
 	const lim = 9 // numActive(8) + 1
 
@@ -613,6 +621,8 @@ func unpcBlock8(pc1, out []int32, num int, coefs []int16, chanShift, denShift ui
 }
 
 // unpcBlockGeneral is the general predictor for any numActive.
+//
+//nolint:gocognit // unpc_block's general path (dp_dec.c): the adaptive predictor's own branching
 func unpcBlockGeneral(
 	pc1, out []int32,
 	num int,

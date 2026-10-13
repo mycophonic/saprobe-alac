@@ -148,6 +148,8 @@ func (info *boxInfo) payloadSize() int64 {
 
 // iterChildren calls callback for each direct child box within parent's payload.
 // callback returns true to stop iteration early.
+//
+//nolint:gocognit // the box walk: position, header, callback, skip, with EOF ending it; one loop, no state to name
 func iterChildren(
 	reader io.ReadSeeker,
 	parent *boxInfo,
@@ -315,6 +317,8 @@ const (
 // extractCookie reads the stsd box from stbl, finds an 'alac' sample entry,
 // and extracts the raw magic cookie (ALACSpecificConfig, possibly wrapped in
 // 'frma'+'alac' atoms which ParseMagicCookie handles).
+//
+//nolint:gocognit // one walk over the stsd entries with the size, type and version checks the format defines
 func extractCookie(reader io.ReadSeeker, stbl *boxInfo) ([]byte, error) {
 	fccStsd := [4]byte{'s', 't', 's', 'd'}
 
