@@ -123,8 +123,12 @@ packages:
         src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
       - name: echo
         src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
-      - name: env
-        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      # No env, here or in the Windows package: the Claude Code harness starts
+      # every sandboxed command as `env` resolved through its own PATH, outside
+      # the sandbox, with the current checkout's manifest. An aqua `env` then
+      # needs that checkout's policy approved before a session can run its
+      # first command, which is what would approve it. The system's env does
+      # the same job (book/identity.md, "The bot's sandbox").
       - name: expand
         src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
       - name: expr
@@ -363,8 +367,6 @@ packages:
         src: usr/bin/du.exe
       - name: echo
         src: usr/bin/echo.exe
-      - name: env
-        src: usr/bin/env.exe
       - name: expand
         src: usr/bin/expand.exe
       - name: expr
