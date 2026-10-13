@@ -426,6 +426,11 @@ golangci:
             allow:
               - $gostd
               - ${MODULE_PATH}
+              # depguard checks one entry per import, the last that sorts at or
+              # before it; a sibling module one hyphen longer sorts between the
+              # module and its packages and hides the entry above. The slash
+              # sorts this one after every such sibling (book/upstream.md).
+              - ${MODULE_PATH}/
             # Standard-library packages the allow list would otherwise admit.
             deny:
               - pkg: log$
