@@ -30,17 +30,19 @@ code: (_banner "lint go" "go") (_go-tool "golangci-lint" "github.com/golangci/go
 # Polices the shape the book requires (linting-go.md, "silencing a
 # finding"): nolintlint checks a directive's form, not which linter it names,
 # and bag linters (revive, gosec, staticcheck) must be silenced per rule.
-# Tracked Go files only.
+# Every Go file in the working tree, untracked included (a new test file is
+# untracked the first time its author lints), ignored ones excluded: the local
+# verdict is CI's.
 [private]
 _suppression-check:
     #!/usr/bin/env bash
     set -euo pipefail
     fail=0
-    # ban <message> <pattern> [<allowed-pattern>]: every tracked Go line matching
+    # ban <message> <pattern> [<allowed-pattern>]: every Go line matching
     # <pattern> and not <allowed-pattern> is a violation.
     ban() {
         local hits
-        hits="$(git grep -nE "$2" -- '*.go' || true)"
+        hits="$(git grep -nE --untracked "$2" -- '*.go' || true)"
         if [ -n "$hits" ] && [ -n "${3:-}" ]; then hits="$(printf '%s\n' "$hits" | grep -vE "$3" || true)"; fi
         if [ -n "$hits" ]; then printf '%s\n' "$hits" >&2; echo "$1" >&2; fail=1; fi
     }
@@ -76,7 +78,7 @@ _suppression-check:
     # The baseline exempts _test.go from gosec, and nolintlint never reads
     # gosec's own directive: a #nosec in a test file silences nothing. Tied
     # to that exclusion: drop this if the baseline ever lints tests with gosec.
-    hits="$(git grep -nE '#nosec' -- '*_test.go' || true)"
+    hits="$(git grep -nE --untracked '#nosec' -- '*_test.go' || true)"
     if [ -n "$hits" ]; then
         printf '%s\n' "$hits" >&2
         echo 'tests are exempt from gosec in the baseline: this #nosec silences nothing — remove it' >&2
