@@ -80,7 +80,7 @@ func (b *BitBuffer) ReadSmall(numBits uint8) uint8 {
 	b.Pos += int(b.BitIdx >> 3)
 	b.BitIdx &= 7
 
-	return uint8(returnBits)
+	return uint8(returnBits) // #nosec G115 -- numBits is 3, 4 or 8 at every call: 8 bits remain after the shift
 }
 
 // ReadOne reads a single bit.

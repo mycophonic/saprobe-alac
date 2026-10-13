@@ -18,6 +18,7 @@ package alac
 
 import (
 	"encoding/binary"
+	"math"
 	"math/bits"
 )
 
@@ -37,6 +38,9 @@ const (
 	nMaxMeanClamp = 0xffff
 	nMeanClampVal = 0xffff
 	maxZeroRun    = 65535 // Maximum zero-run length before resetting zmode.
+
+	// maxPacketBytes is the longest packet the 32-bit bit cursor addresses.
+	maxPacketBytes = math.MaxUint32 / 8
 )
 
 // AGParams holds the adaptive Golomb-Rice codec state.
@@ -66,7 +70,7 @@ func SetAGParams(params *AGParams, meanBase, partBound, kBase, frameWin, sampleW
 // lead returns the number of leading zeros in a 32-bit value.
 // Equivalent to the Apple lead() function.
 func lead(m int32) int32 {
-	return int32(bits.LeadingZeros32(uint32(m)))
+	return int32(bits.LeadingZeros32(uint32(m))) // #nosec G115 -- m's bits, counted; LeadingZeros32 returns 0 to 32
 }
 
 // lg3a computes floor(log2(x+3)).
@@ -115,7 +119,7 @@ func dynGet(input []byte, bitPos, golombM, golombK uint32) (result, newBitPos ui
 	streamLong <<= tempBits & 7
 
 	// Count leading ones (= leading zeros in complement).
-	pre := uint32(lead(int32(^streamLong)))
+	pre := uint32(lead(int32(^streamLong))) // #nosec G115 -- the complement's bits, for lead; lead returns 0 to 32
 
 	if pre >= maxPrefix16 {
 		pre = maxPrefix16
@@ -145,9 +149,17 @@ func dynGet(input []byte, bitPos, golombM, golombK uint32) (result, newBitPos ui
 // DynDecomp performs adaptive Golomb-Rice entropy decoding of a sample block.
 // Writes decoded prediction residuals into predCoefs.
 func DynDecomp(params *AGParams, bitBuf *BitBuffer, predCoefs []int32, numSamples, maxSize int) error {
+	// The bit cursor is 32-bit, as in ag_dec.c: refuse a read position past the
+	// packet (a header's shift-byte count can advance it there) and a packet it
+	// cannot address.
+	remaining := bitBuf.Size - bitBuf.Pos
+	if remaining < 0 || remaining > maxPacketBytes {
+		return ErrBitstreamOverrun
+	}
+
 	input := bitBuf.Buf[bitBuf.Pos:]
 	startPos := bitBuf.BitIdx
-	maxPos := uint32(bitBuf.Size-bitBuf.Pos) * 8
+	maxPos := uint32(remaining) * 8 // #nosec G115 -- remaining is 0 to maxPacketBytes, checked just above
 	bitPos := startPos
 
 	// BCE: reslice so compiler knows len(predCoefs) == numSamples.
@@ -168,34 +180,37 @@ func DynDecomp(params *AGParams, bitBuf *BitBuffer, predCoefs []int32, numSample
 			return ErrBitstreamOverrun
 		}
 
-		m := meanAccum >> qbShift                //nolint:varnamelen // standard Golomb-Rice parameter name
+		m := meanAccum >> qbShift //nolint:varnamelen // standard Golomb-Rice parameter name
+		// #nosec G115 -- m is meanAccum >> qbShift, below 2^23; kbLocal is KB, an 8-bit cookie field
 		k := min(lg3a(int32(m)), int32(kbLocal)) //nolint:varnamelen // standard Golomb-Rice parameter name
 
-		m = (1 << uint32(k)) - 1
+		m = (1 << uint32(k)) - 1 // #nosec G115 -- 0 to KB (8-bit cookie field) by the min above
 
 		// Inlined dynGet32Bit: eliminates per-sample function call overhead (~7% of decode time).
 		{
 			streamLong := read32bit(input, int(bitPos>>3))
 			streamLong <<= bitPos & 7
 
+			// #nosec G115 -- the complement's bits, for lead; lead returns 0 to 32
 			residual = uint32(lead(int32(^streamLong)))
 
 			if residual >= maxPrefix32 {
+				// #nosec G115 -- maxSize is chanBits, at most 33 (decodeCPE)
 				residual = getStreamBits(input, bitPos+maxPrefix32, uint32(maxSize))
-				bitPos += maxPrefix32 + uint32(maxSize)
+				bitPos += maxPrefix32 + uint32(maxSize) // #nosec G115 -- maxSize is chanBits, at most 33
 			} else {
 				bitPos += residual + 1
 
 				if k != 1 {
 					streamLong <<= residual + 1
-					v := streamLong >> (32 - uint32(k))
+					v := streamLong >> (32 - uint32(k)) // #nosec G115 -- 0 to KB (8-bit cookie field) by the min above
 
 					if v >= 2 {
 						residual = residual*m + v - 1
-						bitPos += uint32(k)
+						bitPos += uint32(k) // #nosec G115 -- 0 to KB (8-bit cookie field) by the min above
 					} else {
 						residual *= m
-						bitPos += uint32(k) - 1
+						bitPos += uint32(k) - 1 // #nosec G115 -- 0 to KB (8-bit cookie field) by the min above
 					}
 				}
 			}

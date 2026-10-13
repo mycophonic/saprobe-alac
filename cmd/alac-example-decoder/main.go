@@ -24,9 +24,11 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 
 	alac "github.com/mycophonic/saprobe-alac"
@@ -138,6 +140,9 @@ const (
 	riffChunkHeaderSize = 8
 )
 
+// errWAVLimit reports PCM that the 32-bit size fields of a WAV header cannot describe.
+var errWAVLimit = errors.New("PCM exceeds the WAV format's 4 GiB limit")
+
 // writeWAV writes a standard PCM WAV to writer.
 func writeWAV(writer io.Writer, pcm []byte, format alac.PCMFormat) error {
 	bytesPerSample := format.BitDepth / 8
@@ -145,20 +150,27 @@ func writeWAV(writer io.Writer, pcm []byte, format alac.PCMFormat) error {
 	byteRate := format.SampleRate * blockAlign
 	dataSize := len(pcm)
 
+	// The RIFF and data sizes and the byte rate are 32-bit fields.
+	if int64(dataSize) > math.MaxUint32-(wavHeaderSize-riffChunkHeaderSize) || int64(byteRate) > math.MaxUint32 {
+		return fmt.Errorf("%w: %d bytes at %d bytes/s", errWAVLimit, dataSize, byteRate)
+	}
+
 	var hdr [wavHeaderSize]byte
 
 	copy(hdr[0:4], "RIFF")
 	binary.LittleEndian.PutUint32(hdr[4:8], uint32(wavHeaderSize-riffChunkHeaderSize+dataSize))
 	copy(hdr[8:12], "WAVE")
 
+	// The fmt chunk: the format is the cookie's (NumChannels 8-bit, SampleRate 32-bit, BitDepth 16 to 32).
 	copy(hdr[12:16], "fmt ")
 	binary.LittleEndian.PutUint32(hdr[16:20], 16)
-	binary.LittleEndian.PutUint16(hdr[20:22], 1) // PCM
-	binary.LittleEndian.PutUint16(hdr[22:24], uint16(format.Channels))
-	binary.LittleEndian.PutUint32(hdr[24:28], uint32(format.SampleRate))
+	binary.LittleEndian.PutUint16(hdr[20:22], 1)                         // PCM
+	binary.LittleEndian.PutUint16(hdr[22:24], uint16(format.Channels))   // #nosec G115 -- an 8-bit cookie field
+	binary.LittleEndian.PutUint32(hdr[24:28], uint32(format.SampleRate)) // #nosec G115 -- a 32-bit cookie field
+	// #nosec G115 -- checked above, and unsigned at source
 	binary.LittleEndian.PutUint32(hdr[28:32], uint32(byteRate))
-	binary.LittleEndian.PutUint16(hdr[32:34], uint16(blockAlign))
-	binary.LittleEndian.PutUint16(hdr[34:36], uint16(format.BitDepth))
+	binary.LittleEndian.PutUint16(hdr[32:34], uint16(blockAlign))      // #nosec G115 -- 8-bit channels × 4 bytes
+	binary.LittleEndian.PutUint16(hdr[34:36], uint16(format.BitDepth)) // #nosec G115 -- 16 to 32 (NewPacketDecoder)
 
 	copy(hdr[36:40], "data")
 	binary.LittleEndian.PutUint32(hdr[40:44], uint32(dataSize))

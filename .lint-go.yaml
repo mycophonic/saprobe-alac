@@ -32,41 +32,21 @@ golangci:
         # linter or one package per alignment pull request, each finding then
         # fixed, silenced inline with its reason, or raised as a rule. The last
         # alignment pull request deletes this block.
-        #
-        # gosec G115 (integer conversions), 187 sites: the tree carried one
-        # file-level `//nolint:gosec` per file, with the authors' reason that
-        # the conversions match Apple's reference C implementation's
-        # fixed-width arithmetic (the codec) or are bounded by the MP4 atom
-        # sizes and the audio format (the container, the command, the test
-        # harness). The baseline wants each site named by its rule; until the
-        # alignment pass does that, the file-level judgment is carried here.
-        - path: ^cmd/alac-example-decoder/main\.go$
-          linters: [gosec]
-          text: G115
         - path: ^decode\.go$
-          linters: [gocognit, gosec]
-          text: cognitive complexity|G115
+          linters: [gocognit]
+          text: cognitive complexity
         - path: ^decoder\.go$
-          linters: [gocognit, gosec]
-          text: cognitive complexity|G115
-        - path: ^internal/alac/bitbuffer\.go$
-          linters: [gosec]
-          text: G115
+          linters: [gocognit]
+          text: cognitive complexity
         - path: ^internal/alac/golomb\.go$
-          linters: [gocognit, gosec]
-          text: cognitive complexity|G115
-        - path: ^internal/alac/matrix\.go$
-          linters: [gosec]
-          text: G115
+          linters: [gocognit]
+          text: cognitive complexity
         - path: ^internal/alac/predictor\.go$
-          linters: [gocognit, gosec]
-          text: cognitive complexity|G115
+          linters: [gocognit]
+          text: cognitive complexity
         - path: ^internal/mp4/mp4\.go$
-          linters: [gocognit, gosec]
-          text: cognitive complexity|G115
-        - path: ^tests/testutil/alacconvert\.go$
-          linters: [gosec]
-          text: G115
+          linters: [gocognit]
+          text: cognitive complexity
           # --- end of the onboarding backlog.
 licenses:
   ignore:

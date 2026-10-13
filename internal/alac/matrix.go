@@ -40,10 +40,10 @@ func WriteStereo16(out []byte, mixU, mixV []int32, chanIdx, numChan, numSamples 
 			right := left - mixV[idx]
 
 			dst := out[off : off+4 : off+4]
-			dst[0] = byte(left)
-			dst[1] = byte(left >> 8)
-			dst[2] = byte(right)
-			dst[3] = byte(right >> 8)
+			dst[0] = byte(left)       // #nosec G115 -- byte 0 of the little-endian sample
+			dst[1] = byte(left >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[2] = byte(right)      // #nosec G115 -- byte 0 of the little-endian sample
+			dst[3] = byte(right >> 8) // #nosec G115 -- byte 1 of the little-endian sample, shifted down
 			off += stride
 		}
 	} else {
@@ -52,10 +52,10 @@ func WriteStereo16(out []byte, mixU, mixV []int32, chanIdx, numChan, numSamples 
 			right := mixV[idx]
 
 			dst := out[off : off+4 : off+4]
-			dst[0] = byte(left)
-			dst[1] = byte(left >> 8)
-			dst[2] = byte(right)
-			dst[3] = byte(right >> 8)
+			dst[0] = byte(left)       // #nosec G115 -- byte 0 of the little-endian sample
+			dst[1] = byte(left >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[2] = byte(right)      // #nosec G115 -- byte 0 of the little-endian sample
+			dst[3] = byte(right >> 8) // #nosec G115 -- byte 1 of the little-endian sample, shifted down
 			off += stride
 		}
 	}
@@ -77,12 +77,12 @@ func WriteStereo20(out []byte, mixU, mixV []int32, chanIdx, numChan, numSamples 
 			right <<= 4
 
 			dst := out[off : off+6 : off+6]
-			dst[0] = byte(left)
-			dst[1] = byte(left >> 8)
-			dst[2] = byte(left >> 16)
-			dst[3] = byte(right)
-			dst[4] = byte(right >> 8)
-			dst[5] = byte(right >> 16)
+			dst[0] = byte(left)        // #nosec G115 -- byte 0 of the little-endian sample
+			dst[1] = byte(left >> 8)   // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[2] = byte(left >> 16)  // #nosec G115 -- byte 2 of the little-endian sample, shifted down
+			dst[3] = byte(right)       // #nosec G115 -- byte 0 of the little-endian sample
+			dst[4] = byte(right >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[5] = byte(right >> 16) // #nosec G115 -- byte 2 of the little-endian sample, shifted down
 			off += stride
 		}
 	} else {
@@ -90,14 +90,14 @@ func WriteStereo20(out []byte, mixU, mixV []int32, chanIdx, numChan, numSamples 
 			val := mixU[idx] << 4
 
 			dst := out[off : off+6 : off+6]
-			dst[0] = byte(val)
-			dst[1] = byte(val >> 8)
-			dst[2] = byte(val >> 16)
+			dst[0] = byte(val)       // #nosec G115 -- byte 0 of the little-endian sample
+			dst[1] = byte(val >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[2] = byte(val >> 16) // #nosec G115 -- byte 2 of the little-endian sample, shifted down
 
 			val = mixV[idx] << 4
-			dst[3] = byte(val)
-			dst[4] = byte(val >> 8)
-			dst[5] = byte(val >> 16)
+			dst[3] = byte(val)       // #nosec G115 -- byte 0 of the little-endian sample
+			dst[4] = byte(val >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[5] = byte(val >> 16) // #nosec G115 -- byte 2 of the little-endian sample, shifted down
 			off += stride
 		}
 	}
@@ -131,12 +131,12 @@ func WriteStereo24(out []byte, mixU, mixV []int32, chanIdx, numChan, numSamples 
 			}
 
 			dst := out[off : off+6 : off+6]
-			dst[0] = byte(left)
-			dst[1] = byte(left >> 8)
-			dst[2] = byte(left >> 16)
-			dst[3] = byte(right)
-			dst[4] = byte(right >> 8)
-			dst[5] = byte(right >> 16)
+			dst[0] = byte(left)        // #nosec G115 -- byte 0 of the little-endian sample
+			dst[1] = byte(left >> 8)   // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[2] = byte(left >> 16)  // #nosec G115 -- byte 2 of the little-endian sample, shifted down
+			dst[3] = byte(right)       // #nosec G115 -- byte 0 of the little-endian sample
+			dst[4] = byte(right >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[5] = byte(right >> 16) // #nosec G115 -- byte 2 of the little-endian sample, shifted down
 			off += stride
 		}
 	} else {
@@ -150,12 +150,12 @@ func WriteStereo24(out []byte, mixU, mixV []int32, chanIdx, numChan, numSamples 
 			}
 
 			dst := out[off : off+6 : off+6]
-			dst[0] = byte(left)
-			dst[1] = byte(left >> 8)
-			dst[2] = byte(left >> 16)
-			dst[3] = byte(right)
-			dst[4] = byte(right >> 8)
-			dst[5] = byte(right >> 16)
+			dst[0] = byte(left)        // #nosec G115 -- byte 0 of the little-endian sample
+			dst[1] = byte(left >> 8)   // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[2] = byte(left >> 16)  // #nosec G115 -- byte 2 of the little-endian sample, shifted down
+			dst[3] = byte(right)       // #nosec G115 -- byte 0 of the little-endian sample
+			dst[4] = byte(right >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+			dst[5] = byte(right >> 16) // #nosec G115 -- byte 2 of the little-endian sample, shifted down
 			off += stride
 		}
 	}
@@ -189,8 +189,8 @@ func WriteStereo32(out []byte, mixU, mixV []int32, chanIdx, numChan, numSamples 
 			}
 
 			dst := out[off : off+8 : off+8]
-			binary.LittleEndian.PutUint32(dst[:4], uint32(left))
-			binary.LittleEndian.PutUint32(dst[4:], uint32(right))
+			binary.LittleEndian.PutUint32(dst[:4], uint32(left))  // #nosec G115 -- the sample's bits for PutUint32
+			binary.LittleEndian.PutUint32(dst[4:], uint32(right)) // #nosec G115 -- the sample's bits for PutUint32
 
 			off += stride
 		}
@@ -205,8 +205,8 @@ func WriteStereo32(out []byte, mixU, mixV []int32, chanIdx, numChan, numSamples 
 			}
 
 			dst := out[off : off+8 : off+8]
-			binary.LittleEndian.PutUint32(dst[:4], uint32(left))
-			binary.LittleEndian.PutUint32(dst[4:], uint32(right))
+			binary.LittleEndian.PutUint32(dst[:4], uint32(left))  // #nosec G115 -- the sample's bits for PutUint32
+			binary.LittleEndian.PutUint32(dst[4:], uint32(right)) // #nosec G115 -- the sample's bits for PutUint32
 
 			off += stride
 		}
@@ -224,6 +224,8 @@ func WriteMono16(out []byte, mixU []int32, chanIdx, numChan, numSamples int) {
 
 	for idx := range mixU {
 		dst := out[off : off+2 : off+2]
+		// #nosec G115 -- a 16-bit sample (UnpcBlock sign-extended it to chanBits, 16 at this depth), as PutUint16 takes
+		// it
 		binary.LittleEndian.PutUint16(dst, uint16(int16(mixU[idx])))
 
 		off += stride
@@ -241,9 +243,9 @@ func WriteMono20(out []byte, mixU []int32, chanIdx, numChan, numSamples int) {
 		val := mixU[idx] << 4
 
 		dst := out[off : off+3 : off+3]
-		dst[0] = byte(val)
-		dst[1] = byte(val >> 8)
-		dst[2] = byte(val >> 16)
+		dst[0] = byte(val)       // #nosec G115 -- byte 0 of the little-endian sample
+		dst[1] = byte(val >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+		dst[2] = byte(val >> 16) // #nosec G115 -- byte 2 of the little-endian sample, shifted down
 		off += stride
 	}
 }
@@ -267,9 +269,9 @@ func WriteMono24(out []byte, mixU []int32, chanIdx, numChan, numSamples int, shi
 		}
 
 		dst := out[off : off+3 : off+3]
-		dst[0] = byte(val)
-		dst[1] = byte(val >> 8)
-		dst[2] = byte(val >> 16)
+		dst[0] = byte(val)       // #nosec G115 -- byte 0 of the little-endian sample
+		dst[1] = byte(val >> 8)  // #nosec G115 -- byte 1 of the little-endian sample, shifted down
+		dst[2] = byte(val >> 16) // #nosec G115 -- byte 2 of the little-endian sample, shifted down
 		off += stride
 	}
 }
@@ -293,7 +295,7 @@ func WriteMono32(out []byte, mixU []int32, chanIdx, numChan, numSamples int, shi
 		}
 
 		dst := out[off : off+4 : off+4]
-		binary.LittleEndian.PutUint32(dst, uint32(val))
+		binary.LittleEndian.PutUint32(dst, uint32(val)) // #nosec G115 -- the sample's bits for PutUint32
 
 		off += stride
 	}

@@ -164,6 +164,7 @@ func (s *Decoder) Read(p []byte) (int, error) {
 
 		packet := s.packetBuf[:sample.Size]
 
+		// #nosec G115 -- buildSampleTable refused any offset above MaxInt64
 		if _, err := s.reader.Seek(int64(sample.Offset), io.SeekStart); err != nil {
 			return total, fmt.Errorf("seeking to sample %d at offset %d: %w", s.sampleIdx, sample.Offset, err)
 		}
