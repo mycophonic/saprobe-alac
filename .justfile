@@ -30,18 +30,20 @@ build: do::build::go::default
 security: do::security::default
 
 # --- Reference tools for the conformance and benchmark tests (macOS) ---------
-# Both land under tests/bin/, where tests/testutil looks for them; neither is
-# needed for the unit tests, which skip the legs that want them.
+# Both land under bin/ at the module root, the directory agar.LookFor searches
+# before PATH (it walks up from the test file to go.mod and looks in bin/
+# beside it); .gitignore ignores bin. Neither is needed for the unit tests,
+# which skip the legs that want them.
 
 # Apple's open-source ALAC converter, built from the upstream repository at a
 # fixed commit: the reference the conformance tests compare the decoder to.
 alac_commit := 'c38887c5c5e64a4b31108733bd79ca9b2496d987'
 
-[doc("Build Apple's reference ALAC converter under tests/bin/")]
+[doc("Build Apple's reference ALAC converter under bin/")]
 alacconvert:
     #!/usr/bin/env bash
     set -euo pipefail
-    bin="$PWD/tests/bin"
+    bin="$PWD/bin"
     src="$bin/tmp/alac"
     rm -rf "$src"
     mkdir -p "$bin"
@@ -53,10 +55,10 @@ alacconvert:
 
 # The CoreAudio ALAC encoder/decoder (tests/testutil/coreaudio, C): what the
 # synthetic fixtures are encoded with.
-[doc('Build the CoreAudio ALAC encoder/decoder under tests/bin/')]
+[doc('Build the CoreAudio ALAC encoder/decoder under bin/')]
 alac-coreaudio:
     #!/usr/bin/env bash
     set -euo pipefail
-    mkdir -p tests/bin
-    make -C tests/testutil/coreaudio OUTPUT_DIR="$PWD/tests/bin"
-    echo "alac-coreaudio built: $PWD/tests/bin/alac-coreaudio"
+    mkdir -p bin
+    make -C tests/testutil/coreaudio OUTPUT_DIR="$PWD/bin"
+    echo "alac-coreaudio built: $PWD/bin/alac-coreaudio"

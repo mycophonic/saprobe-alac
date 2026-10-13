@@ -5,8 +5,8 @@
 Build optional reference tools (macOS only):
 
 ```bash
-just alac-coreaudio   # CoreAudio ALAC encoder/decoder → tests/bin/alac-coreaudio
-just alacconvert      # Apple reference ALAC converter → tests/bin/alacconvert
+just alac-coreaudio   # CoreAudio ALAC encoder/decoder → bin/alac-coreaudio
+just alacconvert      # Apple reference ALAC converter → bin/alacconvert
 ```
 
 ## Conformance Testing
