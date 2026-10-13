@@ -146,7 +146,7 @@ func TestNewPacketDecoder_InvalidBitDepth(t *testing.T) {
 func TestDecode_EmptyReader(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := decode(bytes.NewReader(nil))
+	_, err := decode(bytes.NewReader(nil))
 	if err == nil {
 		t.Fatal("expected error for empty reader")
 	}
@@ -161,7 +161,7 @@ func TestDecode_GarbageData(t *testing.T) {
 
 	garbage := bytes.Repeat([]byte{0xDE, 0xAD}, 1024)
 
-	_, _, err := decode(bytes.NewReader(garbage))
+	_, err := decode(bytes.NewReader(garbage))
 	if err == nil {
 		t.Fatal("expected error for garbage data")
 	}
@@ -184,7 +184,7 @@ func TestDecode_TruncatedBeforeMoov(t *testing.T) {
 	// Truncate before moov box.
 	truncated := data[:moovOff]
 
-	_, _, err := decode(bytes.NewReader(truncated))
+	_, err := decode(bytes.NewReader(truncated))
 	if err == nil {
 		t.Fatal("expected error for truncated file (before moov)")
 	}
@@ -214,7 +214,7 @@ func TestDecode_TruncatedMoov(t *testing.T) {
 
 	truncated := data[:cutPoint]
 
-	_, _, err := decode(bytes.NewReader(truncated))
+	_, err := decode(bytes.NewReader(truncated))
 	if err == nil {
 		t.Fatal("expected error for truncated moov")
 	}
@@ -243,7 +243,7 @@ func TestDecode_CorruptedStsd(t *testing.T) {
 		corrupted[i] = 0xFF
 	}
 
-	_, _, err := decode(bytes.NewReader(corrupted))
+	_, err := decode(bytes.NewReader(corrupted))
 	if err == nil {
 		t.Fatal("expected error for corrupted stsd")
 	}
@@ -322,7 +322,7 @@ func TestDecode_CorruptedALACCookie(t *testing.T) {
 		}
 	}
 
-	_, _, err := decode(bytes.NewReader(corrupted))
+	_, err := decode(bytes.NewReader(corrupted))
 	if err == nil {
 		t.Fatal("expected error for corrupted ALAC cookie")
 	}
@@ -354,7 +354,7 @@ func TestDecode_ZeroedStsz(t *testing.T) {
 	}
 
 	// With zero samples, Decode should succeed but produce empty PCM.
-	pcm, _, err := decode(bytes.NewReader(corrupted))
+	pcm, err := decode(bytes.NewReader(corrupted))
 	if err != nil {
 		// Also acceptable: an error during decode.
 		return
@@ -384,7 +384,7 @@ func TestDecode_CorruptedMdat(t *testing.T) {
 		corrupted[i] = 0xBA
 	}
 
-	_, _, err := decode(bytes.NewReader(corrupted))
+	_, err := decode(bytes.NewReader(corrupted))
 	if err == nil {
 		// Some corruptions may decode without error (garbage in → garbage out).
 		// That's acceptable — ALAC doesn't have per-packet checksums.
@@ -430,7 +430,7 @@ func TestDecode_TruncatedPacket(t *testing.T) {
 
 	truncated := data[:cutPoint]
 
-	_, _, err := decode(bytes.NewReader(truncated))
+	_, err := decode(bytes.NewReader(truncated))
 	if err == nil {
 		// Might succeed if the sample table entries before the cut point
 		// happen to be complete. Not guaranteed to fail.
