@@ -1,6 +1,6 @@
 name: Windows cache image
 description: >
-  Windows only. Holds the Go build and module caches, aqua's root and the linter cache in one NTFS disk image (VHDX), cached as a single file. Restoring that file and attaching it costs under a minute; restoring the same caches as files writes 100,000+ small files, which costs several on the Windows runners. mode attach (before setup-aqua) restores or creates the image, attaches it at C:\vcache, points GOCACHE, GOMODCACHE and AQUA_ROOT_DIR into it, and excludes it from Defender's real-time scan; mode save (last, on a cache miss) detaches it and saves it.
+  Windows only. Holds the Go build and module caches, aqua's root and the linter cache in one NTFS disk image (VHDX), cached as a single file. Restoring that file and attaching it costs under a minute; restoring the same caches as files writes 100,000+ small files, which costs several on the Windows runners. mode attach (before setup-aqua) restores or creates the image, attaches it at C:\vcache, points GOCACHE, GOMODCACHE and AQUA_ROOT_DIR into it, and excludes it from Defender's real-time scan; mode save (last, on a cache miss, on main only) detaches it and saves it.
 inputs:
   mode:
     description: attach or save.
@@ -27,13 +27,25 @@ outputs:
 runs:
   using: composite
   steps:
+    # The image accumulates (Go build cache, module cache, linter cache), so
+    # its key carries the UTC day: main refreshes it at most once a day, and
+    # the restore falls back to the newest image of the same hash, then of
+    # the prefix.
+    - id: day
+      if: inputs.mode == 'attach'
+      shell: pwsh
+      run: |
+        "day=$((Get-Date).ToUniversalTime().ToString('yyyyMMdd'))" >> $env:GITHUB_OUTPUT
+
     - id: restore
       if: inputs.mode == 'attach'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: C:\vhd\cache.vhdx
-        key: ${{ inputs.prefix }}${{ inputs.hash }}
-        restore-keys: ${{ inputs.prefix }}
+        key: ${{ inputs.prefix }}${{ inputs.hash }}-${{ steps.day.outputs.day }}
+        restore-keys: |
+          ${{ inputs.prefix }}${{ inputs.hash }}-
+          ${{ inputs.prefix }}
 
     - name: Attach the image
       id: attach
@@ -41,7 +53,7 @@ runs:
       shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
-        "key=${{ inputs.prefix }}${{ inputs.hash }}" >> $env:GITHUB_OUTPUT
+        "key=${{ inputs.prefix }}${{ inputs.hash }}-${{ steps.day.outputs.day }}" >> $env:GITHUB_OUTPUT
         $vhd = 'C:\vhd\cache.vhdx'
         New-Item -ItemType Directory -Force -Path C:\vhd, C:\vcache | Out-Null
         if (Test-Path $vhd) {
@@ -60,11 +72,18 @@ runs:
         }
         Add-PartitionAccessPath -DiskNumber $disk.Number -PartitionNumber $part.PartitionNumber -AccessPath 'C:\vcache\'
         # Without it, Defender scans every file on its first read from the
-        # image, and lint pays what the restore saved.
-        Add-MpPreference -ExclusionPath 'C:\vcache', 'C:\vhd'
+        # image, and lint pays what the restore saved. A speed-up, never a
+        # requirement: some runner images (windows-11-arm) have no Defender
+        # service to take the exclusion, and the restore is worth as much
+        # without it.
+        try {
+          Add-MpPreference -ExclusionPath 'C:\vcache', 'C:\vhd'
+        } catch {
+          Write-Host "Defender exclusion skipped: $_"
+        }
         # The linter cache lives under the workspace (main.just pins it there).
-        New-Item -ItemType Directory -Force -Path C:\vcache\golangci, "$env:GITHUB_WORKSPACE\build" | Out-Null
-        New-Item -ItemType Junction -Path "$env:GITHUB_WORKSPACE\build\cache" -Target C:\vcache\golangci | Out-Null
+        New-Item -ItemType Directory -Force -Path C:\vcache\golangci, "$env:GITHUB_WORKSPACE\.build" | Out-Null
+        New-Item -ItemType Junction -Path "$env:GITHUB_WORKSPACE\.build\cache" -Target C:\vcache\golangci | Out-Null
         "GOCACHE=C:\vcache\go-build" >> $env:GITHUB_ENV
         "GOMODCACHE=C:\vcache\mod" >> $env:GITHUB_ENV
         "AQUA_ROOT_DIR=C:/vcache/aqua" >> $env:GITHUB_ENV
@@ -74,7 +93,7 @@ runs:
       shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
-        Remove-Item "$env:GITHUB_WORKSPACE\build\cache" -Force
+        Remove-Item "$env:GITHUB_WORKSPACE\.build\cache" -Force
         Dismount-DiskImage -ImagePath C:\vhd\cache.vhdx | Out-Null
 
     - if: inputs.mode == 'save'

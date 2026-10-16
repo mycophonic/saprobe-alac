@@ -62,7 +62,7 @@ golangci:
 
   run:
     # Paths in exclusions are relative to the module root, not to the rendered
-    # file under build/ (golangci defaults to the config file's directory).
+    # file under .build/ (golangci defaults to the config file's directory).
     relative-path-mode: gomod
     issues-exit-code: 2
     modules-download-mode: readonly

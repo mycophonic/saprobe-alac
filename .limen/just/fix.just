@@ -43,7 +43,7 @@ yaml: (_banner "fix" "yaml")
 # `just do lint aqua` (needs network). In the default set so a plain
 # `just do fix` heals the drift the lint default flags.
 aqua: (_banner "fix" "aqua")
-    aqua --log-level warn -c .aqua/aqua.yaml update-checksum --prune
+    {{ agent_home }} aqua --log-level warn -c .aqua/aqua.yaml update-checksum --prune
 
 # Go fixers live in their own submodule: `just do fix go` runs them all,
 # `just do fix go <recipe>` (e.g. `just do fix go mod`) runs one.

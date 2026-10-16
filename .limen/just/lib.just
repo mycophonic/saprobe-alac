@@ -19,6 +19,16 @@ _banner mod name:
 # off — go's own default is cgo on wherever a C toolchain happens to exist.
 go_cgo := '${CGO_ENABLED:-${GO_CGO:-0}}'
 
+# Inside a Claude Code session the installer sets LIMEN_AGENT_HOME, the home of
+# the sessions' tool root: slsa-verifier keeps its TUF cache under
+# $HOME/.sigstore and reads no other variable (book/upstream.md), and the
+# sandbox denies the human's. Prefixed on every aqua command that downloads
+# and verifies: install, and update-checksum, which verifies what it sums.
+# Through env, because a word an expansion produces is never an assignment to
+# the shell (`HOME=x aqua` typed is one; `${v:+HOME=x} aqua` runs a command
+# named HOME=x). For a human the variable is unset and this is a bare env.
+agent_home := 'env ${LIMEN_AGENT_HOME:+HOME="$LIMEN_AGENT_HOME"}'
+
 # Run CMD once per supported platform — every GOOS/GOARCH pair in the canonical
 # checksum.supported_envs of .aqua/aqua.yaml (the list below mirrors it; extend them
 # together) — with CGO disabled. The Go build graph is selected by both axes:
@@ -44,52 +54,54 @@ _per-platform +cmd:
         done
     fi
 
-# The native build of one tools/go.mod tool into build/tools/, shared by
+# The native build of one .limen/tools/go.mod tool into .build/tools/, shared by
 # _go-tool and the tools recipes (`{{ go_tool_build }} <pkg>`). GOOS/GOARCH
 # cleared: a per-platform leg would cross-compile the tool itself (exec format
 # error). Directory form of -o: go names the binary itself, which on windows
 # means the .exe suffix the loader needs — git-bash then resolves the bare
-# build/tools/<name> the recipes call to it. (go strips a /vN major suffix
+# .build/tools/<name> the recipes call to it. (go strips a /vN major suffix
 # when naming, so github.com/google/go-licenses/v2 lands as go-licenses.)
-# -o is resolved relative to -C.
-go_tool_build := "mkdir -p build/tools && GOOS='' GOARCH='' go -C tools build -o '../build/tools/'"
+# -o is resolved relative to -C. CGO_ENABLED=0 throughout the tool builds:
+# the tools are pure Go, and with cgo on by default wherever a C compiler
+# exists, `net` alone would call one to build them.
+go_tool_build := "mkdir -p .build/tools && GOOS='' GOARCH='' CGO_ENABLED=0 go -C .limen/tools build -o '../../.build/tools/'"
 
 # Every Go-built tool the recipes run — the Go-source analyzers and the rest
-# alike — is a `tool` directive in a module under tools/, built natively ONCE
-# into build/tools/ by the pinned go (book/tooling.md, "Go-built tools are
+# alike — is a `tool` directive in a module under .limen/tools/, built natively ONCE
+# into .build/tools/ by the pinned go (book/tooling.md, "Go-built tools are
 # go.mod tools"). Never `go tool <name>` from a per-platform leg. Two homes:
-# tools/go.mod, shared by the small tools, and tools/<name>/go.mod for a tool
+# .limen/tools/go.mod, shared by the small tools, and .limen/tools/<name>/go.mod for a tool
 # whose dependency graph must stay its upstream's exactly (golangci-lint:
 # minimal version selection across a shared module would lift its analyzers'
 # dependencies past what upstream tested). The isolated module wins when both
 # exist. A directive missing from both fails with the recipe that adds it.
 # Recipes depend on this with the tool's name and package, then call
-# build/tools/<name>.
+# .build/tools/<name>.
 _go-tool name pkg:
     #!/usr/bin/env bash
     set -euo pipefail
     pattern='^(tool[[:space:]]+)?[[:space:]]*{{ pkg }}([[:space:]]|$)'
-    if grep -qE "$pattern" 'tools/{{ name }}/go.mod' 2>/dev/null; then
-        mkdir -p build/tools && GOOS='' GOARCH='' go -C 'tools/{{ name }}' build -o '../../build/tools/' '{{ pkg }}'
-    elif grep -qE "$pattern" tools/go.mod 2>/dev/null; then
+    if grep -qE "$pattern" '.limen/tools/{{ name }}/go.mod' 2>/dev/null; then
+        mkdir -p .build/tools && GOOS='' GOARCH='' CGO_ENABLED=0 go -C '.limen/tools/{{ name }}' build -o '../../../.build/tools/' '{{ pkg }}'
+    elif grep -qE "$pattern" .limen/tools/go.mod 2>/dev/null; then
         {{ go_tool_build }} '{{ pkg }}'
     else
-        echo "neither tools/{{ name }}/go.mod nor tools/go.mod carries 'tool {{ pkg }}' — add it: just do tools add {{ pkg }} (see book/tooling.md)" >&2
+        echo "neither .limen/tools/{{ name }}/go.mod nor .limen/tools/go.mod carries 'tool {{ pkg }}' — add it: just do tools add {{ pkg }} (see book/tooling.md)" >&2
         exit 1
     fi
 
-# The Go vulnerability database, fetched once into build/vulndb by `limen
+# The Go vulnerability database, fetched once into .build/vulndb by `limen
 # vulndb`, which retries (govulncheck's own client does not). Recipes depend
-# on this, then pass govulncheck `-db "$(cat build/vulndb.url)"`.
+# on this, then pass govulncheck `-db "$(cat .build/vulndb.url)"`.
 _vulndb:
     #!/usr/bin/env bash
     set -euo pipefail
-    mkdir -p build
-    ${LIMEN_BIN:-limen} vulndb build/vulndb > build/vulndb.url
+    mkdir -p .build
+    ${LIMEN_BIN:-limen} vulndb .build/vulndb > .build/vulndb.url
 
 # The golangci-lint configuration the lint and fix recipes run: the baseline
 # limen-lint-go embeds with the project's .lint-go.yaml applied, rendered on
-# every run into build/ (gitignored) — so an edit to the overlay is live at
+# every run into .build/ (gitignored) — so an edit to the overlay is live at
 # the next `just do lint go`, and nothing at the root invites a hand edit
 # (book/linting-go.md, "one baseline, per-project carve-outs"). First the
 # floor: the baseline names linters, and a pinned golangci-lint older than the
@@ -99,5 +111,5 @@ _vulndb:
 # LIMEN_LINT_GO_BIN is for the limen repository itself, which builds it from
 # its own tree (same idea as LIMEN_BIN in lint.just).
 _golangci-config:
-    ${LIMEN_LINT_GO_BIN:-limen-lint-go} check build/tools/golangci-lint
-    ${LIMEN_LINT_GO_BIN:-limen-lint-go} render -o build/golangci.yml
+    ${LIMEN_LINT_GO_BIN:-limen-lint-go} check .build/tools/golangci-lint
+    ${LIMEN_LINT_GO_BIN:-limen-lint-go} render -o .build/golangci.yml

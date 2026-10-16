@@ -10,3 +10,6 @@ generated
 /build
 /_scratch
 .claude
+
+# Required by limen (book/mandatory-files.md, ".gitignore").
+/.build

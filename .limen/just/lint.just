@@ -77,7 +77,7 @@ dockerfile: (_banner "lint" "dockerfile") (_go-tool "godolint" "github.com/forkc
     done < "$list"
     # godolint runs shellcheck on RUN lines when it finds one on PATH — the
     # pinned one, here.
-    [ ${#files[@]} -eq 0 ] || build/tools/godolint "${files[@]}"
+    [ ${#files[@]} -eq 0 ] || .build/tools/godolint "${files[@]}"
 
 yaml: (_banner "lint" "yaml")
     yamlfmt -conf .limen/.yamlfmt -lint
@@ -215,9 +215,9 @@ commits range="": (_banner "lint" "commits") (_go-tool "git-validation" "github.
     fi
     export GIT_CONFIG_COUNT=$n
     if [ -n "$range" ]; then
-        build/tools/git-validation -run DCO,short-subject,dangling-whitespace -range "$range"
+        .build/tools/git-validation -run DCO,short-subject,dangling-whitespace -range "$range"
     else
-        build/tools/git-validation -run DCO,short-subject,dangling-whitespace
+        .build/tools/git-validation -run DCO,short-subject,dangling-whitespace
     fi
     # .lint-signers lists everyone who authors here, email and key, in git's
     # allowed-signers format: every commit in the range must be signed by a
@@ -288,7 +288,7 @@ aqua: (_banner "lint" "aqua")
     }
     trap restore EXIT
     # --log-level warn: the per-package INFO lines are noise when nothing is wrong.
-    aqua --log-level warn update-checksum --prune
+    {{ agent_home }} aqua --log-level warn update-checksum --prune
     if [ -n "$had" ] && cmp -s .aqua/aqua-checksums.json "$tmpdir/snapshot"; then
         exit 0
     fi

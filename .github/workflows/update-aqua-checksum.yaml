@@ -103,7 +103,7 @@ jobs:
         # this repository only; the private key only mints.
         if: vars.UPDATE_AQUA_CHECKSUM_APP_ID != ''
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.UPDATE_AQUA_CHECKSUM_APP_ID }}
           private-key: ${{ secrets.UPDATE_AQUA_CHECKSUM_APP_PRIVATE_KEY }}
@@ -161,7 +161,7 @@ jobs:
           # --untracked-files=all: by default a new directory is ONE entry,
           # `?? dir/`, which is not a file, would be sent as a deletion, and
           # its files never committed — any directory the pinned limen fix
-          # seeds (tools/golangci-lint/ did) would be lost.
+          # seeds (.limen/tools/golangci-lint/ did) would be lost.
           done < <(git status --porcelain -z --untracked-files=all)
           # Signed-off-by: `just do lint commits` enforces DCO on the PR range,
           # bot commits included.

@@ -1,0 +1,145 @@
+name: Job caches
+description: >
+  The caches a canonical job keeps: aqua's package store and, with go, the Go build and module caches, plus the linter's with linter-cache. Called three times per job, each mode once: attach (before setup-aqua), restore (right after setup-aqua, before the job links or runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since aqua's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on main only, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and main refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
+inputs:
+  mode:
+    description: attach, restore or save.
+    required: true
+  go:
+    description: false to keep aqua's store only, no Go caches (restore).
+    required: false
+    default: 'true'
+  linter-cache:
+    description: true to keep the linter's .build/cache with the Go caches (restore).
+    required: false
+    default: 'false'
+  aqua-fallback:
+    description: false to restore the store's exact key only, so a changed pin is a real install (restore).
+    required: false
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    # --- attach: the Windows image, before setup-aqua ---
+    - if: inputs.mode == 'attach' && runner.os == 'Windows'
+      shell: bash
+      run: |
+        if [ -n "${LIMEN_CACHE_IMAGE_KEY:-}" ]; then
+          echo "::error::cache attached twice in one job: save would lose the first key"
+          exit 1
+        fi
+
+    # The image holds aqua's root and the Go caches, so it varies on the pins
+    # and every go.sum.
+    - id: image
+      if: inputs.mode == 'attach' && runner.os == 'Windows'
+      uses: ./.github/actions/windows-cache-image
+      with:
+        mode: attach
+        prefix: win-image-${{ runner.os }}-${{ runner.arch }}-
+        hash: ${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua.yaml', '.limen/aqua-registry.yaml', '**/go.sum') }}
+
+    - if: inputs.mode == 'attach' && runner.os == 'Windows'
+      shell: bash
+      env:
+        KEY: ${{ steps.image.outputs.key }}
+        HIT: ${{ steps.image.outputs.cache-hit }}
+      run: |
+        {
+          echo "LIMEN_CACHE_IMAGE_KEY=$KEY"
+          echo "LIMEN_CACHE_IMAGE_HIT=$HIT"
+        } >> "$GITHUB_ENV"
+
+    # --- restore: the store and the Go caches as files, Linux and macOS ---
+    - if: inputs.mode == 'restore' && runner.os != 'Windows'
+      shell: bash
+      run: |
+        if [ -n "${LIMEN_CACHE_AQUA_KEY:-}" ]; then
+          echo "::error::cache restored twice in one job: save would lose the first key"
+          exit 1
+        fi
+
+    # The store first: go is one of its tools, and resolving the Go caches'
+    # paths runs it, which would download the toolchain the store holds.
+    # Through aqua exec, since restore comes before the job links its tools.
+    - id: aqua
+      if: inputs.mode == 'restore' && runner.os != 'Windows'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.AQUA_ROOT_DIR }}/pkgs
+        key: aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua-registry.yaml') }}
+        restore-keys: ${{ inputs.aqua-fallback == 'true' && format('aqua-pkgs-{0}-{1}-', runner.os, runner.arch) || '' }}
+
+    - id: paths
+      if: inputs.mode == 'restore' && runner.os != 'Windows' && inputs.go == 'true'
+      shell: bash
+      env:
+        LINTER: ${{ inputs.linter-cache }}
+      run: |
+        {
+          if [ "$LINTER" = true ]; then echo "prefix=go-lint"; else echo "prefix=go"; fi
+          echo "build=$(aqua exec -- go env GOCACHE)"
+          echo "mod=$(aqua exec -- go env GOMODCACHE)"
+          echo "version=$(aqua exec -- go env GOVERSION)"
+          echo "day=$(date -u +%Y%m%d)"
+          if [ "$LINTER" = true ]; then echo "lint=.build/cache"; else echo "lint="; fi
+        } >> "$GITHUB_OUTPUT"
+
+    # An empty line in path is dropped, so without linter-cache the list is
+    # the two Go caches alone; a different list is a different entry, so it
+    # gets a different key prefix.
+    - id: go
+      if: inputs.mode == 'restore' && runner.os != 'Windows' && inputs.go == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ steps.paths.outputs.build }}
+          ${{ steps.paths.outputs.mod }}
+          ${{ steps.paths.outputs.lint }}
+        key: ${{ steps.paths.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.paths.outputs.version }}-${{ hashFiles('**/go.sum') }}-${{ steps.paths.outputs.day }}
+        restore-keys: |
+          ${{ steps.paths.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.paths.outputs.version }}-${{ hashFiles('**/go.sum') }}-
+          ${{ steps.paths.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.paths.outputs.version }}-
+          ${{ steps.paths.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-
+
+    - if: inputs.mode == 'restore' && runner.os != 'Windows'
+      shell: bash
+      env:
+        AQUA_KEY: ${{ steps.aqua.outputs.cache-primary-key }}
+        AQUA_HIT: ${{ steps.aqua.outputs.cache-hit }}
+        GO_KEY: ${{ steps.go.outputs.cache-primary-key }}
+        GO_HIT: ${{ steps.go.outputs.cache-hit }}
+        BUILD: ${{ steps.paths.outputs.build }}
+        MOD: ${{ steps.paths.outputs.mod }}
+        LINT: ${{ steps.paths.outputs.lint }}
+      run: |
+        {
+          echo "LIMEN_CACHE_AQUA_KEY=$AQUA_KEY"
+          echo "LIMEN_CACHE_AQUA_HIT=$AQUA_HIT"
+          echo "LIMEN_CACHE_GO_KEY=$GO_KEY"
+          echo "LIMEN_CACHE_GO_HIT=$GO_HIT"
+          echo "LIMEN_CACHE_GO_PATHS<<LIMEN_CACHE_GO_PATHS_END"
+          if [ -n "$BUILD" ]; then echo "$BUILD"; fi
+          if [ -n "$MOD" ]; then echo "$MOD"; fi
+          if [ -n "$LINT" ]; then echo "$LINT"; fi
+          echo "LIMEN_CACHE_GO_PATHS_END"
+        } >> "$GITHUB_ENV"
+
+    # --- save: main only, on a miss ---
+    - if: inputs.mode == 'save' && runner.os != 'Windows' && github.ref == 'refs/heads/main' && env.LIMEN_CACHE_AQUA_KEY != '' && env.LIMEN_CACHE_AQUA_HIT != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.AQUA_ROOT_DIR }}/pkgs
+        key: ${{ env.LIMEN_CACHE_AQUA_KEY }}
+
+    - if: inputs.mode == 'save' && runner.os != 'Windows' && github.ref == 'refs/heads/main' && env.LIMEN_CACHE_GO_KEY != '' && env.LIMEN_CACHE_GO_HIT != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.LIMEN_CACHE_GO_PATHS }}
+        key: ${{ env.LIMEN_CACHE_GO_KEY }}
+
+    - if: inputs.mode == 'save' && runner.os == 'Windows' && github.ref == 'refs/heads/main' && env.LIMEN_CACHE_IMAGE_KEY != '' && env.LIMEN_CACHE_IMAGE_HIT != 'true'
+      uses: ./.github/actions/windows-cache-image
+      with:
+        mode: save
+        key: ${{ env.LIMEN_CACHE_IMAGE_KEY }}

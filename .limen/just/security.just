@@ -78,7 +78,7 @@ links: (_banner "security" "links")
 # against the Go vulnerability database (fetched once, see _vulndb in
 # lib.just), by the symbols it links, so a known standard-library or module
 # vulnerability in a pinned tool is seen the day the advisory lands, whoever
-# built it. The binaries the pinned toolchain builds here (tools/go.mod) are
+# built it. The binaries the pinned toolchain builds here (.limen/tools/go.mod) are
 # the go vuln lane's; this one is for what we did not build. Enumerated from
 # aqua's proxies: `aqua which` answers only for the names this repository's
 # config provides, and `go version -m` tells a Go executable from the rest.
@@ -91,7 +91,7 @@ links: (_banner "security" "links")
 binaries: (_banner "security" "binaries") (_go-tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck") _vulndb
     #!/usr/bin/env bash
     set -euo pipefail
-    db=$(cat build/vulndb.url)
+    db=$(cat .build/vulndb.url)
     bin="$(aqua root-dir)/bin"
     # A newline-delimited list, not an associative array: macOS ships bash 3.
     seen=$'\n'
@@ -108,7 +108,7 @@ binaries: (_banner "security" "binaries") (_go-tool "govulncheck" "golang.org/x/
         # A darwin universal binary (goreleaser ships one) is beyond govulncheck's
         # reader; the other platforms' legs scan that tool's thin binaries, so
         # the darwin leg says so and moves on rather than failing on a format.
-        if ! out=$(build/tools/govulncheck -db "$db" -mode binary "$path" 2>&1); then
+        if ! out=$(.build/tools/govulncheck -db "$db" -mode binary "$path" 2>&1); then
             case "$out" in
                 *"unrecognized binary format"*) echo "  skipped: universal binary, scanned on the other platforms";;
                 *) printf '%s\n' "$out"; fail=1;;

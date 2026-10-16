@@ -19,7 +19,7 @@ registries:
 packages:
   # The limen this repository runs, and with it every canonical file it
   # writes: the one canonical pin kept here, where Renovate bumps it.
-  - name: farcloser/limen@v0.11.0 # renovate: depName=farcloser/limen
+  - name: farcloser/limen@v0.12.0 # renovate: depName=farcloser/limen
     registry: local
   # The Go toolchain is the repository's own pin, seeded from limen's own
   # manifest once and Renovate's here afterwards: a standard-library fix
