@@ -10,7 +10,7 @@ packages:
   # and treats a separate `version:` key as hand-held, and Renovate reads only
   # that form.
   # No Go-built tool is pinned here: every one is a `tool` directive in
-  # tools/go.mod, built by the pinned go (book/tooling.md, "Go-built tools
+  # .limen/tools/go.mod, built by the pinned go (book/tooling.md, "Go-built tools
   # are go.mod tools"). aqua's go_install would build it once per tool
   # version, with whichever go ran first, and share that binary.
   # The coreutils under their bare names, the same pin on every platform:
@@ -26,7 +26,8 @@ packages:
   # afterwards): a standard-library fix must not wait for a limen release.
   - name: casey/just@1.58.0
   - name: koalaman/shellcheck@v0.11.0
-  - name: google/yamlfmt@v0.21.0
+  - name: forkcloser/yamlfmt@v0.1.0
+    registry: local
   - name: lycheeverse/lychee@lychee-v0.24.2
   - name: goreleaser/goreleaser@v2.18.3
   - name: sigstore/cosign@v3.1.3
@@ -38,7 +39,12 @@ packages:
     registry: local
   - name: forkcloser/curl@v8.22.0
     registry: local
+  # tar, gtar, xz, gzip, zstd, zip and unzip, one pure-Go build on every
+  # platform, so a build script unpacks and packs with the same program
+  # everywhere instead of the host's (the registry entry says more).
+  - name: forkcloser/compress@v0.2.0
+    registry: local
   # darwin/arm64 only. Its `docker` link shadows the machine's Docker on the
   # hermetic PATH there; aqua skips the package everywhere else.
-  - name: farcloser/ossein@v0.3.1
+  - name: farcloser/ossein@v0.3.2
     registry: local

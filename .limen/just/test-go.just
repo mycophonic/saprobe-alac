@@ -113,14 +113,14 @@ fuzz: (_banner "test go" "fuzz")
     fi
     exit "$fail"
 
-# Coverage: per-function summary, an HTML report under build/coverage/, and an
+# Coverage: per-function summary, an HTML report under .build/coverage/, and an
 # optional minimum gate — export TEST_GO_COVER_MIN := '80' (integer percent)
 # from the root .justfile to enforce a floor; unset or 0 reports without gating.
 cover: (_banner "test go" "cover")
     #!/usr/bin/env bash
     set -euo pipefail
     export CGO_ENABLED="{{ go_cgo }}"
-    dir=build/coverage
+    dir=.build/coverage
     mkdir -p "$dir"
     gotestsum -- -count=1 -timeout "${TEST_GO_TIMEOUT:-10m}" -coverprofile="$dir/coverage.out" ./...
     go tool cover -func="$dir/coverage.out"

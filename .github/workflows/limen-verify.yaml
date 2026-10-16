@@ -51,62 +51,28 @@ jobs:
           # range against the PR's base branch, which a shallow clone lacks.
           fetch-depth: 0
 
-      # Windows keeps every cache below in one disk image, cached as a single
-      # file: restored as files, they cost minutes of small-file writes there.
-      # Before setup-aqua, which takes the AQUA_ROOT_DIR it sets; the hash is
-      # taken here because hashFiles cannot walk into the attached image.
-      - id: image
-        if: runner.os == 'Windows'
-        uses: ./.github/actions/windows-cache-image
+      # The job's caches (.github/actions/cache): attached here, before
+      # setup-aqua, since on Windows aqua's root is inside the cache image
+      # (restored as files, the caches cost minutes of small-file writes
+      # there); restored right after setup-aqua; saved at the end.
+      - uses: ./.github/actions/cache
         with:
           mode: attach
-          prefix: win-image-${{ runner.os }}-${{ runner.arch }}-
-          hash: ${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua.yaml', '.limen/aqua-registry.yaml', '**/go.sum') }}
 
       - name: Install aqua (pinned, checksum-verified)
         uses: ./.github/actions/setup-aqua
 
-      # aqua's package store, keyed on the exact pins and per architecture
-      # (the store holds native binaries). A warm store turns every lazy first
-      # use below into a link; the fallback key keeps the tools a pin bump did
-      # not touch, and the changed one downloads and verifies as before.
-      - if: runner.os != 'Windows'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # The per-platform analysis legs compile the whole module graph five
+      # times, cold, on every run without the Go caches.
+      - uses: ./.github/actions/cache
         with:
-          path: ${{ env.AQUA_ROOT_DIR }}/pkgs
-          key: aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua-registry.yaml') }}
-          restore-keys: |
-            aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-
+          mode: restore
+          linter-cache: 'true'
 
       - name: Install pinned tools
         # Link-only: tools download lazily on first use, checksum-verified; a
         # job pays only for what its recipes run.
         run: aqua install --only-link
-
-      # The Go build and module caches, plus the linter's (build/cache/, see
-      # main.just). The per-platform analysis legs compile the whole module
-      # graph five times, cold, on every run without this. Paths come from the
-      # pinned go itself — they differ per OS — and the key carries its version
-      # and every go.sum; a stale restore is harmless (the build cache is
-      # content-addressed, the module cache is checksum-verified), so the
-      # fallback key is always worth taking.
-      - id: gocache
-        if: runner.os != 'Windows'
-        run: |
-          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-          echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
-      - if: runner.os != 'Windows'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ steps.gocache.outputs.build }}
-            ${{ steps.gocache.outputs.mod }}
-            build/cache
-          key: go-${{ runner.os }}-${{ runner.arch }}-${{ steps.gocache.outputs.version }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            go-${{ runner.os }}-${{ runner.arch }}-${{ steps.gocache.outputs.version }}-
-            go-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Lint
         run: just lint
@@ -114,13 +80,9 @@ jobs:
       - name: Test
         run: just test
 
-      # On a miss, the image this run filled becomes the key's; a hit needs no
-      # save, since a cache key is never overwritten.
-      - if: runner.os == 'Windows' && steps.image.outputs.cache-hit != 'true'
-        uses: ./.github/actions/windows-cache-image
+      - uses: ./.github/actions/cache
         with:
           mode: save
-          key: ${{ steps.image.outputs.key }}
 
   # One linux leg, not the matrix: fuzzing explores the same corpus wherever
   # it runs, so more legs cost CPU and add nothing. The recipe passes on a
@@ -143,19 +105,31 @@ jobs:
         run: aqua install --only-link
 
       # The cached corpus is what makes fuzzing cumulative across runs. Keyed
-      # on the fuzz sources so a changed target restarts its corpus;
-      # restore-keys keep the rest.
+      # on the fuzz sources so a changed target restarts its corpus, and on
+      # the UTC day so that main saves what a day of runs found (a key is
+      # never overwritten); restore-keys keep the rest. Saved on main only
+      # (caches.yaml).
       - id: fuzzdir
-        run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        run: |
+          echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
+          echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      - id: corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.fuzzdir.outputs.dir }}
-          key: fuzz-corpus-${{ runner.os }}-${{ hashFiles('**/*_fuzz_test.go', '**/fuzz_test.go') }}
+          key: fuzz-corpus-${{ runner.os }}-${{ hashFiles('**/*_fuzz_test.go', '**/fuzz_test.go') }}-${{ steps.fuzzdir.outputs.day }}
           restore-keys: |
+            fuzz-corpus-${{ runner.os }}-${{ hashFiles('**/*_fuzz_test.go', '**/fuzz_test.go') }}-
             fuzz-corpus-${{ runner.os }}-
 
       - name: Fuzz
         run: just do test go fuzz
+
+      - if: github.ref == 'refs/heads/main' && steps.corpus.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.fuzzdir.outputs.dir }}
+          key: ${{ steps.corpus.outputs.cache-primary-key }}
 
       # A crasher is a bug with a reproducer attached; the log names the
       # target, the input file is what reproduces it locally. Uploaded only
@@ -172,7 +146,7 @@ jobs:
   # checksum, would merge green and fail at first use. One linux leg pays for
   # the real install; aqua's package store is cached on the exact pins, so a
   # warm key costs seconds and a changed pin is always a real install. (The
-  # Go-built tools are tools/go.mod directives, built by the verify legs.)
+  # Go-built tools are .limen/tools/go.mod directives, built by the verify legs.)
   tools:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -186,13 +160,20 @@ jobs:
       - name: Install aqua (pinned, checksum-verified)
         uses: ./.github/actions/setup-aqua
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # The same store as the verify legs', so this job and the linux leg
+      # share it, and no fallback here: a changed pin must be a real install,
+      # which is what this job exists to prove.
+      - uses: ./.github/actions/cache
         with:
-          path: ${{ env.AQUA_ROOT_DIR }}/pkgs
-          # The same key as the verify legs', so this job and the linux leg
-          # share one store — and no fallback key here: a changed pin must be
-          # a real install, which is what this job exists to prove.
-          key: aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua-registry.yaml') }}
+          mode: restore
+          go: 'false'
+          aqua-fallback: 'false'
 
       - name: Install every pinned tool
         run: aqua install
+
+      # Saved on main only, on a miss (caches.yaml); the verify leg that
+      # shares the key may have saved it first, and a key is never overwritten.
+      - uses: ./.github/actions/cache
+        with:
+          mode: save

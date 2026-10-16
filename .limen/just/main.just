@@ -46,7 +46,7 @@ export PATH := if os() == 'windows' { aqua_bin + ';' + env_var('PATH') } else { 
 #   GOFLAGS      ambient flags (-mod=mod, -tags=…, -count=1) rewrite what every
 #                go command does; '' leaves the recipes' own args the whole story.
 #   GOSUMDB      pinned to the real checksum database so an ambient GOSUMDB=off
-#                cannot defeat the GOSUMDB verification the tools/go.mod pins
+#                cannot defeat the GOSUMDB verification the .limen/tools/go.mod pins
 #                depend on.
 #   GOPRIVATE    '' so no module path is silently exempted from the proxy and
 #                checksum db — a non-empty value is precisely how GOSUMDB gets
@@ -80,10 +80,24 @@ export GOARCH := ''
 # module boundary) and not '' (git takes an empty command and cannot fork it).
 export GIT_SSH_COMMAND := `git config --get core.sshCommand 2>/dev/null || printf '%s' "${GIT_SSH_COMMAND:-${GIT_SSH:-ssh}}"`
 
+# cgo on macOS compiles with the selected developer directory's own clang and
+# SDK (Xcode's toolchain, or the Command Line Tools'), never /usr/bin/clang:
+# that one is a shim that runs xcrun, whose cache lives in the per-user temp
+# directory, which a sandbox may deny — the build then dies before its first
+# C line. Where no developer directory is selected the three stay as the
+# environment has them, and go falls back to its own default. Other platforms
+# are untouched; a project overrides any of them in its root .justfile.
+xcode_dev := if os() == 'macos' { `xcode-select -p 2>/dev/null || true` } else { '' }
+xcode_bin := if xcode_dev == '' { '' } else if path_exists(xcode_dev / 'Toolchains/XcodeDefault.xctoolchain/usr/bin/clang') == 'true' { xcode_dev / 'Toolchains/XcodeDefault.xctoolchain/usr/bin' } else if path_exists(xcode_dev / 'usr/bin/clang') == 'true' { xcode_dev / 'usr/bin' } else { '' }
+xcode_sdk := if xcode_dev == '' { '' } else if path_exists(xcode_dev / 'Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk') == 'true' { xcode_dev / 'Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk' } else if path_exists(xcode_dev / 'SDKs/MacOSX.sdk') == 'true' { xcode_dev / 'SDKs/MacOSX.sdk' } else { '' }
+export CC := if xcode_bin == '' { env('CC', '') } else { xcode_bin / 'clang' }
+export CXX := if xcode_bin == '' { env('CXX', '') } else { xcode_bin / 'clang++' }
+export SDKROOT := if xcode_sdk == '' { env('SDKROOT', '') } else { xcode_sdk }
+
 # Hermetic, per-project linter cache (same doctrine as PATH and GOROOT: no
-# shared mutable state across repos). Lives under build/ — gitignored, and
+# shared mutable state across repos). Lives under .build/ — gitignored, and
 # local runs behave like CI instead of diverging on cache state.
-export GOLANGCI_LINT_CACHE := justfile_directory() / 'build/cache/golangci-lint'
+export GOLANGCI_LINT_CACHE := justfile_directory() / '.build/cache/golangci-lint'
 
 # just's default recipe is the first one defined, so a project's first own
 # recipe replaces this one.

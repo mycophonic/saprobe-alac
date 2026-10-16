@@ -32,7 +32,7 @@ release *args:
     usage() {
         echo "usage: just do release <tag>                                               # signed tag + push; CI builds, signs (keyless), publishes (no .release-go.yaml: the release page, with notes)" >&2
         echo "       just do release --local <cosign-key> <tag> [--cosign-password-stdin] # fully local, key-based cosign" >&2
-        echo "       just do release --local --dry-run                                   # local unsigned snapshot into build/release/" >&2
+        echo "       just do release --local --dry-run                                   # local unsigned snapshot into .build/release/" >&2
         echo "       just do release --ci                                                # workflow half of the default lane (GitHub Actions only)" >&2
     }
     require_clean() {
@@ -84,14 +84,30 @@ release *args:
     # publisher in this lane.
     # No tag while a pull request is open, a bot's included: what is open is
     # part of the release or the next one's first commit, and both say wait
-    # (book/recipes.md). gh resolves the repository from origin, the remote
-    # the tag goes to.
+    # (book/recipes.md). A pull request the human parks, one the release must
+    # not carry and that is not closed only to tag, is named in PARKED_PRS
+    # (numbers, space-separated); it is printed as skipped, and every other
+    # open one still blocks. gh resolves the repository from origin, the
+    # remote the tag goes to.
     require_empty_queue() {
-        local open
-        open=$(gh pr list --state open --json number --jq 'length' -R "$(git remote get-url origin)")
-        if [ "$open" != 0 ]; then
-            echo "$open pull request(s) are open — a release waits for an empty queue (merge or close them first):" >&2
-            gh pr list --state open -R "$(git remote get-url origin)" >&2
+        local repo list number title blocking=0
+        repo=$(git remote get-url origin)
+        # The list first, so a gh failure refuses: fed through a process
+        # substitution the loop would read nothing and the tag would proceed
+        # against an unknown queue.
+        list=$(gh pr list --state open --json number,title --jq '.[] | "\(.number)\t\(.title)"' -R "$repo") || {
+            echo "gh pr list failed: the queue is unknown, no tag." >&2
+            exit 1
+        }
+        while IFS=$'\t' read -r number title; do
+            [ -n "$number" ] || continue
+            case " ${PARKED_PRS:-} " in
+                *" $number "*) echo "parked, not blocking the tag (PARKED_PRS): #$number $title" ;;
+                *) echo "open, blocking the tag: #$number $title" >&2; blocking=1 ;;
+            esac
+        done <<< "$list"
+        if [ "$blocking" = 1 ]; then
+            echo "a release waits for an empty queue: merge or close what is open, or name a parked pull request in PARKED_PRS." >&2
             exit 1
         fi
     }

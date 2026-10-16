@@ -7,7 +7,7 @@ set working-directory := '../..'
 # Silence just's per-line command echo; recipes announce themselves via _banner.
 set quiet
 
-# Shared private _banner recipe and go_tool_build (see lib.just).
+# Shared private _banner recipe, go_tool_build and agent_home (see lib.just).
 import 'lib.just'
 
 # aqua's GitHub API calls (a package's tag list, its release assets) are
@@ -19,16 +19,9 @@ import 'lib.just'
 # commands only, never exported to a recipe's other children.
 aqua_api := 'AQUA_GITHUB_TOKEN="${AQUA_GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}" aqua'
 
-# Inside a Claude Code session the installer sets LIMEN_AGENT_HOME, the home of
-# the sessions' tool root: slsa-verifier keeps its TUF cache under
-# $HOME/.sigstore and reads no other variable (book/upstream.md), and the
-# sandbox denies the human's. For a human the variable is unset and this
-# expands to nothing.
-agent_home := '${LIMEN_AGENT_HOME:+HOME="$LIMEN_AGENT_HOME"}'
-
 # --- Project tooling (see book/tooling.md). Every recipe takes the tool as it
 #     is pinned: an aqua slug exactly as in .aqua/aqua.yaml (goreleaser/goreleaser),
-#     or a Go package path exactly as in tools/go.mod
+#     or a Go package path exactly as in .limen/tools/go.mod
 #     (golang.org/x/tools/cmd/deadcode). ---
 #
 # The two are told apart by the first path element: a Go module root is a
@@ -38,7 +31,7 @@ agent_home := '${LIMEN_AGENT_HOME:+HOME="$LIMEN_AGENT_HOME"}'
 # The mutating recipes end by really installing the tool, never by linking:
 # a FULL `aqua install` for an aqua package (links verify nothing — lazy pulls
 # are a CI economy, wrong at the moment a pin changes; on a warm machine the
-# full install is incremental), and a native build into build/tools/ for a
+# full install is incremental), and a native build into .build/tools/ for a
 # Go tool (the same build _go-tool does before a recipe runs it). Either way a
 # bad pin fails here, not at first use.
 #
@@ -55,7 +48,7 @@ project_aqua := '''
     project_aqua() {
         local copy scratch rc=0
         copy=$(mktemp .aqua/aqua.yaml.XXXXXX)
-        scratch=$(mktemp -d)
+        scratch=$(mktemp -d "${TMPDIR:-/tmp}/limen-tools.XXXXXX")
         sed 's|^\([[:space:]]*\)- import: \(\.\./\.limen/aqua\.yaml\)[[:space:]]*$|\1# limen-import: \2|' .aqua/aqua.yaml > "$copy"
         (cd "$scratch" && env -u AQUA_GLOBAL_CONFIG AQUA_GITHUB_TOKEN="${AQUA_GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}" aqua -c "$OLDPWD/$copy" "$@") || rc=$?
         rmdir "$scratch"
@@ -79,12 +72,12 @@ add pkg version="": (_banner "tools" "add")
     version='{{ version }}'
     first='{{ pkg }}'; first=${first%%/*}
     if [[ $first == *.* ]]; then
-        if grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" tools/go.mod 2>/dev/null; then
-            echo "{{ pkg }} is already a tool directive in tools/go.mod — use 'just do tools update <command>' or 'just do tools set {{ pkg }} <version>'." >&2
+        if grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" .limen/tools/go.mod 2>/dev/null; then
+            echo "{{ pkg }} is already a tool directive in .limen/tools/go.mod — use 'just do tools update <command>' or 'just do tools set {{ pkg }} <version>'." >&2
             exit 1
         fi
-        go -C tools get -tool "{{ pkg }}@${version:-latest}"   # the directive
-        go -C tools mod tidy
+        go -C .limen/tools get -tool "{{ pkg }}@${version:-latest}"   # the directive
+        go -C .limen/tools mod tidy
         {{ go_tool_build }} '{{ pkg }}'           # REAL build: a bad pin fails here, not at first use
         exit 0
     fi
@@ -115,7 +108,7 @@ add pkg version="": (_banner "tools" "add")
         exit 1
     fi
     mv "$tmp" .aqua/aqua.yaml
-    {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # record its checksum (and drop stale ones)
+    {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # record its checksum (and drop stale ones)
     {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Set an existing tool to an exact version, e.g. `just do tools set goreleaser/goreleaser v2.0.0`.
@@ -126,22 +119,22 @@ set pkg version: (_banner "tools" "set")
     esc=$(printf '%s' '{{ pkg }}' | sed 's/[.^$*+?()[{}|]/\\&/g')
     first='{{ pkg }}'; first=${first%%/*}
     if [[ $first == *.* ]]; then
-        # An isolated module (tools/<name>/go.mod, see _go-tool in lib.just)
+        # An isolated module (.limen/tools/<name>/go.mod, see _go-tool in lib.just)
         # holds the directive for the tool that builds as <name>.
         pkg='{{ pkg }}'; name=${pkg##*/}
         if [[ $name =~ ^v[0-9]+$ ]]; then name=${pkg%/*}; name=${name##*/}; fi
-        if grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" "tools/${name}/go.mod" 2>/dev/null; then
-            go -C "tools/${name}" get -tool '{{ pkg }}@{{ version }}'   # moves the pin
-            go -C "tools/${name}" mod tidy
-            mkdir -p build/tools && GOOS='' GOARCH='' go -C "tools/${name}" build -o '../../build/tools/' '{{ pkg }}'
+        if grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" ".limen/tools/${name}/go.mod" 2>/dev/null; then
+            go -C ".limen/tools/${name}" get -tool '{{ pkg }}@{{ version }}'   # moves the pin
+            go -C ".limen/tools/${name}" mod tidy
+            mkdir -p .build/tools && GOOS='' GOARCH='' CGO_ENABLED=0 go -C ".limen/tools/${name}" build -o '../../../.build/tools/' '{{ pkg }}'
             exit 0
         fi
-        if ! grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" tools/go.mod 2>/dev/null; then
-            echo "{{ pkg }} is not a tool directive in tools/go.mod — add it with 'just do tools add {{ pkg }}'." >&2
+        if ! grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" .limen/tools/go.mod 2>/dev/null; then
+            echo "{{ pkg }} is not a tool directive in .limen/tools/go.mod — add it with 'just do tools add {{ pkg }}'." >&2
             exit 1
         fi
-        go -C tools get -tool '{{ pkg }}@{{ version }}'   # moves the pin
-        go -C tools mod tidy
+        go -C .limen/tools get -tool '{{ pkg }}@{{ version }}'   # moves the pin
+        go -C .limen/tools mod tidy
         {{ go_tool_build }} '{{ pkg }}'                   # REAL build: a bad pin fails here, not at first use
         exit 0
     fi
@@ -155,7 +148,7 @@ set pkg version: (_banner "tools" "set")
     trap 'rm -f "$tmp"' EXIT
     sed -E "s#(^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc})@[^[:space:]]*#\1@{{ version }}#" .aqua/aqua.yaml > "$tmp"
     mv "$tmp" .aqua/aqua.yaml
-    {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksum in, replaced version's out
+    {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksum in, replaced version's out
     {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Takes the COMMAND name (`just`, `limen`, `deadcode`), not the package: `aqua
@@ -172,7 +165,7 @@ set pkg version: (_banner "tools" "set")
 update command="": (_banner "tools" "update")
     #!/usr/bin/env bash
     set -euo pipefail
-    # Every directive in tools/go.mod: a `tool` line and a `tool (…)` block are
+    # Every directive in .limen/tools/go.mod: a `tool` line and a `tool (…)` block are
     # both walked; a `//` comment line inside the block is not a directive.
     # (A read loop, not mapfile: macOS ships bash 3. A capture and a
     # here-string, never a process substitution: see lint.just's `just`.)
@@ -181,7 +174,7 @@ update command="": (_banner "tools" "update")
         block && /^\)/ { block = 0; next }
         /^tool[[:blank:]]/ { print $2 }
         block && NF && $1 !~ /^\/\// { print $1 }
-    ' tools/go.mod 2>/dev/null || true)
+    ' .limen/tools/go.mod 2>/dev/null || true)
     pkgs=()
     while IFS= read -r p; do
         [ -n "$p" ] || continue
@@ -191,7 +184,7 @@ update command="": (_banner "tools" "update")
     # major suffix (github.com/google/go-licenses/v2 builds as go-licenses —
     # see _go-tool).
     name_of() { local n=${1##*/}; if [[ $n =~ ^v[0-9]+$ ]]; then n=${1%/*}; n=${n##*/}; fi; printf '%s' "$n"; }
-    # The isolated modules, tools/<name>/go.mod (see _go-tool in lib.just):
+    # The isolated modules, .limen/tools/<name>/go.mod (see _go-tool in lib.just):
     # one directive each, moved and rebuilt in their own module.
     isolated_update() {
         local dir=$1 p
@@ -199,32 +192,32 @@ update command="": (_banner "tools" "update")
         [ -n "$p" ] || return 0
         go -C "$dir" get -tool "${p}@latest"
         go -C "$dir" mod tidy
-        mkdir -p build/tools && GOOS='' GOARCH='' go -C "$dir" build -o '../../build/tools/' "$p"
+        mkdir -p .build/tools && GOOS='' GOARCH='' CGO_ENABLED=0 go -C "$dir" build -o '../../../.build/tools/' "$p"
     }
     {{ project_aqua }}
     if [ -z '{{ command }}' ]; then
         project_aqua update               # every project pin and the registries, to the latest
-        {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksums in, replaced versions' out
+        {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksums in, replaced versions' out
         {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
         if [ ${#pkgs[@]} -gt 0 ]; then
-            go -C tools get -tool "${pkgs[@]/%/@latest}"   # one solve for all of them
-            go -C tools mod tidy
+            go -C .limen/tools get -tool "${pkgs[@]/%/@latest}"   # one solve for all of them
+            go -C .limen/tools mod tidy
             {{ go_tool_build }} "${pkgs[@]}"              # REAL build of every directive
         fi
-        for m in tools/*/go.mod; do
+        for m in .limen/tools/*/go.mod; do
             [ -f "$m" ] && isolated_update "${m%/go.mod}"
         done
         exit 0
     fi
-    if [ -f 'tools/{{ command }}/go.mod' ]; then
-        isolated_update 'tools/{{ command }}'
+    if [ -f '.limen/tools/{{ command }}/go.mod' ]; then
+        isolated_update '.limen/tools/{{ command }}'
         exit 0
     fi
     # ${pkgs[@]+…}: under set -u, bash 3 treats an empty array as unset.
     for p in ${pkgs[@]+"${pkgs[@]}"}; do
         if [ "$(name_of "$p")" = '{{ command }}' ]; then
-            go -C tools get -tool "${p}@latest"   # bump tools/go.mod to the latest release
-            go -C tools mod tidy
+            go -C .limen/tools get -tool "${p}@latest"   # bump .limen/tools/go.mod to the latest release
+            go -C .limen/tools mod tidy
             {{ go_tool_build }} "$p"              # REAL build: a bad pin fails here, not at first use
             exit 0
         fi
@@ -233,7 +226,7 @@ update command="": (_banner "tools" "update")
         echo "{{ command }} is not pinned in .aqua/aqua.yaml — a canonical tool moves with limen; pin your own version with 'just do tools add <package>'." >&2
         exit 1
     fi
-    {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksum in, replaced version's out
+    {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksum in, replaced version's out
     {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Remove a tool entirely, e.g. `just do tools remove junegunn/fzf`.
@@ -247,19 +240,19 @@ remove pkg: (_banner "tools" "remove")
         # The built binary, named as go names it: last element, /vN stripped.
         pkg='{{ pkg }}'; name=${pkg##*/}
         if [[ $name =~ ^v[0-9]+$ ]]; then name=${pkg%/*}; name=${name##*/}; fi
-        # An isolated module (tools/<name>/go.mod) is the tool's alone: it
+        # An isolated module (.limen/tools/<name>/go.mod) is the tool's alone: it
         # goes as a whole, go.sum included.
-        if grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" "tools/${name}/go.mod" 2>/dev/null; then
-            rm -rf "tools/${name}" "build/tools/${name}" "build/tools/${name}.exe"
+        if grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" ".limen/tools/${name}/go.mod" 2>/dev/null; then
+            rm -rf ".limen/tools/${name}" ".build/tools/${name}" ".build/tools/${name}.exe"
             exit 0
         fi
-        if ! grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" tools/go.mod 2>/dev/null; then
-            echo "{{ pkg }} is not a tool directive in tools/go.mod — nothing to remove." >&2
+        if ! grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" .limen/tools/go.mod 2>/dev/null; then
+            echo "{{ pkg }} is not a tool directive in .limen/tools/go.mod — nothing to remove." >&2
             exit 1
         fi
-        go -C tools get -tool '{{ pkg }}@none'   # drops the directive
-        go -C tools mod tidy                     # and the requirements only it needed
-        rm -f "build/tools/${name}" "build/tools/${name}.exe"
+        go -C .limen/tools get -tool '{{ pkg }}@none'   # drops the directive
+        go -C .limen/tools mod tidy                     # and the requirements only it needed
+        rm -f ".build/tools/${name}" ".build/tools/${name}.exe"
         exit 0
     fi
     if ! grep -qE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc}([[:space:]]|@|$)" .aqua/aqua.yaml; then
@@ -291,4 +284,4 @@ remove pkg: (_banner "tools" "remove")
     # No `aqua remove`: it uninstalls from aqua's root, which every checkout on
     # the machine shares, and another may still pin the same version (the
     # canonical set imports it, for one).
-    {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # drop the now-unused checksum
+    {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # drop the now-unused checksum

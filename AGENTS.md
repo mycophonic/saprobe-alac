@@ -33,6 +33,11 @@ chapter; the procedure is limen's `skills/contribute`.
   the pull requests it merged, so a title says what changed for a consumer; no
   `CHANGELOG.md` is kept by hand. One that breaks a consumer carries the `breaking` label
   (`gh label create breaking` the first time a repository needs it).
+- **A pull request is read by someone who was not in the session.** Its description says
+  what changes and why in the terms of the code: the defect or the gap, the mechanism, the
+  evidence it works. A decision appears as its technical reason; who asked, who decided and
+  how the review went stay in the session. Every reference resolves from the page: a URL, a
+  file and section, a published document.
 - **One commit per thing.** Different things get different commits; iteration on the
   same thing — a review round, a fix to your own commit — is squashed into the commit it
   amends before the pull request is opened. Never a stack of fix-ups for one change.
@@ -66,7 +71,7 @@ chapter; the procedure is limen's `skills/contribute`.
   rejects.
 - **Not yours to do:** merge by hand, push to `main`, force-push a shared branch, tag a
   release. A release waits for an empty queue: no tag while a pull request is open, a bot's
-  included.
+  included, unless the human parks it by number for that tag (`PARKED_PRS`).
 
 ## Scope
 
@@ -162,9 +167,9 @@ chapter; the procedure is limen's `skills/contribute`.
 - **Tests are black-box, never bought with indirection.** External test package
   (`package foo_test`), no reach into private state, and no interface, function field, or
   other indirection in production code whose only purpose is a test's fake: that is bad
-  design, not testability. A property no unit test can observe (a power loss, a
-  filesystem failure) gets none; a mock that asserts it was called proves only that the
-  code calls itself.
+  design, not testability. A crash is tested with a child process killed inside the
+  window; only what no process boundary reaches gets no test, and a mock that asserts it
+  was called proves only that the code calls itself.
 - **A comment names a trap, not a story.** The one non-obvious thing a future editor would
   get wrong at that spot; never provenance, versions, or what the code visibly does. The
   reasoning goes in the commit message. See the book's
@@ -172,7 +177,7 @@ chapter; the procedure is limen's `skills/contribute`.
 - **A module's `go` directive is the earliest Go release still supported upstream**, as
   its first version (`go 1.N.0`), or the patch a dependency requires when that is higher
   (what `go mod tidy` raises it to); never a newer release. The tools modules
-  (`tools/go.mod`, `tools/<name>/go.mod`) are exempt. See the book's
+  (`.limen/tools/go.mod`, `.limen/tools/<name>/go.mod`) are exempt. See the book's
   [baseline version](https://github.com/farcloser/limen/blob/main/book/dependencies-go.md#the-baseline-version).
 - **A `replace` directive is never committed**, nor anything that permits one (a
   `gomoddirectives` `replace-local` or `replace-allow-list`). A local replace is a

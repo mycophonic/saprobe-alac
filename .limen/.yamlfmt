@@ -2,7 +2,7 @@
 # This file is common to all projects and managed by limen.
 # Global configuration changes proposals can be discussed on https://github.com/farcloser/limen
 
-# .yamlfmt — https://github.com/google/yamlfmt
+# .yamlfmt — https://github.com/forkcloser/yamlfmt (the fleet's fork of google/yamlfmt)
 # Formatter: the 'basic' formatter is the only one; these are its options.
 formatter:
   type: basic

@@ -5,7 +5,7 @@
 
 packages:
   # No go_install entries: every Go-built tool is a tool directive in
-  # tools/go.mod (book/tooling.md, "Go-built tools are go.mod tools").
+  # .limen/tools/go.mod (book/tooling.md, "Go-built tools are go.mod tools").
   # limen itself: every repo pins the version that enforces it, so the binary
   # and the canonical files it embeds travel together (no version skew between
   # the checker and the checked). Graduates to the standard registry once
@@ -615,3 +615,76 @@ packages:
       - darwin/arm64
       - linux
       - windows
+  # The archive tools — tar (gtar is the same binary, under the name build
+  # scripts reach for on macOS), xz, gzip, zstd, zip and unzip — in pure Go,
+  # one build on every platform: forkcloser/compress. Until it a build script
+  # took whatever tar the host had: GNU on Linux, bsdtar on macOS, MSYS2's on
+  # a Windows runner, none of it pinned. The entry is the one the repository's
+  # README carries; the release signs checksums.txt keyless and the bundle is
+  # verified on install. The binaries sit at the archive root, .exe on windows.
+  - type: github_release
+    repo_owner: forkcloser
+    repo_name: compress
+    description: tar, xz, gzip, zstd, zip and unzip in pure Go (forkcloser/compress)
+    asset: compress_{{trimV .Version}}_{{.OS}}_{{.Arch}}.tar.gz
+    format: tar.gz
+    files:
+      - name: tar
+      - name: gtar
+        src: tar
+      - name: xz
+      - name: gzip
+      - name: zstd
+      - name: zip
+      - name: unzip
+    checksum:
+      type: github_release
+      asset: checksums.txt
+      algorithm: sha256
+      cosign:
+        bundle:
+          type: github_release
+          asset: checksums.txt.sigstore.json
+        opts:
+          - --certificate-identity
+          - https://github.com/forkcloser/compress/.github/workflows/release.yaml@refs/tags/{{.Version}}
+          - --certificate-oidc-issuer
+          - https://token.actions.githubusercontent.com
+    supported_envs:
+      - darwin/arm64
+      - linux/amd64
+      - linux/arm64
+      - windows/amd64
+      - windows/arm64
+  # The YAML formatter: forkcloser/yamlfmt, upstream google/yamlfmt with its
+  # data-changing formats fixed (a placeholder leaked into output, blank lines
+  # in folded scalars): on the fleet's YAML the fork changes layout only.
+  # Release and verification in compress's shape; the binary at the archive
+  # root, .exe on windows.
+  - type: github_release
+    repo_owner: forkcloser
+    repo_name: yamlfmt
+    description: An extensible command line tool or library to format yaml files (forkcloser/yamlfmt)
+    asset: yamlfmt_{{trimV .Version}}_{{.OS}}_{{.Arch}}.tar.gz
+    format: tar.gz
+    files:
+      - name: yamlfmt
+    checksum:
+      type: github_release
+      asset: checksums.txt
+      algorithm: sha256
+      cosign:
+        bundle:
+          type: github_release
+          asset: checksums.txt.sigstore.json
+        opts:
+          - --certificate-identity
+          - https://github.com/forkcloser/yamlfmt/.github/workflows/release.yaml@refs/tags/{{.Version}}
+          - --certificate-oidc-issuer
+          - https://token.actions.githubusercontent.com
+    supported_envs:
+      - darwin/arm64
+      - linux/amd64
+      - linux/arm64
+      - windows/amd64
+      - windows/arm64
