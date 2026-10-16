@@ -19,7 +19,7 @@ require (
 	github.com/containerd/typeurl/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.15.0 // indirect
-	github.com/forkcloser/dot v1.2.1 // indirect
+	github.com/forkcloser/dot v1.3.0 // indirect
 	github.com/forkcloser/go-graphviz v0.5.1 // indirect
 	github.com/forkcloser/godolint v0.4.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
