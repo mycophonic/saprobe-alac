@@ -86,7 +86,7 @@ CoreAudio and alacconvert are optional; tests skip gracefully when unavailable.
 
 ## Example Decoder (`TestExampleDecoder`)
 
-Integration test for the `alac-example-decoder` binary (`cmd/alac-example-decoder`).
+Integration test for the `decoder` example binary (`examples/decoder`).
 
 ```bash
 go test ./tests/ -run TestExampleDecoder -count=1 -v
