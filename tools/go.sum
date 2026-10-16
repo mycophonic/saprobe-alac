@@ -21,8 +21,8 @@ github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1m
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/fatih/color v1.15.0 h1:kOqh6YHBtK8aywxGerMG2Eq3H6Qgoqeo13Bk2Mv/nBs=
 github.com/fatih/color v1.15.0/go.mod h1:0h5ZqXfHYED7Bhv2ZJamyIOUej9KtShiJESRwBDUSsw=
-github.com/forkcloser/dot v1.2.1 h1:bxGOMJBSI76kHyxzj7LmFb8O9AMLpDwVKE9JeyUsDvE=
-github.com/forkcloser/dot v1.2.1/go.mod h1:xUgYLXN4L59fE+WzPORysuUZ+Fveqf3eysgp0VCrSFY=
+github.com/forkcloser/dot v1.3.0 h1:5BZ8oE3U7nhheOcgGxWwkca5xbpu+c/1oXfcQ5N6Zv4=
+github.com/forkcloser/dot v1.3.0/go.mod h1:xUgYLXN4L59fE+WzPORysuUZ+Fveqf3eysgp0VCrSFY=
 github.com/forkcloser/go-graphviz v0.5.1 h1:F6w6DEOZ1W7c1tyHSbe+T9Br5mpZWjuJ6BzSQu8EcoY=
 github.com/forkcloser/go-graphviz v0.5.1/go.mod h1:EbSWnUlAz5sNUrAeWXI45Fiy074kdsvwXuVuD8nO5Eo=
 github.com/forkcloser/godolint v0.4.0 h1:a0WMn1ypt09nqCbrnCTVSXq8mZY46a8HLBp2XhX6iAI=
