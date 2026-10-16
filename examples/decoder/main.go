@@ -14,11 +14,11 @@
    limitations under the License.
 */
 
-// alac-example-decoder decodes an ALAC M4A file to WAV or raw PCM on stdout.
+// decoder decodes an ALAC M4A file to WAV or raw PCM on stdout.
 //
 // Usage:
 //
-//	alac-example-decoder [-format wav|pcm] <input.m4a | ->
+//	decoder [-format wav|pcm] <input.m4a | ->
 package main
 
 import (
@@ -36,7 +36,7 @@ import (
 
 const formatWAV = "wav"
 
-// version is the build's stamp: the shared build recipe sets it from `git describe`
+// version is the build's stamp: the build recipe sets it from `git describe`
 // through -X main.version; a plain `go build` leaves "dev". gochecknoglobals
 // exempts the name for this use.
 var version = "dev"
@@ -53,7 +53,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Fprintln(os.Stdout, "alac-example-decoder", version)
+		fmt.Fprintln(os.Stdout, "decoder", version)
 		os.Exit(0)
 	}
 

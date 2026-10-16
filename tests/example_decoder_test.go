@@ -29,7 +29,7 @@ import (
 	"github.com/mycophonic/saprobe-alac/tests/testutil"
 )
 
-// TestExampleDecoder verifies the alac-example-decoder binary produces
+// TestExampleDecoder verifies the example decoder binary produces
 // output identical to the CoreAudio reference decoder.
 func TestExampleDecoder(t *testing.T) {
 	t.Parallel()
@@ -41,13 +41,13 @@ func TestExampleDecoder(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Build the example decoder binary.
-	decoderBin := filepath.Join(tmpDir, "alac-example-decoder")
+	decoderBin := filepath.Join(tmpDir, "decoder")
 
-	build := exec.CommandContext(t.Context(), "go", "build", "-o", decoderBin, "./cmd/alac-example-decoder")
+	build := exec.CommandContext(t.Context(), "go", "build", "-o", decoderBin, "./examples/decoder")
 	build.Dir = ".."
 
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build alac-example-decoder: %v\n%s", err, out)
+		t.Fatalf("build decoder: %v\n%s", err, out)
 	}
 
 	// Generate synthetic PCM (16-bit, 44100 Hz, stereo, 1 second).
