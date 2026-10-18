@@ -109,8 +109,8 @@ profile: (_banner "perf go" "profile") (_go-tool "dot" "github.com/forkcloser/do
     #!/usr/bin/env bash
     set -euo pipefail
     export CGO_ENABLED="{{ go_cgo }}"
-    prof=.build/profiles
-    docs=.build/profiles-docs
+    prof="$LIMEN_BUILD/profiles"
+    docs="$LIMEN_BUILD/profiles-docs"
     mkdir -p "$prof" "$docs"
     # Rendered from pprof's -dot text rather than pprof's own -png, which
     # shells out to a dot it expects on PATH. -o with a pre-created file: under
@@ -121,7 +121,7 @@ profile: (_banner "perf go" "profile") (_go-tool "dot" "github.com/forkcloser/do
         src=$1; png=$2; shift 2
         go tool pprof -dot -nodecount=20 "$@" "$src" > "$png.dot" 2>/dev/null
         : > "$png"
-        .build/tools/dot -Tpng -o "$png" "$png.dot"
+        "$LIMEN_BUILD/tools/dot" -Tpng -o "$png" "$png.dot"
         rm -f "$png.dot"
         echo "  -> $png"
     }

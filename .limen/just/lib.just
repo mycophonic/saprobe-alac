@@ -64,7 +64,7 @@ _per-platform +cmd:
 # -o is resolved relative to -C. CGO_ENABLED=0 throughout the tool builds:
 # the tools are pure Go, and with cgo on by default wherever a C compiler
 # exists, `net` alone would call one to build them.
-go_tool_build := "mkdir -p .build/tools && GOOS='' GOARCH='' CGO_ENABLED=0 go -C .limen/tools build -o '../../.build/tools/'"
+go_tool_build := 'mkdir -p "$LIMEN_BUILD/tools" && GOOS="" GOARCH="" CGO_ENABLED=0 go -C .limen/tools build -o "$LIMEN_BUILD/tools/"'
 
 # Every Go-built tool the recipes run — the Go-source analyzers and the rest
 # alike — is a `tool` directive in a module under .limen/tools/, built natively ONCE
@@ -82,7 +82,7 @@ _go-tool name pkg:
     set -euo pipefail
     pattern='^(tool[[:space:]]+)?[[:space:]]*{{ pkg }}([[:space:]]|$)'
     if grep -qE "$pattern" '.limen/tools/{{ name }}/go.mod' 2>/dev/null; then
-        mkdir -p .build/tools && GOOS='' GOARCH='' CGO_ENABLED=0 go -C '.limen/tools/{{ name }}' build -o '../../../.build/tools/' '{{ pkg }}'
+        mkdir -p "$LIMEN_BUILD/tools" && GOOS='' GOARCH='' CGO_ENABLED=0 go -C '.limen/tools/{{ name }}' build -o "$LIMEN_BUILD/tools/" '{{ pkg }}'
     elif grep -qE "$pattern" .limen/tools/go.mod 2>/dev/null; then
         {{ go_tool_build }} '{{ pkg }}'
     else
@@ -96,8 +96,8 @@ _go-tool name pkg:
 _vulndb:
     #!/usr/bin/env bash
     set -euo pipefail
-    mkdir -p .build
-    ${LIMEN_BIN:-limen} vulndb .build/vulndb > .build/vulndb.url
+    mkdir -p "$LIMEN_BUILD"
+    ${LIMEN_BIN:-limen} vulndb "$LIMEN_BUILD/vulndb" > "$LIMEN_BUILD/vulndb.url"
 
 # The golangci-lint configuration the lint and fix recipes run: the baseline
 # limen-lint-go embeds with the project's .lint-go.yaml applied, rendered on
@@ -111,5 +111,5 @@ _vulndb:
 # LIMEN_LINT_GO_BIN is for the limen repository itself, which builds it from
 # its own tree (same idea as LIMEN_BIN in lint.just).
 _golangci-config:
-    ${LIMEN_LINT_GO_BIN:-limen-lint-go} check .build/tools/golangci-lint
-    ${LIMEN_LINT_GO_BIN:-limen-lint-go} render -o .build/golangci.yml
+    ${LIMEN_LINT_GO_BIN:-limen-lint-go} check "$LIMEN_BUILD/tools/golangci-lint"
+    ${LIMEN_LINT_GO_BIN:-limen-lint-go} render -o "$LIMEN_BUILD/golangci.yml"

@@ -91,7 +91,7 @@ links: (_banner "security" "links")
 binaries: (_banner "security" "binaries") (_go-tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck") _vulndb
     #!/usr/bin/env bash
     set -euo pipefail
-    db=$(cat .build/vulndb.url)
+    db=$(cat "$LIMEN_BUILD/vulndb.url")
     bin="$(aqua root-dir)/bin"
     # A newline-delimited list, not an associative array: macOS ships bash 3.
     seen=$'\n'
@@ -108,7 +108,7 @@ binaries: (_banner "security" "binaries") (_go-tool "govulncheck" "golang.org/x/
         # A darwin universal binary (goreleaser ships one) is beyond govulncheck's
         # reader; the other platforms' legs scan that tool's thin binaries, so
         # the darwin leg says so and moves on rather than failing on a format.
-        if ! out=$(.build/tools/govulncheck -db "$db" -mode binary "$path" 2>&1); then
+        if ! out=$("$LIMEN_BUILD/tools/govulncheck" -db "$db" -mode binary "$path" 2>&1); then
             case "$out" in
                 *"unrecognized binary format"*) echo "  skipped: universal binary, scanned on the other platforms";;
                 *) printf '%s\n' "$out"; fail=1;;

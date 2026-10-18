@@ -106,9 +106,10 @@ jobs:
 
       # The cached corpus is what makes fuzzing cumulative across runs. Keyed
       # on the fuzz sources so a changed target restarts its corpus, and on
-      # the UTC day so that main saves what a day of runs found (a key is
-      # never overwritten); restore-keys keep the rest. Saved on main only
-      # (caches.yaml).
+      # the UTC day so that the default branch saves what a day of runs found
+      # (a key is never overwritten); restore-keys keep the rest. Saved on the
+      # default branch only (caches.yaml), read from the event, never assumed
+      # by name.
       - id: fuzzdir
         run: |
           echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
@@ -125,7 +126,7 @@ jobs:
       - name: Fuzz
         run: just do test go fuzz
 
-      - if: github.ref == 'refs/heads/main' && steps.corpus.outputs.cache-hit != 'true'
+      - if: (github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && steps.corpus.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.fuzzdir.outputs.dir }}
@@ -172,8 +173,9 @@ jobs:
       - name: Install every pinned tool
         run: aqua install
 
-      # Saved on main only, on a miss (caches.yaml); the verify leg that
-      # shares the key may have saved it first, and a key is never overwritten.
+      # Saved on the default branch only, on a miss (caches.yaml); the verify
+      # leg that shares the key may have saved it first, and a key is never
+      # overwritten.
       - uses: ./.github/actions/cache
         with:
           mode: save

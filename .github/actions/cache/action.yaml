@@ -1,6 +1,6 @@
 name: Job caches
 description: >
-  The caches a canonical job keeps: aqua's package store and, with go, the Go build and module caches, plus the linter's with linter-cache. Called three times per job, each mode once: attach (before setup-aqua), restore (right after setup-aqua, before the job links or runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since aqua's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on main only, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and main refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
+  The caches a canonical job keeps: aqua's package store and, with go, the Go build and module caches, plus the linter's with linter-cache. Called three times per job, each mode once: attach (before setup-aqua), restore (right after setup-aqua, before the job links or runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since aqua's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on the default branch only, read from the event (a scheduled run is on it by definition), never assumed by name, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and the default branch refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
 inputs:
   mode:
     description: attach, restore or save.
@@ -10,7 +10,7 @@ inputs:
     required: false
     default: 'true'
   linter-cache:
-    description: true to keep the linter's .build/cache with the Go caches (restore).
+    description: true to keep the linter's $LIMEN_BUILD/cache with the Go caches (restore).
     required: false
     default: 'false'
   aqua-fallback:
@@ -82,7 +82,7 @@ runs:
           echo "mod=$(aqua exec -- go env GOMODCACHE)"
           echo "version=$(aqua exec -- go env GOVERSION)"
           echo "day=$(date -u +%Y%m%d)"
-          if [ "$LINTER" = true ]; then echo "lint=.build/cache"; else echo "lint="; fi
+          if [ "$LINTER" = true ]; then echo "lint=${LIMEN_BUILD}/cache"; else echo "lint="; fi
         } >> "$GITHUB_OUTPUT"
 
     # An empty line in path is dropped, so without linter-cache the list is
@@ -125,20 +125,20 @@ runs:
           echo "LIMEN_CACHE_GO_PATHS_END"
         } >> "$GITHUB_ENV"
 
-    # --- save: main only, on a miss ---
-    - if: inputs.mode == 'save' && runner.os != 'Windows' && github.ref == 'refs/heads/main' && env.LIMEN_CACHE_AQUA_KEY != '' && env.LIMEN_CACHE_AQUA_HIT != 'true'
+    # --- save: the default branch only, on a miss ---
+    - if: inputs.mode == 'save' && runner.os != 'Windows' && (github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && env.LIMEN_CACHE_AQUA_KEY != '' && env.LIMEN_CACHE_AQUA_HIT != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.AQUA_ROOT_DIR }}/pkgs
         key: ${{ env.LIMEN_CACHE_AQUA_KEY }}
 
-    - if: inputs.mode == 'save' && runner.os != 'Windows' && github.ref == 'refs/heads/main' && env.LIMEN_CACHE_GO_KEY != '' && env.LIMEN_CACHE_GO_HIT != 'true'
+    - if: inputs.mode == 'save' && runner.os != 'Windows' && (github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && env.LIMEN_CACHE_GO_KEY != '' && env.LIMEN_CACHE_GO_HIT != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.LIMEN_CACHE_GO_PATHS }}
         key: ${{ env.LIMEN_CACHE_GO_KEY }}
 
-    - if: inputs.mode == 'save' && runner.os == 'Windows' && github.ref == 'refs/heads/main' && env.LIMEN_CACHE_IMAGE_KEY != '' && env.LIMEN_CACHE_IMAGE_HIT != 'true'
+    - if: inputs.mode == 'save' && runner.os == 'Windows' && (github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && env.LIMEN_CACHE_IMAGE_KEY != '' && env.LIMEN_CACHE_IMAGE_HIT != 'true'
       uses: ./.github/actions/windows-cache-image
       with:
         mode: save

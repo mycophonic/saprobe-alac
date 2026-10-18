@@ -39,21 +39,21 @@ go_fixers := "wsl_v5,godot,tagalign,nolintlint"
 # runs and no other, since `go vet` honours neither the rendered lint
 # configuration nor `//nolint` and a fix must not fail on a finding lint
 # never reports (book/linting-go.md).
-code: (_banner "fix go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform ".build/tools/golangci-lint run --fix --issues-exit-code 0 --enable-only " + go_fixers + " -c .build/golangci.yml")
+code: (_banner "fix go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform '"$LIMEN_BUILD/tools/golangci-lint" run --fix --issues-exit-code 0 --enable-only ' + go_fixers + ' -c "$LIMEN_BUILD/golangci.yml"')
     #!/usr/bin/env bash
     set -euo pipefail
     max=5
     pass=0
     # Check first: an already-formatted tree costs one --diff and no rewrite.
-    while ! .build/tools/golangci-lint fmt --diff -c .build/golangci.yml >/dev/null 2>&1; do
+    while ! "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c "$LIMEN_BUILD/golangci.yml" >/dev/null 2>&1; do
         pass=$((pass + 1))
         if [ "${pass}" -gt "${max}" ]; then
             echo "formatters did not converge after ${max} passes — they are fighting each other." >&2
             echo "The residual diff below reverses on the next pass; fix the formatter config." >&2
-            .build/tools/golangci-lint fmt --diff -c .build/golangci.yml >&2 || true
+            "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c "$LIMEN_BUILD/golangci.yml" >&2 || true
             exit 1
         fi
-        .build/tools/golangci-lint fmt -c .build/golangci.yml
+        "$LIMEN_BUILD/tools/golangci-lint" fmt -c "$LIMEN_BUILD/golangci.yml"
     done
     if ! go vet -asmdecl -buildtag ./...; then
         echo "the fixers left a tree that does not compile: repair what they broke above, then run again." >&2

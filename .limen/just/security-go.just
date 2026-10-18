@@ -29,4 +29,4 @@ vuln: (_banner "security go" "vuln")
     fi
     just do security go _vuln
 
-_vuln: (_go-tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck") _vulndb (_per-platform '.build/tools/govulncheck -db "$(cat .build/vulndb.url)" ./...')
+_vuln: (_go-tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck") _vulndb (_per-platform '"$LIMEN_BUILD/tools/govulncheck" -db "$(cat "$LIMEN_BUILD/vulndb.url")" ./...')

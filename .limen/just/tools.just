@@ -126,7 +126,7 @@ set pkg version: (_banner "tools" "set")
         if grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" ".limen/tools/${name}/go.mod" 2>/dev/null; then
             go -C ".limen/tools/${name}" get -tool '{{ pkg }}@{{ version }}'   # moves the pin
             go -C ".limen/tools/${name}" mod tidy
-            mkdir -p .build/tools && GOOS='' GOARCH='' CGO_ENABLED=0 go -C ".limen/tools/${name}" build -o '../../../.build/tools/' '{{ pkg }}'
+            mkdir -p "$LIMEN_BUILD/tools" && GOOS='' GOARCH='' CGO_ENABLED=0 go -C ".limen/tools/${name}" build -o "$LIMEN_BUILD/tools/" '{{ pkg }}'
             exit 0
         fi
         if ! grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" .limen/tools/go.mod 2>/dev/null; then
@@ -192,7 +192,7 @@ update command="": (_banner "tools" "update")
         [ -n "$p" ] || return 0
         go -C "$dir" get -tool "${p}@latest"
         go -C "$dir" mod tidy
-        mkdir -p .build/tools && GOOS='' GOARCH='' CGO_ENABLED=0 go -C "$dir" build -o '../../../.build/tools/' "$p"
+        mkdir -p "$LIMEN_BUILD/tools" && GOOS='' GOARCH='' CGO_ENABLED=0 go -C "$dir" build -o "$LIMEN_BUILD/tools/" "$p"
     }
     {{ project_aqua }}
     if [ -z '{{ command }}' ]; then
@@ -243,7 +243,7 @@ remove pkg: (_banner "tools" "remove")
         # An isolated module (.limen/tools/<name>/go.mod) is the tool's alone: it
         # goes as a whole, go.sum included.
         if grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" ".limen/tools/${name}/go.mod" 2>/dev/null; then
-            rm -rf ".limen/tools/${name}" ".build/tools/${name}" ".build/tools/${name}.exe"
+            rm -rf ".limen/tools/${name}" "$LIMEN_BUILD/tools/${name}" "$LIMEN_BUILD/tools/${name}.exe"
             exit 0
         fi
         if ! grep -qE "^(tool[[:space:]]+)?[[:space:]]*${esc}([[:space:]]|$)" .limen/tools/go.mod 2>/dev/null; then
@@ -252,7 +252,7 @@ remove pkg: (_banner "tools" "remove")
         fi
         go -C .limen/tools get -tool '{{ pkg }}@none'   # drops the directive
         go -C .limen/tools mod tidy                     # and the requirements only it needed
-        rm -f ".build/tools/${name}" ".build/tools/${name}.exe"
+        rm -f "$LIMEN_BUILD/tools/${name}" "$LIMEN_BUILD/tools/${name}.exe"
         exit 0
     fi
     if ! grep -qE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc}([[:space:]]|@|$)" .aqua/aqua.yaml; then

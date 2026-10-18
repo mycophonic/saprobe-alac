@@ -69,8 +69,8 @@ jobs:
       - name: Scan
         run: just security
 
-      # Saved on main only, on a miss (the cache budget: caches.yaml). The
-      # scheduled run is on main too.
+      # Saved on the default branch only, on a miss (the cache budget:
+      # caches.yaml); the scheduled run is on it by definition.
       - uses: ./.github/actions/cache
         with:
           mode: save
