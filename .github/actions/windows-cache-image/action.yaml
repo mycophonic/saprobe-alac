@@ -81,9 +81,13 @@ runs:
         } catch {
           Write-Host "Defender exclusion skipped: $_"
         }
-        # The linter cache lives under the workspace (main.just pins it there).
-        New-Item -ItemType Directory -Force -Path C:\vcache\golangci, "$env:GITHUB_WORKSPACE\.build" | Out-Null
-        New-Item -ItemType Junction -Path "$env:GITHUB_WORKSPACE\.build\cache" -Target C:\vcache\golangci | Out-Null
+        # The linter cache lives under the checkout's output directory
+        # (main.just's LIMEN_BUILD, the same path). This step runs before
+        # setup-aqua, so it is the one that exports it for the steps after.
+        $build = ($env:GITHUB_WORKSPACE -replace '\\', '/') + '/.build'
+        New-Item -ItemType Directory -Force -Path C:\vcache\golangci, $build | Out-Null
+        New-Item -ItemType Junction -Path "$build/cache" -Target C:\vcache\golangci | Out-Null
+        "LIMEN_BUILD=$build" >> $env:GITHUB_ENV
         "GOCACHE=C:\vcache\go-build" >> $env:GITHUB_ENV
         "GOMODCACHE=C:\vcache\mod" >> $env:GITHUB_ENV
         "AQUA_ROOT_DIR=C:/vcache/aqua" >> $env:GITHUB_ENV
@@ -93,7 +97,7 @@ runs:
       shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
-        Remove-Item "$env:GITHUB_WORKSPACE\.build\cache" -Force
+        Remove-Item "$env:LIMEN_BUILD/cache" -Force
         Dismount-DiskImage -ImagePath C:\vhd\cache.vhdx | Out-Null
 
     - if: inputs.mode == 'save'

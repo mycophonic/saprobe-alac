@@ -24,8 +24,8 @@ default: code vet mod licenses nilaway
 # The formatter is build-graph-independent and runs once. The last step
 # enforces the suppression doctrine (book/linting-go.md, "silencing a
 # finding"): a finding is silenced by its rule, never by its linter.
-code: (_banner "lint go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform ".build/tools/golangci-lint run -c .build/golangci.yml") _suppression-check
-    .build/tools/golangci-lint fmt --diff -c .build/golangci.yml
+code: (_banner "lint go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform '"$LIMEN_BUILD/tools/golangci-lint" run -c "$LIMEN_BUILD/golangci.yml"') _suppression-check
+    "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c "$LIMEN_BUILD/golangci.yml"
 
 # Polices the shape the book requires (linting-go.md, "silencing a
 # finding"): nolintlint checks a directive's form, not which linter it names,
@@ -136,13 +136,13 @@ nilaway: (_banner "lint go" "nilaway") (_go-tool "nilaway" "go.uber.org/nilaway/
         echo "CGO_ENABLED=1: cross-platform runs are impossible (foreign-platform package" >&2
         echo "loading needs that platform's C toolchain) — native platform only." >&2
         # shellcheck disable=SC2086 # the flags are a list by contract
-        .build/tools/nilaway $flags ./... || fail=1
+        "$LIMEN_BUILD/tools/nilaway" $flags ./... || fail=1
     else
         platforms=(darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64)
         for platform in "${platforms[@]}"; do
             echo "→ GOOS=${platform%/*} GOARCH=${platform#*/}"
             # shellcheck disable=SC2086 # the flags are a list by contract
-            CGO_ENABLED=0 GOOS="${platform%/*}" GOARCH="${platform#*/}" .build/tools/nilaway $flags ./... || fail=1
+            CGO_ENABLED=0 GOOS="${platform%/*}" GOARCH="${platform#*/}" "$LIMEN_BUILD/tools/nilaway" $flags ./... || fail=1
         done
     fi
     if [ "$fail" = 1 ] && [ "$mode" != blocking ]; then
@@ -167,11 +167,11 @@ nilaway: (_banner "lint go" "nilaway") (_go-tool "nilaway" "go.uber.org/nilaway/
 # graph, the repository's own LICENSE is the `license` rule's, and go-licenses
 # classifies a license by its text, so the Closed-source notice limen writes
 # failed every package of such a module.
-licenses: (_banner "lint go" "licenses") (_go-tool "go-licenses" "github.com/google/go-licenses/v2") (_per-platform 'GOROOT="$(go env GOROOT)" .build/tools/go-licenses check --include_tests --ignore "$(go list -m)" $(${LIMEN_LINT_GO_BIN:-limen-lint-go} flags licenses) ./...')
+licenses: (_banner "lint go" "licenses") (_go-tool "go-licenses" "github.com/google/go-licenses/v2") (_per-platform 'GOROOT="$(go env GOROOT)" "$LIMEN_BUILD/tools/go-licenses" check --include_tests --ignore "$(go list -m)" $(${LIMEN_LINT_GO_BIN:-limen-lint-go} flags licenses) ./...')
 
 # Unreachable functions, by whole-program call-graph analysis (deeper than the
 # per-package `unused` linter in golangci). -test keeps library-only repos
 # analyzable (test binaries serve as roots) and stops dead code from hiding
 # behind test-only callers. Informational: native only, not in the default set.
 deadcode: (_banner "lint go" "deadcode") (_go-tool "deadcode" "golang.org/x/tools/cmd/deadcode")
-    .build/tools/deadcode -test ./...
+    "$LIMEN_BUILD/tools/deadcode" -test ./...

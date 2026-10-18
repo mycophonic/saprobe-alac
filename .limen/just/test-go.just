@@ -120,7 +120,7 @@ cover: (_banner "test go" "cover")
     #!/usr/bin/env bash
     set -euo pipefail
     export CGO_ENABLED="{{ go_cgo }}"
-    dir=.build/coverage
+    dir="$LIMEN_BUILD/coverage"
     mkdir -p "$dir"
     gotestsum -- -count=1 -timeout "${TEST_GO_TIMEOUT:-10m}" -coverprofile="$dir/coverage.out" ./...
     go tool cover -func="$dir/coverage.out"

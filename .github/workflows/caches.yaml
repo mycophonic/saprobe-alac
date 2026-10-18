@@ -3,14 +3,14 @@
 # The cache budget. GitHub keeps 10 GB of Actions caches per repository and
 # evicts the least recently used beyond it, the current entries included, so
 # a repository over budget runs cold at random. The canonical lanes save on
-# main only (a cache a pull request run saves is scoped to that pull request
-# and restorable by nothing else), and every pin or go.sum change starts a new
-# generation of every key while the old one lingers until eviction (and the
-# caches that accumulate, Go's and the fuzz corpus, start one a day). This
-# keeps one generation per key on main: after each ci run on main, and once a
-# day, every entry under a canonical prefix that is not the newest of its
-# family is deleted. GitHub's own token, `gh` from the runner image; no
-# checkout, no third-party actions.
+# the default branch only (a cache a pull request run saves is scoped to that
+# pull request and restorable by nothing else), and every pin or go.sum change
+# starts a new generation of every key while the old one lingers until
+# eviction (and the caches that accumulate, Go's and the fuzz corpus, start
+# one a day). This keeps one generation per key on the default branch: after
+# each ci run there, and once a day, every entry under a canonical prefix that
+# is not the newest of its family is deleted. GitHub's own token, `gh` from
+# the runner image; no checkout, no third-party actions.
 name: caches
 
 on:
@@ -43,13 +43,15 @@ jobs:
       # Listing and deleting caches is an Actions write.
       actions: write
     steps:
-      - name: One generation per key on main
+      - name: One generation per key on the default branch
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          # Main's entries, newest first. Listed before the loop so a refused
-          # token or a failed call fails the step: fed through a process
+          # The default branch's entries, newest first, the branch read from
+          # the repository, never assumed by name (a scheduled run has no
+          # event naming it). Listed before the loop so a refused token or a
+          # failed call fails the step: fed through a process
           # substitution, the loop would read nothing and pass, and the prune
           # would silently not happen. A family is a key without its UTC day
           # and content hash (and, for the Go caches, without the Go version,
@@ -60,7 +62,8 @@ jobs:
           # other's older generation. The first of each family is kept, the
           # rest deleted. Only the canonical prefixes; whatever else is in the
           # store is not ours to judge.
-          entries=$(gh cache list --ref refs/heads/main --limit 500 --sort created_at --order desc \
+          default_branch=$(gh api "repos/$GH_REPO" --jq .default_branch)
+          entries=$(gh cache list --ref "refs/heads/$default_branch" --limit 500 --sort created_at --order desc \
             --json id,key,version,sizeInBytes --jq '.[] | "\(.id)\t\(.key)\t\(.version)\t\(.sizeInBytes)"')
           kept=
           while IFS=$'\t' read -r id key version size; do

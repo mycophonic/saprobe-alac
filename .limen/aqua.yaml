@@ -24,7 +24,7 @@ packages:
   # Not here: golang/go. The Go toolchain is each repository's own pin, in its
   # .aqua/aqua.yaml above the import (seeded once by `limen fix`, Renovate's
   # afterwards): a standard-library fix must not wait for a limen release.
-  - name: casey/just@1.58.0
+  - name: casey/just@1.59.0
   - name: koalaman/shellcheck@v0.11.0
   - name: forkcloser/yamlfmt@v0.1.0
     registry: local

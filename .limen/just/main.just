@@ -94,10 +94,20 @@ export CC := if xcode_bin == '' { env('CC', '') } else { xcode_bin / 'clang' }
 export CXX := if xcode_bin == '' { env('CXX', '') } else { xcode_bin / 'clang++' }
 export SDKROOT := if xcode_sdk == '' { env('SDKROOT', '') } else { xcode_sdk }
 
+# The checkout's output directory, gitignored: what a recipe writes and keeps
+# between runs goes under it, in a subdirectory named for what it holds. The
+# only spelling of the name: the shared recipes and the project's own use
+# {{ LIMEN_BUILD }} or $LIMEN_BUILD, a script a recipe runs reads it from the
+# environment, and CI's setup-aqua and windows-cache-image actions export the
+# same path for the steps after them. Absolute, so a script that changes
+# directory still finds it; forward slashes on windows, which git-bash's own
+# tools and the native ones both read.
+export LIMEN_BUILD := replace(justfile_directory(), '\', '/') / '.build'
+
 # Hermetic, per-project linter cache (same doctrine as PATH and GOROOT: no
-# shared mutable state across repos). Lives under .build/ — gitignored, and
-# local runs behave like CI instead of diverging on cache state.
-export GOLANGCI_LINT_CACHE := justfile_directory() / '.build/cache/golangci-lint'
+# shared mutable state across repos). Lives under LIMEN_BUILD, so local runs
+# behave like CI instead of diverging on cache state.
+export GOLANGCI_LINT_CACHE := LIMEN_BUILD / 'cache/golangci-lint'
 
 # just's default recipe is the first one defined, so a project's first own
 # recipe replaces this one.

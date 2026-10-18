@@ -77,7 +77,7 @@ dockerfile: (_banner "lint" "dockerfile") (_go-tool "godolint" "github.com/forkc
     done < "$list"
     # godolint runs shellcheck on RUN lines when it finds one on PATH — the
     # pinned one, here.
-    [ ${#files[@]} -eq 0 ] || .build/tools/godolint "${files[@]}"
+    [ ${#files[@]} -eq 0 ] || "$LIMEN_BUILD/tools/godolint" "${files[@]}"
 
 yaml: (_banner "lint" "yaml")
     yamlfmt -conf .limen/.yamlfmt -lint
@@ -142,13 +142,21 @@ shell: (_banner "lint" "shell")
     # name is only a label, so module separators are flattened. The directory
     # reaches awk through ENVIRON, never -v: -v processes escapes, and a
     # windows temp path's backslashes are eaten (\l becomes l).
+    # Each body ends with one line naming the root's exports as assigned
+    # (`: "${NAME:=}"`): just puts them in every recipe's environment, but a
+    # body read alone references LIMEN_BUILD unassigned (SC2154 under
+    # check-unassigned-uppercase). Appended, so the reported lines stay the
+    # recipe's own, and behind an SC2317 directive, since after a body's
+    # last `exit` the line is unreachable.
     printf '%s' "$dump" | jq -r '
-            def recipes_of(prefix):
+            ((.assignments // {}) | to_entries | map(select(.value.export) | "\"${" + .key + ":=}\"")
+                | if length == 0 then [] else ["# shellcheck disable=SC2317", ": " + join(" ")] end) as $exports
+            | def recipes_of(prefix):
                 ((.recipes // {}) | to_entries[]
                     | (.value.body
                        | map(map(if type == "string" then . else "INTERP" end) | join(""))) as $lines
                     | select(($lines[0] // "") | test("^#!.*\\b(bash|dash|ksh|sh)\\b"))
-                    | prefix + .key, ($lines | join("\n")), ([30] | implode)),
+                    | prefix + .key, ($lines + $exports | join("\n")), ([30] | implode)),
                 ((.modules // {}) | to_entries[]
                     | .key as $mod | .value | recipes_of(prefix + $mod + "::"));
             recipes_of("")' | tr -d '\r' | LINT_SHELL_DIR="$tmpdir" awk '
@@ -215,9 +223,9 @@ commits range="": (_banner "lint" "commits") (_go-tool "git-validation" "github.
     fi
     export GIT_CONFIG_COUNT=$n
     if [ -n "$range" ]; then
-        .build/tools/git-validation -run DCO,short-subject,dangling-whitespace -range "$range"
+        "$LIMEN_BUILD/tools/git-validation" --run DCO,short-subject,dangling-whitespace --range "$range"
     else
-        .build/tools/git-validation -run DCO,short-subject,dangling-whitespace
+        "$LIMEN_BUILD/tools/git-validation" --run DCO,short-subject,dangling-whitespace
     fi
     # .lint-signers lists everyone who authors here, email and key, in git's
     # allowed-signers format: every commit in the range must be signed by a

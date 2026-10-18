@@ -32,6 +32,17 @@ runs:
         fi
         export AQUA_ROOT_DIR
         echo "AQUA_ROOT_DIR=${AQUA_ROOT_DIR}" >>"$GITHUB_ENV"
+        # The checkout's output directory, the path main.just's LIMEN_BUILD
+        # computes, for the steps after this one (cache paths, a project's own
+        # steps); a recipe computes it again itself. Kept when set: on windows
+        # the cache image is attached first and exports it. Equal to main.just's
+        # value only with the checkout at the workspace root (actions/checkout
+        # without `path:`), as every canonical workflow checks out.
+        LIMEN_BUILD="${LIMEN_BUILD:-$GITHUB_WORKSPACE/.build}"
+        if command -v cygpath >/dev/null 2>&1; then
+          LIMEN_BUILD="$(cygpath -m "$LIMEN_BUILD")"
+        fi
+        echo "LIMEN_BUILD=${LIMEN_BUILD}" >>"$GITHUB_ENV"
         tmp="$(mktemp -d)"
         # Retries for transient runner failures. Windows curl (schannel) refuses
         # a handshake when the CA's revocation server is unreachable (exit 35,
