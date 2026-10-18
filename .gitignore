@@ -1,10 +1,6 @@
 .DS_Store
 .idea
-_*
 bin
-tmp
-third-party
-generated
 
 # Required by limen (book/mandatory-files.md, ".gitignore").
 /build
