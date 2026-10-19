@@ -259,27 +259,27 @@ commits range="": (_banner "lint" "commits") (_go-tool "git-validation" "github.
         echo "warning: no .lint-signers: commit signatures are not checked — list every author, <email> namespaces=\"git\" <public key>" >&2
     fi
 
-# Verify .aqua/aqua-checksums.json is in sync with .aqua/aqua.yaml — the working tree's
-# pair, exactly as it stands: git state (staged, committed, neither) is
+# Verify .hermetic/aqua-checksums.json is in sync with .hermetic/hermetic.yaml — the
+# working tree's pair, exactly as it stands: git state (staged, committed, neither) is
 # irrelevant to coherence. Recipes judge the working tree; git answers
 # enumeration and history questions only.
 aqua: (_banner "lint" "aqua")
     #!/usr/bin/env bash
     set -euo pipefail
-    # aqua has no read-only validator, so regenerate, compare against a
+    # update-checksum has no read-only form, so regenerate, compare against a
     # snapshot, and restore (needs network): the lint observes, never mutates —
     # `just do fix aqua` is the mutating twin. mktemp gets an explicit template
     # because macOS mktemp ignores $TMPDIR.
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/lint-aqua.XXXXXX")
     trap 'rm -rf "$tmpdir"' EXIT
     had=""
-    if [ -f .aqua/aqua-checksums.json ]; then
-        cp .aqua/aqua-checksums.json "$tmpdir/snapshot"
+    if [ -f .hermetic/aqua-checksums.json ]; then
+        cp .hermetic/aqua-checksums.json "$tmpdir/snapshot"
         had=1
     fi
     # Restore the working tree from the snapshot on EVERY exit — success, drift,
-    # an aqua failure (set -e), or an interrupt. update-checksum mutates
-    # .aqua/aqua-checksums.json in place, and a lint must never leave that behind; an
+    # a hermetic failure (set -e), or an interrupt. update-checksum mutates
+    # .hermetic/aqua-checksums.json in place, and a lint must never leave that behind; an
     # inline restore only runs on the paths it is written on, so it belongs in the
     # trap. Installed AFTER the snapshot so `had` is known — restoring before that
     # would wrongly rm a file we had not yet copied.
@@ -288,17 +288,17 @@ aqua: (_banner "lint" "aqua")
     # shellcheck disable=SC2329
     restore() {
         if [ -n "$had" ]; then
-            cp "$tmpdir/snapshot" .aqua/aqua-checksums.json
+            cp "$tmpdir/snapshot" .hermetic/aqua-checksums.json
         else
-            rm -f .aqua/aqua-checksums.json
+            rm -f .hermetic/aqua-checksums.json
         fi
         rm -rf "$tmpdir"
     }
     trap restore EXIT
     # --log-level warn: the per-package INFO lines are noise when nothing is wrong.
-    {{ agent_home }} aqua --log-level warn update-checksum --prune
-    if [ -n "$had" ] && cmp -s .aqua/aqua-checksums.json "$tmpdir/snapshot"; then
+    {{ agent_home }} hermetic --log-level warn -c .hermetic/hermetic.yaml update-checksum --prune
+    if [ -n "$had" ] && cmp -s .hermetic/aqua-checksums.json "$tmpdir/snapshot"; then
         exit 0
     fi
-    echo ".aqua/aqua-checksums.json is out of sync with .aqua/aqua.yaml — run 'just do fix aqua'." >&2
+    echo ".hermetic/aqua-checksums.json is out of sync with .hermetic/hermetic.yaml — run 'just do fix aqua'." >&2
     exit 1

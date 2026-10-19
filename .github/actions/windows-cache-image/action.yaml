@@ -1,6 +1,6 @@
 name: Windows cache image
 description: >
-  Windows only. Holds the Go build and module caches, aqua's root and the linter cache in one NTFS disk image (VHDX), cached as a single file. Restoring that file and attaching it costs under a minute; restoring the same caches as files writes 100,000+ small files, which costs several on the Windows runners. mode attach (before setup-aqua) restores or creates the image, attaches it at C:\vcache, points GOCACHE, GOMODCACHE and AQUA_ROOT_DIR into it, and excludes it from Defender's real-time scan; mode save (last, on a cache miss, on main only) detaches it and saves it.
+  Windows only. Holds the Go build and module caches, hermetic's root and the linter cache in one NTFS disk image (VHDX), cached as a single file. Restoring that file and attaching it costs under a minute; restoring the same caches as files writes 100,000+ small files, which costs several on the Windows runners. mode attach (before setup-hermetic) restores or creates the image, attaches it at C:\vcache, points GOCACHE, GOMODCACHE and HERMETIC_ROOT_DIR into it, and excludes it from Defender's real-time scan; mode save (last, on a cache miss, on main only) detaches it and saves it.
 inputs:
   mode:
     description: attach or save.
@@ -83,14 +83,14 @@ runs:
         }
         # The linter cache lives under the checkout's output directory
         # (main.just's LIMEN_BUILD, the same path). This step runs before
-        # setup-aqua, so it is the one that exports it for the steps after.
+        # setup-hermetic, so it is the one that exports it for the steps after.
         $build = ($env:GITHUB_WORKSPACE -replace '\\', '/') + '/.build'
         New-Item -ItemType Directory -Force -Path C:\vcache\golangci, $build | Out-Null
         New-Item -ItemType Junction -Path "$build/cache" -Target C:\vcache\golangci | Out-Null
         "LIMEN_BUILD=$build" >> $env:GITHUB_ENV
         "GOCACHE=C:\vcache\go-build" >> $env:GITHUB_ENV
         "GOMODCACHE=C:\vcache\mod" >> $env:GITHUB_ENV
-        "AQUA_ROOT_DIR=C:/vcache/aqua" >> $env:GITHUB_ENV
+        "HERMETIC_ROOT_DIR=C:/vcache/hermetic" >> $env:GITHUB_ENV
 
     - name: Detach the image
       if: inputs.mode == 'save'

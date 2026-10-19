@@ -1,12 +1,12 @@
 name: Job caches
 description: >
-  The caches a canonical job keeps: aqua's package store and, with go, the Go build and module caches, plus the linter's with linter-cache. Called three times per job, each mode once: attach (before setup-aqua), restore (right after setup-aqua, before the job links or runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since aqua's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on the default branch only, read from the event (a scheduled run is on it by definition), never assumed by name, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and the default branch refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
+  The caches a canonical job keeps: hermetic's package store and, with go, the Go build and module caches, plus the linter's with linter-cache. Called three times per job, each mode once: attach (before setup-hermetic), restore (right after setup-hermetic, before the job runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since hermetic's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on the default branch only, read from the event (a scheduled run is on it by definition), never assumed by name, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and the default branch refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
 inputs:
   mode:
     description: attach, restore or save.
     required: true
   go:
-    description: false to keep aqua's store only, no Go caches (restore).
+    description: false to keep hermetic's store only, no Go caches (restore).
     required: false
     default: 'true'
   linter-cache:
@@ -20,7 +20,7 @@ inputs:
 runs:
   using: composite
   steps:
-    # --- attach: the Windows image, before setup-aqua ---
+    # --- attach: the Windows image, before setup-hermetic ---
     - if: inputs.mode == 'attach' && runner.os == 'Windows'
       shell: bash
       run: |
@@ -29,7 +29,7 @@ runs:
           exit 1
         fi
 
-    # The image holds aqua's root and the Go caches, so it varies on the pins
+    # The image holds hermetic's root and the Go caches, so it varies on the pins
     # and every go.sum.
     - id: image
       if: inputs.mode == 'attach' && runner.os == 'Windows'
@@ -37,7 +37,7 @@ runs:
       with:
         mode: attach
         prefix: win-image-${{ runner.os }}-${{ runner.arch }}-
-        hash: ${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua.yaml', '.limen/aqua-registry.yaml', '**/go.sum') }}
+        hash: ${{ hashFiles('.hermetic/hermetic.yaml', '.hermetic/aqua-checksums.json', '.limen/hermetic.yaml', '.limen/hermetic-registry.yaml', '**/go.sum') }}
 
     - if: inputs.mode == 'attach' && runner.os == 'Windows'
       shell: bash
@@ -61,13 +61,13 @@ runs:
 
     # The store first: go is one of its tools, and resolving the Go caches'
     # paths runs it, which would download the toolchain the store holds.
-    # Through aqua exec, since restore comes before the job links its tools.
+    # Through the link setup-hermetic made, which installs on first use.
     - id: aqua
       if: inputs.mode == 'restore' && runner.os != 'Windows'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ env.AQUA_ROOT_DIR }}/pkgs
-        key: aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.aqua/aqua.yaml', '.aqua/aqua-checksums.json', '.limen/aqua-registry.yaml') }}
+        path: ${{ env.HERMETIC_ROOT_DIR }}/store/pkgs
+        key: aqua-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.hermetic/hermetic.yaml', '.hermetic/aqua-checksums.json', '.limen/hermetic-registry.yaml') }}
         restore-keys: ${{ inputs.aqua-fallback == 'true' && format('aqua-pkgs-{0}-{1}-', runner.os, runner.arch) || '' }}
 
     - id: paths
@@ -78,9 +78,9 @@ runs:
       run: |
         {
           if [ "$LINTER" = true ]; then echo "prefix=go-lint"; else echo "prefix=go"; fi
-          echo "build=$(aqua exec -- go env GOCACHE)"
-          echo "mod=$(aqua exec -- go env GOMODCACHE)"
-          echo "version=$(aqua exec -- go env GOVERSION)"
+          echo "build=$(go env GOCACHE)"
+          echo "mod=$(go env GOMODCACHE)"
+          echo "version=$(go env GOVERSION)"
           echo "day=$(date -u +%Y%m%d)"
           if [ "$LINTER" = true ]; then echo "lint=${LIMEN_BUILD}/cache"; else echo "lint="; fi
         } >> "$GITHUB_OUTPUT"
@@ -129,7 +129,7 @@ runs:
     - if: inputs.mode == 'save' && runner.os != 'Windows' && (github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && env.LIMEN_CACHE_AQUA_KEY != '' && env.LIMEN_CACHE_AQUA_HIT != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ env.AQUA_ROOT_DIR }}/pkgs
+        path: ${{ env.HERMETIC_ROOT_DIR }}/store/pkgs
         key: ${{ env.LIMEN_CACHE_AQUA_KEY }}
 
     - if: inputs.mode == 'save' && runner.os != 'Windows' && (github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && env.LIMEN_CACHE_GO_KEY != '' && env.LIMEN_CACHE_GO_HIT != 'true'

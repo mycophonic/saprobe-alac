@@ -14,12 +14,12 @@ registries:
     ref: v4.575.0 # renovate: depName=aquaproj/aqua-registry
   - name: local
     type: local
-    path: ../.limen/aqua-registry.yaml
+    path: ../.limen/hermetic-registry.yaml
 
 packages:
   # The limen this repository runs, and with it every canonical file it
   # writes: the one canonical pin kept here, where Renovate bumps it.
-  - name: farcloser/limen@v0.13.0 # renovate: depName=farcloser/limen
+  - name: farcloser/limen@v0.14.0 # renovate: depName=farcloser/limen
     registry: local
   # The Go toolchain is the repository's own pin, seeded from limen's own
   # manifest once and Renovate's here afterwards: a standard-library fix
@@ -32,4 +32,4 @@ packages:
   # this limen pins: a limen bump changes that file, never this list
   # (book/tooling.md).
   - name: Tyrrrz/FFmpegBin@9.0.2
-  - import: ../.limen/aqua.yaml
+  - import: ../.limen/hermetic.yaml

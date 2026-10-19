@@ -72,7 +72,7 @@ links: (_banner "security" "links")
     sleep 60
     lychee --no-progress "${args[@]}" "$scratch/recheck.md"
 
-# Every Go binary aqua pins carries its own copy of the standard library, built
+# Every Go binary the pins name carries its own copy of the standard library, built
 # by its upstream with whatever Go they used that day: a fixed net/http or
 # crypto/tls reaches us only when THEY rebuild. This scans each such binary
 # against the Go vulnerability database (fetched once, see _vulndb in
@@ -80,26 +80,25 @@ links: (_banner "security" "links")
 # vulnerability in a pinned tool is seen the day the advisory lands, whoever
 # built it. The binaries the pinned toolchain builds here (.limen/tools/go.mod) are
 # the go vuln lane's; this one is for what we did not build. Enumerated from
-# aqua's proxies: `aqua which` answers only for the names this repository's
-# config provides, and `go version -m` tells a Go executable from the rest.
+# the store's links: `hermetic which` answers only for the names this
+# repository's pins provide, and `go version -m` tells a Go executable from the rest.
 #
 # Named, not yet in the default set: its first run found every pinned Go
 # binary but the toolchain's own, golangci-lint and limen carrying known
-# vulnerabilities, aqua included, and a red no repository can clear is
-# noise. It joins the default set once the pinned tools are built here with
-# the pinned toolchain and aqua's own pin is current.
+# vulnerabilities, and a red no repository can clear is noise. It joins the
+# default set once the pinned tools are built here with the pinned toolchain.
 binaries: (_banner "security" "binaries") (_go-tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck") _vulndb
     #!/usr/bin/env bash
     set -euo pipefail
     db=$(cat "$LIMEN_BUILD/vulndb.url")
-    bin="$(aqua root-dir)/bin"
+    bin="$(hermetic root-dir)/bin"
     # A newline-delimited list, not an associative array: macOS ships bash 3.
     seen=$'\n'
     fail=0
     for proxy in "$bin"/*; do
         name=${proxy##*/}
         name=${name%.exe}
-        path=$(aqua which "$name" 2>/dev/null) || continue
+        path=$(hermetic which "$name" 2>/dev/null) || continue
         [ -f "$path" ] || continue
         case "$seen" in *$'\n'"$path"$'\n'*) continue;; esac
         seen="$seen$path"$'\n'

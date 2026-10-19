@@ -26,11 +26,31 @@ export BREW_BIN := env_var_or_default('BREW_BIN', `command -v brew || true`)
 # absent; Windows' ambient PATH already carries Git for Windows' own.
 export GPG_BIN := if os() == 'windows' { '' } else { env_var_or_default('GPG_BIN', `command -v gpg || true`) }
 
-# aqua-pinned tools + base system only, so an unpinned tool fails loudly.
-# Windows (git-bash) has no knowable base-system list and uses ';': pins are
+# The pinned tools + base system only, so an unpinned tool fails loudly. The
+# pins are hermetic's: its root's bin holds one link per tool, each a name for
+# the binary, which resolves the name from this repository's .hermetic/ pins.
+# The root is HERMETIC_ROOT_DIR (a session's own, from its settings) or the
+# binary's default for the platform, the one limen-install fills. Windows
+# (git-bash) has no knowable base-system list and uses ';': pins are
 # prepended to the ambient PATH there instead.
-aqua_bin := env_var_or_default('AQUA_ROOT_DIR', env_var_or_default('XDG_DATA_HOME', home_directory() / '.local/share') / 'aquaproj-aqua') / 'bin'
-export PATH := if os() == 'windows' { aqua_bin + ';' + env_var('PATH') } else { aqua_bin + ":/usr/bin:/bin:/usr/sbin:/sbin" }
+hermetic_root := env_var_or_default('HERMETIC_ROOT_DIR', if os() == 'macos' { home_directory() / 'Library/Application Support/hermetic' } else if os() == 'windows' { env_var_or_default('LOCALAPPDATA', home_directory() / 'AppData/Local') / 'hermetic' } else { env_var_or_default('XDG_DATA_HOME', home_directory() / '.local/share') / 'hermetic' })
+hermetic_bin := hermetic_root / 'bin'
+export PATH := if os() == 'windows' { hermetic_bin + ';' + env_var('PATH') } else { hermetic_bin + ":/usr/bin:/bin:/usr/sbin:/sbin" }
+
+# A tool's link is its entry point: the shell looks the name up in the root's
+# bin and fails before hermetic runs when none is there, and a fresh root, or
+# a tool a merged pull request added, has no link until an install plants one.
+# So every recipe run plants the missing links first (link-only: no download,
+# no policy, milliseconds, and no network once the root holds the registries),
+# the step CI's setup-hermetic action takes before the recipes. The binary by real path, since a top-level
+# expression does not see the PATH exported above. Skipped where the pins or
+# the binary are absent (a repository not yet converged, a machine without
+# limen-install), where the first tool fails loudly as before; not evaluated
+# for --list. A failure is printed and swallowed here, so the recipe fails on
+# the tool it needs rather than every recipe in a variable.
+hermetic_pins := replace(justfile_directory(), '\', '/') / '.hermetic/hermetic.yaml'
+hermetic_exe := if os() == 'windows' { hermetic_bin / 'hermetic.exe' } else { hermetic_bin / 'hermetic' }
+_hermetic_links := if path_exists(hermetic_pins) != 'true' { '' } else if path_exists(hermetic_exe) != 'true' { '' } else { shell('"$1" --log-level warn -c "$2" install -l >&2 || true', hermetic_exe, hermetic_pins) }
 
 # GO* variables tunnel through the pinned PATH, so each is emptied or pinned
 # (go treats '' as unset; `export` propagates into module recipes, `unexport`
@@ -98,7 +118,7 @@ export SDKROOT := if xcode_sdk == '' { env('SDKROOT', '') } else { xcode_sdk }
 # between runs goes under it, in a subdirectory named for what it holds. The
 # only spelling of the name: the shared recipes and the project's own use
 # {{ LIMEN_BUILD }} or $LIMEN_BUILD, a script a recipe runs reads it from the
-# environment, and CI's setup-aqua and windows-cache-image actions export the
+# environment, and CI's setup-hermetic and windows-cache-image actions export the
 # same path for the steps after them. Absolute, so a script that changes
 # directory still finds it; forward slashes on windows, which git-bash's own
 # tools and the native ones both read.

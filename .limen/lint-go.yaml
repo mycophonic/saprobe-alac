@@ -435,6 +435,20 @@ golangci:
             deny:
               - pkg: log$
                 desc: logging is log/slog
+              - pkg: github.com/spf13/cobra
+                desc: a command line is flag, kong or primordium's app (book/dependencies-go.md)
+              - pkg: github.com/urfave/cli
+                desc: a command line is flag, kong or primordium's app (book/dependencies-go.md)
+              - pkg: github.com/sirupsen/logrus
+                desc: logging is log/slog (book/dependencies-go.md)
+              - pkg: k8s.io/klog
+                desc: logging is log/slog (book/dependencies-go.md)
+              - pkg: github.com/go-logr/logr
+                desc: logging is log/slog (book/dependencies-go.md)
+              - pkg: go.uber.org/zap
+                desc: logging is log/slog (book/dependencies-go.md)
+              - pkg: github.com/rs/zerolog
+                desc: logging is log/slog (book/dependencies-go.md)
               - pkg: math/rand$
                 desc: use math/rand/v2
               - pkg: io/ioutil$
@@ -446,6 +460,20 @@ golangci:
             deny:
               - pkg: log$
                 desc: logging is log/slog
+              - pkg: github.com/spf13/cobra
+                desc: a command line is flag, kong or primordium's app (book/dependencies-go.md)
+              - pkg: github.com/urfave/cli
+                desc: a command line is flag, kong or primordium's app (book/dependencies-go.md)
+              - pkg: github.com/sirupsen/logrus
+                desc: logging is log/slog (book/dependencies-go.md)
+              - pkg: k8s.io/klog
+                desc: logging is log/slog (book/dependencies-go.md)
+              - pkg: github.com/go-logr/logr
+                desc: logging is log/slog (book/dependencies-go.md)
+              - pkg: go.uber.org/zap
+                desc: logging is log/slog (book/dependencies-go.md)
+              - pkg: github.com/rs/zerolog
+                desc: logging is log/slog (book/dependencies-go.md)
               - pkg: math/rand$
                 desc: use math/rand/v2
               - pkg: io/ioutil$
