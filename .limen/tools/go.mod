@@ -21,7 +21,7 @@ require (
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/forkcloser/dot v1.3.1 // indirect
 	github.com/forkcloser/go-graphviz v0.5.2 // indirect
-	github.com/forkcloser/godolint v0.4.0 // indirect
+	github.com/forkcloser/godolint v0.5.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/go-licenses/v2 v2.0.1 // indirect
@@ -33,7 +33,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/moby/buildkit v0.34.0 // indirect
-	github.com/mycophonic/primordium v0.14.0 // indirect
+	github.com/mycophonic/primordium v0.15.0 // indirect
 	github.com/otiai10/copy v1.10.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
