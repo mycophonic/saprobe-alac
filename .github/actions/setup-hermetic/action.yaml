@@ -1,0 +1,143 @@
+name: Setup hermetic
+description: >
+  Install hermetic (pinned, verified against its release's checksums.txt and GitHub's build provenance), put its root's bin directory on PATH, authorize the repository's committed policy and link the repository's pins. hermetic is the toolset's own aqua (forkcloser/hermetic): the one tool the toolset cannot pin. Same pins as limen-install: the release at an exact version, its checksums.txt under a sha256 pinned beside the version.
+inputs:
+  github-token:
+    description: >
+      Token for hermetic's GitHub API calls (exported as HERMETIC_GITHUB_TOKEN, the one variable hermetic reads it from). Unauthenticated calls are limited per runner IP, shared with every tenant: a "403 API rate limit exceeded" on the first tool is that limit. Default: the job's token. Pass "" to opt out — the write-capable checksum workflow does.
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - name: Install hermetic (pinned, verified)
+      shell: bash
+      env:
+        # A pair: Renovate moves the version, in limen alone, and the checksum
+        # workflow recomputes the sha256 beside it on Renovate's branch, the
+        # digest of the release's checksums.txt, which must change with the
+        # version. One digest covers every platform: the asset is verified
+        # against checksums.txt, and checksums.txt against this.
+        # renovate: depName=forkcloser/hermetic
+        HERMETIC_VERSION: v0.2.1
+        HERMETIC_CHECKSUMS_SHA256: ccce092b673a33b287704a5ba949d5e75b5164dbbaf4ec75f391207a5f636166
+        # The job's own token, for `gh attestation verify` only, here and not
+        # exported: a read of GitHub's attestations API, before any
+        # branch-declared binary runs.
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Pin the root explicitly: hermetic's own default differs per
+        # platform, the windows cache image attaches first and exports its
+        # own, and the layers must agree.
+        HERMETIC_ROOT_DIR="${HERMETIC_ROOT_DIR:-$HOME/.local/share/hermetic}"
+        # Native form on windows: git-bash's POSIX $HOME (/c/Users/…) is misread
+        # by native binaries as drive-relative; cygpath -m yields C:/Users/…,
+        # which every layer reads.
+        if command -v cygpath >/dev/null 2>&1; then
+          HERMETIC_ROOT_DIR="$(cygpath -m "$HERMETIC_ROOT_DIR")"
+        fi
+        export HERMETIC_ROOT_DIR
+        echo "HERMETIC_ROOT_DIR=${HERMETIC_ROOT_DIR}" >>"$GITHUB_ENV"
+        # The checkout's output directory, the path main.just's LIMEN_BUILD
+        # computes, for the steps after this one (cache paths, a project's own
+        # steps); a recipe computes it again itself. Kept when set: on windows
+        # the cache image is attached first and exports it. Equal to main.just's
+        # value only with the checkout at the workspace root (actions/checkout
+        # without `path:`), as every canonical workflow checks out.
+        LIMEN_BUILD="${LIMEN_BUILD:-$GITHUB_WORKSPACE/.build}"
+        if command -v cygpath >/dev/null 2>&1; then
+          LIMEN_BUILD="$(cygpath -m "$LIMEN_BUILD")"
+        fi
+        echo "LIMEN_BUILD=${LIMEN_BUILD}" >>"$GITHUB_ENV"
+        # The asset for this runner: RUNNER_OS and RUNNER_ARCH are the truth
+        # (Git for Windows' arm64 build ships an x86_64 bash, so uname lies
+        # there).
+        case "$RUNNER_OS" in
+          Linux) os=linux ;;
+          macOS) os=darwin ;;
+          Windows) os=windows ;;
+          *) echo "::error::unsupported runner OS: $RUNNER_OS"; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *) echo "::error::unsupported runner architecture: $RUNNER_ARCH"; exit 1 ;;
+        esac
+        asset="hermetic_${HERMETIC_VERSION#v}_${os}_${arch}.tar.gz"
+        bin="hermetic"
+        [ "$os" != windows ] || bin="hermetic.exe"
+        mkdir -p "${HERMETIC_ROOT_DIR}/bin"
+        if [ -x "${HERMETIC_ROOT_DIR}/bin/${bin}" ] && [ "$("${HERMETIC_ROOT_DIR}/bin/${bin}" version 2>/dev/null || true)" = "${HERMETIC_VERSION#v}" ]; then
+          echo "hermetic ${HERMETIC_VERSION} already in the root (the cache image)"
+        else
+          tmp="$(mktemp -d)"
+          base="https://github.com/forkcloser/hermetic/releases/download/${HERMETIC_VERSION}"
+          # Retries for transient runner failures. Windows curl (schannel)
+          # refuses a handshake when the CA's revocation server is unreachable
+          # (exit 35, seen repeatedly): best-effort revocation still rejects a
+          # known-revoked certificate, and the checksums below are the real
+          # guard. schannel-only flag, so windows-only.
+          revoke=()
+          [ "$RUNNER_OS" != Windows ] || revoke=(--ssl-revoke-best-effort)
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors "${revoke[@]}" \
+            -o "${tmp}/checksums.txt" "${base}/checksums.txt"
+          # No single digest tool exists everywhere: linux and windows git-bash
+          # ship coreutils sha256sum, macOS ships perl shasum.
+          if command -v sha256sum >/dev/null 2>&1; then
+            echo "${HERMETIC_CHECKSUMS_SHA256}  ${tmp}/checksums.txt" | sha256sum -c -
+          else
+            echo "${HERMETIC_CHECKSUMS_SHA256}  ${tmp}/checksums.txt" | shasum -a 256 -c -
+          fi
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors "${revoke[@]}" \
+            -o "${tmp}/${asset}" "${base}/${asset}"
+          expected="$(awk -v a="$asset" '$2 == a {print $1}' "${tmp}/checksums.txt")"
+          [ -n "$expected" ] || { echo "::error::checksums.txt of hermetic ${HERMETIC_VERSION} does not list ${asset}"; exit 1; }
+          if command -v sha256sum >/dev/null 2>&1; then
+            echo "${expected}  ${tmp}/${asset}" | sha256sum -c -
+          else
+            echo "${expected}  ${tmp}/${asset}" | shasum -a 256 -c -
+          fi
+          # GitHub's build provenance, on every runner through gh: the asset was
+          # built by hermetic's release workflow from the tagged commit.
+          gh attestation verify "${tmp}/${asset}" --repo forkcloser/hermetic
+          tar -xzf "${tmp}/${asset}" -C "${tmp}" "${bin}"
+          # Set aside, not overwritten: on windows the links are hard links
+          # and the old file may be held; the install below relinks.
+          if [ -e "${HERMETIC_ROOT_DIR}/bin/${bin}" ]; then
+            mv -f "${HERMETIC_ROOT_DIR}/bin/${bin}" "${HERMETIC_ROOT_DIR}/bin/${bin}.old"
+          fi
+          mv -f "${tmp}/${bin}" "${HERMETIC_ROOT_DIR}/bin/${bin}"
+          chmod 755 "${HERMETIC_ROOT_DIR}/bin/${bin}"
+          rm -f "${HERMETIC_ROOT_DIR}/bin/${bin}.old" 2>/dev/null || true
+          rm -rf "${tmp}"
+          echo "hermetic ${HERMETIC_VERSION}: checksum and attestation verified"
+        fi
+        echo "${HERMETIC_ROOT_DIR}/bin" >>"$GITHUB_PATH"
+    - name: Authenticate hermetic's GitHub API calls
+      # GITHUB_ENV so every later step's hermetic and its links see it
+      # (downloads happen lazily, on first use). HERMETIC_GITHUB_TOKEN, not
+      # GITHUB_TOKEN: hermetic hands it to the library and the verifiers and
+      # scrubs the shell's GITHUB_TOKEN from them.
+      if: inputs.github-token != ''
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.github-token }}
+      run: echo "HERMETIC_GITHUB_TOKEN=${TOKEN}" >>"$GITHUB_ENV"
+    - name: Authorize the committed policy and link the pins
+      # The runner's root holds no machine toolset, and hermetic reads the
+      # root's own policy on every run: an empty one, allowing nothing, so
+      # the repository's committed policy is the only one that applies.
+      # Written once; the cache image keeps it. Before hermetic will read
+      # the repo's local registry, the committed policy must be allowed —
+      # every caller needs this, whatever it runs next. Then the links: a
+      # tool is pulled when first run, verified against the committed
+      # checksums, so the steps after this one run the repository's pins by
+      # name, `go` included, which the cache action's restore resolves the
+      # Go caches' paths with.
+      shell: bash
+      run: |
+        if [ ! -f "${HERMETIC_ROOT_DIR}/policy.yaml" ]; then
+          printf '# Written by setup-hermetic: no machine toolset on a runner, so the root allows nothing of its own.\nregistries: []\npackages: []\n' > "${HERMETIC_ROOT_DIR}/policy.yaml"
+        fi
+        hermetic policy allow .hermetic/policy.yaml
+        hermetic install -l

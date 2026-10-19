@@ -12,7 +12,7 @@ import 'lib.just'
 
 default: limen just yaml aqua
 
-# Repairs what `just do lint limen` reports; regenerates .aqua/aqua-checksums.json
+# Repairs what `just do lint limen` reports; regenerates .hermetic/aqua-checksums.json
 # when pins changed (network). Same LIMEN_BIN override as lint.just.
 limen: (_banner "fix" "limen")
     ${LIMEN_BIN:-limen} fix .
@@ -39,11 +39,11 @@ just: (_banner "fix" "just")
 yaml: (_banner "fix" "yaml")
     yamlfmt -conf .limen/.yamlfmt
 
-# Regenerate .aqua/aqua-checksums.json from .aqua/aqua.yaml — the mutating twin of
-# `just do lint aqua` (needs network). In the default set so a plain
-# `just do fix` heals the drift the lint default flags.
+# Regenerate .hermetic/aqua-checksums.json from .hermetic/hermetic.yaml — the
+# mutating twin of `just do lint aqua` (needs network). In the default set so
+# a plain `just do fix` heals the drift the lint default flags.
 aqua: (_banner "fix" "aqua")
-    {{ agent_home }} aqua --log-level warn -c .aqua/aqua.yaml update-checksum --prune
+    {{ agent_home }} hermetic --log-level warn -c .hermetic/hermetic.yaml update-checksum --prune
 
 # Go fixers live in their own submodule: `just do fix go` runs them all,
 # `just do fix go <recipe>` (e.g. `just do fix go mod`) runs one.

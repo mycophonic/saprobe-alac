@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": [
     "The canonical Renovate configuration of every farcloser repository, content-pinned like the rest of .limen/: each repository carries this file byte for byte and its renovate.json extends it by the repository's own name (local>owner/name//.limen/renovate — Renovate refuses a relative reference in a repository's own config), so a fix here reaches every repository at its next limen bump, in the bump's diff. Reasoning: limen's book, mandatory files (CI workflows).",
-    "extends: config:recommended, plus aqua's preset, which detects owner/repo@ver and go-module packages in .aqua/aqua.yaml and updates the standard-registry ref. Its `aqua_version` manager reads that key in lowercase only; the canonical setup-aqua action names its pin AQUA_VERSION, so aqua itself sat three minors behind for months with nothing proposing the bump. The customManager below watches that pin, in limen alone (the content-pinned rule silences the action everywhere else), so aqua moves through a limen release like every other canonical pin.",
+    "extends: config:recommended alone. aqua's own preset detected pins by the file names aqua.yaml and .aqua/aqua.yaml; the pins live in .hermetic/hermetic.yaml now, resolved by hermetic, which that preset never sees, so the customManagers below carry its three managers that apply here, pointed at .hermetic/hermetic.yaml and the canonical .limen/hermetic.yaml: owner/repo@version pins against GitHub releases and against GitHub tags (a package released by tag alone), and the standard registry's `ref:` line. hermetic itself is pinned in the canonical setup-hermetic action as HERMETIC_VERSION, watched by the manager below in limen alone (the content-pinned rule silences the action everywhere else), so it moves through a limen release like every other canonical pin; its sha256 companion is recomputed by the checksum workflow on Renovate's branch, as the project checksums are.",
     "minimumReleaseAge: supply-chain cooldown before proposing a bump; doubles as protection against a release tag whose assets are not uploaded yet.",
     "packageRules, golang/go: no cooldown. The Go toolchain is each repository's own pin so that a standard-library fix reaches it without a limen release, and a Go patch release is that fix; three days of cooldown would be three days of red security lanes. Go's releases are not pulled or re-uploaded the way the cooldown guards against.",
     "packageRules, own releases: the cooldown guards against third parties (a tag whose assets are still uploading, a release pulled the next day). A release cut by one of our organizations carries no risk we do not already own, and its assets are published by the release workflow within minutes \u2014 so farcloser, forkcloser and mycophonic packages, in aqua's owner/repo form and Go's github.com/owner/repo form alike, are proposed as soon as they exist. A repository that wants the cooldown back on one of them adds a later packageRule in its own renovate.json; rules merge in order and the last match wins.",
@@ -12,9 +12,9 @@
     "vulnerabilityAlerts: fix PRs from GitHub's Dependabot alerts (the baseline keeps the alerts on for exactly this; Dependabot's own update PRs are off, Renovate is the one bot). Stated explicitly because enabled: true here is what reaches // indirect Go modules, which the gomod manager skips by default. Fix PRs skip the cooldown and take the lowest fixed version, both Renovate defaults for this object.",
     "postUpdateOptions gomodTidy: a Go module bump rewrites go.mod; without tidy, go.sum keeps the old module's lines and `just do lint go mod` (go mod tidy, diffed) fails every gomod PR. gomodUpdateImportPaths is what keeps tidy running on a MAJOR bump: without it Renovate skips tidy on every major (its guard for the /vN import-path rewrite, which must precede tidy), and a v0 to v1 bump is major while changing no path, so the PR landed a go.sum with the new go.mod hash, no h1 line and the old pseudo-version lines still in it, green for Renovate and red on the tidy diff. With the option, v0 to v1 does no path rewrite and tidies; a real /vN bump rewrites the imports with marwan-at-work/mod (which Renovate go-installs at run time, no image support needed) and then tidies.",
     "constraints gomodMod: the version Renovate go-installs marwan-at-work/mod at for that rewrite; without it the install is @latest, a third-party binary that rewrites import paths across the tree fetched at whatever is newest the day a /vN bump lands. Pinned means by digest, and this lever takes only a v-prefixed tag, so this is the nearest the lever allows: a version pin, its content fixed and transparency-logged by the checksum database that go install verifies against. Named here as that exception rather than left implicit. Renovate's own config manager marks this constraint unsupported and never scans a preset, so limen's renovate.json watches the value with a custom manager and proposes its bumps there.",
-    "packageRules, content-pinned files: the checksum-update workflow, the shared CI lanes (limen-verify.yaml), the security workflow, the setup-aqua, cache and windows-cache-image actions and everything under .limen/ are limen's byte for byte; a bump Renovate makes inside one is drift the next `limen check` rejects. Their pins move in limen's own repository, the one place Renovate keeps touching them, and reach every other repository through a limen release.",
+    "packageRules, content-pinned files: the checksum-update workflow, the shared CI lanes (limen-verify.yaml), the security workflow, the setup-hermetic, cache and windows-cache-image actions and everything under .limen/ are limen's byte for byte; a bump Renovate makes inside one is drift the next `limen check` rejects. Their pins move in limen's own repository, the one place Renovate keeps touching them, and reach every other repository through a limen release.",
     "packageRules, Go-built tools: the tool directives under .limen/tools/ (git-validation, godolint, dot, the Go-source analyzers deadcode, govulncheck, go-licenses, and golangci-lint in .limen/tools/golangci-lint/go.mod, a module of its own so its analyzers' dependencies stay upstream's), which Go lists as // indirect and the gomod manager would skip; re-enabled exactly, by module. dot is forkcloser's own tagged module (upstream's cmd/dot is a nested module without tags), so it moves like the others, and as one of ours it is proposed without the cooldown. Two rules, by file: .limen/tools/go.mod for the shared tools, .limen/tools/*/go.mod for golangci-lint and nilaway only. One rule over every gomod file re-enabled golang.org/x/tools where it is a plain // indirect requirement of golangci-lint's and nilaway's own modules, and bumped it past the version each upstream pins (forkcloser/infra#10): the isolated module exists so that graph stays upstream's, so nothing in it moves but the tool itself.",
-    "packageRules, groups: one pull request per repository per kind, not one per dependency — a registry ref that moves most days and a dozen tool pins were arriving as a dozen pull requests a month per repository, each reviewed alone. Three groups: `aqua tools` (every third-party pin in .aqua/aqua.yaml, the standard-registry ref and aqua itself included), `github actions`, and `go modules` (non-major gomod bumps, the .limen/tools/go.mod directives included). Renovate keeps the one open pull request current as further versions arrive instead of opening another. Grouped, not scheduled: a bump still arrives as soon as its cooldown ends. Outside the groups on purpose: our own releases (immediate and alone, so a limen bump is its own reviewed change), major Go bumps (code may have to move), pins.yaml entries (each a deliberate supply-chain change), and security fixes, which Renovate's vulnerabilityAlerts defaults keep ungrouped. A repository that wants a dependency out of a group adds a later packageRule with groupName null.",
+    "packageRules, groups: one pull request per repository per kind, not one per dependency — a registry ref that moves most days and a dozen tool pins were arriving as a dozen pull requests a month per repository, each reviewed alone. Three groups: `aqua tools` (every third-party pin in .hermetic/hermetic.yaml and the standard-registry ref), `github actions`, and `go modules` (non-major gomod bumps, the .limen/tools/go.mod directives included). Renovate keeps the one open pull request current as further versions arrive instead of opening another. Grouped, not scheduled: a bump still arrives as soon as its cooldown ends. Outside the groups on purpose: our own releases (immediate and alone, so a limen bump is its own reviewed change), major Go bumps (code may have to move), pins.yaml entries (each a deliberate supply-chain change), and security fixes, which Renovate's vulnerabilityAlerts defaults keep ungrouped. A repository that wants a dependency out of a group adds a later packageRule with groupName null.",
     "packageRules, lychee: releases are tagged lychee-vX.Y.Z next to lychee-lib-vX.Y.Z and nightly; regex versioning that carries the prefix parses the pin and the candidates alike and excludes the others by construction.",
     "packageRules, git-for-windows: releases are tagged vX.Y.Z.windows.N, and the N moves on its own (a Git for Windows rebuild of the same Git); a semver reading drops it and would never propose that bump. The build group carries it, and release candidates (vX.Y.Z-rcN.windows.N) fall outside the pattern.",
     "packageRules, runner images: the github-actions manager, which config:recommended enables, also proposes the runs-on images (ubuntu-24.04 to 26.04, macos-15 to 26) from the github-runners datasource. Those are product targets, not dependencies: the matrix is the set of platforms the code and the commands are proven on, set by the canonical ci.yaml seed and moved deliberately, on purpose, as a reviewed change. Off for that datasource; the actions themselves keep moving.",
@@ -22,8 +22,7 @@
     "commitBody: `just do lint commits` enforces DCO on every PR range, bot commits included."
   ],
   "extends": [
-    "config:recommended",
-    "github>aquaproj/aqua-renovate-config#2.13.0"
+    "config:recommended"
   ],
   "minimumReleaseAge": "3 days",
   "rebaseWhen": "behind-base-branch",
@@ -52,9 +51,34 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/actions/setup-aqua/action\\.ya?ml$/"],
-      "matchStrings": ["AQUA_VERSION: (?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
-      "depNameTemplate": "aquaproj/aqua",
+      "managerFilePatterns": ["/^\\.github/actions/setup-hermetic/action\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: depName=(?<depName>[^\\s]+)\\n\\s*HERMETIC_VERSION: (?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)\\.hermetic/hermetic\\.ya?ml$/", "/(^|/)\\.limen/hermetic\\.ya?ml$/"],
+      "matchStrings": [
+        " +(?:name|'name'|\"name\") *: +(?<depName>(?<packageName>[^'\" _.@/\\n]+/[^'\" @/\\n]+)(/[^'\" /@\\n]+)*)@(?<currentValue>[^'\" \\n]+)"
+      ],
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)\\.hermetic/hermetic\\.ya?ml$/", "/(^|/)\\.limen/hermetic\\.ya?ml$/"],
+      "matchStrings": [
+        " +(?:name|'name'|\"name\") *: +(?<depName>(?<packageName>[^'\" _.@/\\n]+/[^'\" @/\\n]+)(/[^'\" /@\\n]+)*)@(?<currentValue>[^'\" \\n]+)"
+      ],
+      "datasourceTemplate": "github-tags"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)\\.hermetic/hermetic\\.ya?ml$/"],
+      "matchStrings": [
+        " +(?:ref|'ref'|\"ref\") *: +(?<currentValue>[^'\" \\n]+) +# renovate: depName=(?<depName>(?<packageName>[^'\" _.@/\\n]+/[^'\" @/\\n]+)(/[^'\" /@\\n]+)*)"
+      ],
       "datasourceTemplate": "github-releases"
     }
   ],
@@ -74,7 +98,7 @@
     {
       "matchFileNames": [
         ".github/workflows/update-aqua-checksum.yaml",
-        ".github/actions/setup-aqua/**",
+        ".github/actions/setup-hermetic/**",
         ".github/actions/windows-cache-image/**",
         ".github/actions/cache/**",
         ".github/workflows/limen-verify.yaml",
@@ -118,19 +142,11 @@
     },
     {
       "matchFileNames": [
-        ".aqua/aqua.yaml",
-        ".limen/aqua.yaml",
-        "aqua.yaml",
-        "aqua.yml"
+        ".hermetic/hermetic.yaml",
+        ".limen/hermetic.yaml"
       ],
       "matchDepNames": [
         "!/^(github\\.com/)?(farcloser|forkcloser|mycophonic)/[^/]+$/"
-      ],
-      "groupName": "aqua tools"
-    },
-    {
-      "matchDepNames": [
-        "aquaproj/aqua"
       ],
       "groupName": "aqua tools"
     },

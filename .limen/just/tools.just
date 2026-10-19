@@ -10,51 +10,55 @@ set quiet
 # Shared private _banner recipe, go_tool_build and agent_home (see lib.just).
 import 'lib.just'
 
-# aqua's GitHub API calls (a package's tag list, its release assets) are
+# hermetic's GitHub API calls (a package's tag list, its release assets) are
 # limited per address when unauthenticated, and one checksum update makes
 # one per package: a laptop pinning one tool across nine repositories hit the
 # 403 on the second (the download then 404s on an unset version). The laptop's
 # own gh login authenticates them when it has one and nothing set the
-# variable; setup-aqua sets it in CI. Prefixed on the API-calling aqua
-# commands only, never exported to a recipe's other children.
-aqua_api := 'AQUA_GITHUB_TOKEN="${AQUA_GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}" aqua'
+# variable; setup-hermetic sets it in CI. HERMETIC_GITHUB_TOKEN is the one
+# variable hermetic reads a token from. Prefixed on the API-calling commands
+# only, never exported to a recipe's other children.
+aqua_api := 'HERMETIC_GITHUB_TOKEN="${HERMETIC_GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}" hermetic'
 
 # --- Project tooling (see book/tooling.md). Every recipe takes the tool as it
-#     is pinned: an aqua slug exactly as in .aqua/aqua.yaml (goreleaser/goreleaser),
+#     is pinned: an aqua slug exactly as in .hermetic/hermetic.yaml (goreleaser/goreleaser),
 #     or a Go package path exactly as in .limen/tools/go.mod
 #     (golang.org/x/tools/cmd/deadcode). ---
 #
 # The two are told apart by the first path element: a Go module root is a
-# host and always carries a dot; a GitHub owner never can. .aqua/aqua.yaml holds no
+# host and always carries a dot; a GitHub owner never can. .hermetic/hermetic.yaml holds no
 # go_install package any more (book/tooling.md), so there is no overlap.
 #
 # The mutating recipes end by really installing the tool, never by linking:
-# a FULL `aqua install` for an aqua package (links verify nothing — lazy pulls
+# a FULL `hermetic install` for an aqua package (links verify nothing — lazy pulls
 # are a CI economy, wrong at the moment a pin changes; on a warm machine the
 # full install is incremental), and a native build into .build/tools/ for a
 # Go tool (the same build _go-tool does before a recipe runs it). Either way a
 # bad pin fails here, not at first use.
 #
-# The recipes edit the project's own pins in .aqua/aqua.yaml, never the
-# canonical set it imports (.limen/aqua.yaml, limen's): a project pin of a
+# The recipes edit the project's own pins in .hermetic/hermetic.yaml, never the
+# canonical set it imports (.limen/hermetic.yaml, limen's): a project pin of a
 # canonical tool overrides limen's version, and removing it falls back to it.
 
-# aqua on the project's own pins alone: a sibling copy of the manifest with the
-# import commented out, run from outside the repository — run inside it, a
-# command the copy lacks is resolved through the real manifest, and aqua
-# rewrites .limen/aqua.yaml (and `generate` skips a canonical tool as already
-# declared). The copy, import restored, then replaces the manifest.
+# hermetic on the project's own pins alone: a sibling copy of the manifest with
+# the import commented out, run from outside the repository — run inside it, a
+# command the copy lacks is resolved through the real manifest, and the
+# library rewrites .limen/hermetic.yaml (and `generate` skips a canonical tool as
+# already declared). HERMETIC_NO_GLOBAL_CONFIG keeps the toolset's own pins
+# out as well: the binary derives the global config from its root, so
+# unsetting the variable would not. The copy, import restored, then replaces
+# the manifest.
 project_aqua := '''
     project_aqua() {
         local copy scratch rc=0
-        copy=$(mktemp .aqua/aqua.yaml.XXXXXX)
+        copy=$(mktemp .hermetic/hermetic.yaml.XXXXXX)
         scratch=$(mktemp -d "${TMPDIR:-/tmp}/limen-tools.XXXXXX")
-        sed 's|^\([[:space:]]*\)- import: \(\.\./\.limen/aqua\.yaml\)[[:space:]]*$|\1# limen-import: \2|' .aqua/aqua.yaml > "$copy"
-        (cd "$scratch" && env -u AQUA_GLOBAL_CONFIG AQUA_GITHUB_TOKEN="${AQUA_GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}" aqua -c "$OLDPWD/$copy" "$@") || rc=$?
+        sed 's|^\([[:space:]]*\)- import: \(\.\./\.limen/hermetic\.yaml\)[[:space:]]*$|\1# limen-import: \2|' .hermetic/hermetic.yaml > "$copy"
+        (cd "$scratch" && HERMETIC_NO_GLOBAL_CONFIG=true HERMETIC_GITHUB_TOKEN="${HERMETIC_GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}" hermetic -c "$OLDPWD/$copy" "$@") || rc=$?
         rmdir "$scratch"
         if [ "$rc" -eq 0 ]; then
             sed 's|^\([[:space:]]*\)# limen-import: |\1- import: |' "$copy" > "$copy.restored"
-            mv "$copy.restored" .aqua/aqua.yaml
+            mv "$copy.restored" .hermetic/hermetic.yaml
         fi
         rm -f "$copy" "$copy.restored"
         return "$rc"
@@ -81,8 +85,8 @@ add pkg version="": (_banner "tools" "add")
         {{ go_tool_build }} '{{ pkg }}'           # REAL build: a bad pin fails here, not at first use
         exit 0
     fi
-    if grep -qE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc}([[:space:]]|@|$)" .aqua/aqua.yaml; then
-        echo "{{ pkg }} is already in .aqua/aqua.yaml — use 'just do tools update <command>' or 'just do tools set {{ pkg }} <version>'." >&2
+    if grep -qE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc}([[:space:]]|@|$)" .hermetic/hermetic.yaml; then
+        echo "{{ pkg }} is already in .hermetic/hermetic.yaml — use 'just do tools update <command>' or 'just do tools set {{ pkg }} <version>'." >&2
         exit 1
     fi
     {{ project_aqua }}
@@ -90,12 +94,12 @@ add pkg version="": (_banner "tools" "add")
     if [ -n "$version" ]; then
         entry=$(printf '%s\n' "$entry" | sed "1s#@[^[:space:]]*#@${version}#")
     fi
-    # The entry goes right above the import, at its indent: aqua takes a
+    # The entry goes right above the import, at its indent: the resolver takes a
     # package's first declaration, so below it the entry would be shadowed.
-    tmp=$(mktemp .aqua/aqua.yaml.XXXXXX)
+    tmp=$(mktemp .hermetic/hermetic.yaml.XXXXXX)
     trap 'rm -f "$tmp"' EXIT
     if ! ENTRY=$entry awk '
-        /^[[:space:]]*- import: \.\.\/\.limen\/aqua\.yaml[[:space:]]*$/ && !done {
+        /^[[:space:]]*- import: \.\.\/\.limen\/hermetic\.yaml[[:space:]]*$/ && !done {
             indent = $0; sub(/-.*/, "", indent)
             n = split(ENVIRON["ENTRY"], lines, "\n")
             for (i = 1; i <= n; i++) if (lines[i] != "") print indent lines[i]
@@ -103,13 +107,13 @@ add pkg version="": (_banner "tools" "add")
         }
         { print }
         END { if (!done) exit 1 }
-    ' .aqua/aqua.yaml > "$tmp"; then
-        echo ".aqua/aqua.yaml does not import ../.limen/aqua.yaml — run 'limen fix' first." >&2
+    ' .hermetic/hermetic.yaml > "$tmp"; then
+        echo ".hermetic/hermetic.yaml does not import ../.limen/hermetic.yaml — run 'limen fix' first." >&2
         exit 1
     fi
-    mv "$tmp" .aqua/aqua.yaml
-    {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # record its checksum (and drop stale ones)
-    {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
+    mv "$tmp" .hermetic/hermetic.yaml
+    {{ agent_home }} {{ aqua_api }} -c .hermetic/hermetic.yaml update-checksum --prune      # record its checksum (and drop stale ones)
+    {{ agent_home }} hermetic -c .hermetic/hermetic.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Set an existing tool to an exact version, e.g. `just do tools set goreleaser/goreleaser v2.0.0`.
 set pkg version: (_banner "tools" "set")
@@ -138,23 +142,23 @@ set pkg version: (_banner "tools" "set")
         {{ go_tool_build }} '{{ pkg }}'                   # REAL build: a bad pin fails here, not at first use
         exit 0
     fi
-    if ! grep -qE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc}@" .aqua/aqua.yaml; then
-        echo "{{ pkg }} is not pinned in .aqua/aqua.yaml — add it with 'just do tools add {{ pkg }} {{ version }}'." >&2
+    if ! grep -qE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc}@" .hermetic/hermetic.yaml; then
+        echo "{{ pkg }} is not pinned in .hermetic/hermetic.yaml — add it with 'just do tools add {{ pkg }} {{ version }}'." >&2
         exit 1
     fi
     # Explicit sibling template: macOS mktemp ignores $TMPDIR, and a sibling
     # makes the mv an atomic same-filesystem rename.
-    tmp=$(mktemp .aqua/aqua.yaml.XXXXXX)
+    tmp=$(mktemp .hermetic/hermetic.yaml.XXXXXX)
     trap 'rm -f "$tmp"' EXIT
-    sed -E "s#(^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc})@[^[:space:]]*#\1@{{ version }}#" .aqua/aqua.yaml > "$tmp"
-    mv "$tmp" .aqua/aqua.yaml
-    {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksum in, replaced version's out
-    {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
+    sed -E "s#(^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc})@[^[:space:]]*#\1@{{ version }}#" .hermetic/hermetic.yaml > "$tmp"
+    mv "$tmp" .hermetic/hermetic.yaml
+    {{ agent_home }} {{ aqua_api }} -c .hermetic/hermetic.yaml update-checksum --prune      # new checksum in, replaced version's out
+    {{ agent_home }} hermetic -c .hermetic/hermetic.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Takes the COMMAND name (`just`, `limen`, `deadcode`), not the package: `aqua
 # update` resolves a command to the project's pin, local registry included,
 # and a tool directive is found by the command it builds as. With no argument
-# every tool moves: each project aqua pin and the registries (`aqua update`), then
+# every tool moves: each project aqua pin and the registries (`hermetic update`), then
 # each directive at its latest — one `go get` for all of them, so the module
 # graph is solved once — and every directive is rebuilt. Renovate does this
 # one tool at a time; the no-argument form is for moving everything by hand
@@ -197,8 +201,8 @@ update command="": (_banner "tools" "update")
     {{ project_aqua }}
     if [ -z '{{ command }}' ]; then
         project_aqua update               # every project pin and the registries, to the latest
-        {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksums in, replaced versions' out
-        {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
+        {{ agent_home }} {{ aqua_api }} -c .hermetic/hermetic.yaml update-checksum --prune      # new checksums in, replaced versions' out
+        {{ agent_home }} hermetic -c .hermetic/hermetic.yaml install                      # REAL install: a bad pin fails here, not at first use
         if [ ${#pkgs[@]} -gt 0 ]; then
             go -C .limen/tools get -tool "${pkgs[@]/%/@latest}"   # one solve for all of them
             go -C .limen/tools mod tidy
@@ -222,12 +226,12 @@ update command="": (_banner "tools" "update")
             exit 0
         fi
     done
-    if ! project_aqua update '{{ command }}'; then   # bump .aqua/aqua.yaml to the latest release
-        echo "{{ command }} is not pinned in .aqua/aqua.yaml — a canonical tool moves with limen; pin your own version with 'just do tools add <package>'." >&2
+    if ! project_aqua update '{{ command }}'; then   # bump .hermetic/hermetic.yaml to the latest release
+        echo "{{ command }} is not pinned in .hermetic/hermetic.yaml — a canonical tool moves with limen; pin your own version with 'just do tools add <package>'." >&2
         exit 1
     fi
-    {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # new checksum in, replaced version's out
-    {{ agent_home }} aqua -c .aqua/aqua.yaml install                      # REAL install: a bad pin fails here, not at first use
+    {{ agent_home }} {{ aqua_api }} -c .hermetic/hermetic.yaml update-checksum --prune      # new checksum in, replaced version's out
+    {{ agent_home }} hermetic -c .hermetic/hermetic.yaml install                      # REAL install: a bad pin fails here, not at first use
 
 # Remove a tool entirely, e.g. `just do tools remove junegunn/fzf`.
 remove pkg: (_banner "tools" "remove")
@@ -255,12 +259,12 @@ remove pkg: (_banner "tools" "remove")
         rm -f "$LIMEN_BUILD/tools/${name}" "$LIMEN_BUILD/tools/${name}.exe"
         exit 0
     fi
-    if ! grep -qE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc}([[:space:]]|@|$)" .aqua/aqua.yaml; then
-        echo "{{ pkg }} is not in .aqua/aqua.yaml — nothing to remove." >&2
+    if ! grep -qE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*${esc}([[:space:]]|@|$)" .hermetic/hermetic.yaml; then
+        echo "{{ pkg }} is not in .hermetic/hermetic.yaml — nothing to remove." >&2
         exit 1
     fi
     # See `set` for why mktemp gets an explicit sibling-path template.
-    tmp=$(mktemp .aqua/aqua.yaml.XXXXXX)
+    tmp=$(mktemp .hermetic/hermetic.yaml.XXXXXX)
     trap 'rm -f "$tmp"' EXIT
     # Exact string compare on the parsed slug, not a regex (a dot would be a
     # wildcard, and escaping for awk is unportable: -v eats backslashes). The
@@ -279,9 +283,9 @@ remove pkg: (_banner "tools" "remove")
             }
             print
         }
-    ' .aqua/aqua.yaml > "$tmp"
-    mv "$tmp" .aqua/aqua.yaml
-    # No `aqua remove`: it uninstalls from aqua's root, which every checkout on
+    ' .hermetic/hermetic.yaml > "$tmp"
+    mv "$tmp" .hermetic/hermetic.yaml
+    # No `remove`: it would uninstall from the store, which every checkout on
     # the machine shares, and another may still pin the same version (the
     # canonical set imports it, for one).
-    {{ agent_home }} {{ aqua_api }} -c .aqua/aqua.yaml update-checksum --prune      # drop the now-unused checksum
+    {{ agent_home }} {{ aqua_api }} -c .hermetic/hermetic.yaml update-checksum --prune      # drop the now-unused checksum

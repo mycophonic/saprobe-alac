@@ -3,7 +3,7 @@
 # (`uses: ./.github/workflows/limen-verify.yaml`). A change here reaches every
 # repository with its limen bump; the project's own jobs live in its ci.yaml.
 #
-# Minimal glue: GitHub's own actions pinned by SHA, aqua at .aqua/aqua.yaml's
+# Minimal glue: GitHub's own actions pinned by SHA, hermetic at .hermetic/hermetic.yaml's
 # pins, `just` running the recipes a laptop runs. No third-party actions,
 # hence no egress-filtering action either.
 name: limen-verify
@@ -52,27 +52,24 @@ jobs:
           fetch-depth: 0
 
       # The job's caches (.github/actions/cache): attached here, before
-      # setup-aqua, since on Windows aqua's root is inside the cache image
-      # (restored as files, the caches cost minutes of small-file writes
-      # there); restored right after setup-aqua; saved at the end.
+      # setup-hermetic, since on Windows hermetic's root is inside the cache
+      # image (restored as files, the caches cost minutes of small-file writes
+      # there); restored right after setup-hermetic; saved at the end.
       - uses: ./.github/actions/cache
         with:
           mode: attach
 
-      - name: Install aqua (pinned, checksum-verified)
-        uses: ./.github/actions/setup-aqua
+      - name: Install hermetic (pinned, verified)
+        uses: ./.github/actions/setup-hermetic
 
       # The per-platform analysis legs compile the whole module graph five
-      # times, cold, on every run without the Go caches.
+      # times, cold, on every run without the Go caches. The pins are linked
+      # by setup-hermetic: a tool downloads lazily on first use,
+      # checksum-verified, so a job pays only for what its recipes run.
       - uses: ./.github/actions/cache
         with:
           mode: restore
           linter-cache: 'true'
-
-      - name: Install pinned tools
-        # Link-only: tools download lazily on first use, checksum-verified; a
-        # job pays only for what its recipes run.
-        run: aqua install --only-link
 
       - name: Lint
         run: just lint
@@ -98,11 +95,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install aqua (pinned, checksum-verified)
-        uses: ./.github/actions/setup-aqua
-
-      - name: Install pinned tools
-        run: aqua install --only-link
+      - name: Install hermetic (pinned, verified)
+        uses: ./.github/actions/setup-hermetic
 
       # The cached corpus is what makes fuzzing cumulative across runs. Keyed
       # on the fuzz sources so a changed target restarts its corpus, and on
@@ -158,8 +152,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install aqua (pinned, checksum-verified)
-        uses: ./.github/actions/setup-aqua
+      - name: Install hermetic (pinned, verified)
+        uses: ./.github/actions/setup-hermetic
 
       # The same store as the verify legs', so this job and the linux leg
       # share it, and no fallback here: a changed pin must be a real install,
@@ -171,7 +165,7 @@ jobs:
           aqua-fallback: 'false'
 
       - name: Install every pinned tool
-        run: aqua install
+        run: hermetic install
 
       # Saved on the default branch only, on a miss (caches.yaml); the verify
       # leg that shares the key may have saved it first, and a key is never

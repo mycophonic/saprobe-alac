@@ -22,15 +22,15 @@ go_cgo := '${CGO_ENABLED:-${GO_CGO:-0}}'
 # Inside a Claude Code session the installer sets LIMEN_AGENT_HOME, the home of
 # the sessions' tool root: slsa-verifier keeps its TUF cache under
 # $HOME/.sigstore and reads no other variable (book/upstream.md), and the
-# sandbox denies the human's. Prefixed on every aqua command that downloads
+# sandbox denies the human's. Prefixed on every hermetic command that downloads
 # and verifies: install, and update-checksum, which verifies what it sums.
 # Through env, because a word an expansion produces is never an assignment to
-# the shell (`HOME=x aqua` typed is one; `${v:+HOME=x} aqua` runs a command
-# named HOME=x). For a human the variable is unset and this is a bare env.
+# the shell (`HOME=x hermetic` typed is one; `${v:+HOME=x} hermetic` runs a
+# command named HOME=x). For a human the variable is unset and this is a bare env.
 agent_home := 'env ${LIMEN_AGENT_HOME:+HOME="$LIMEN_AGENT_HOME"}'
 
 # Run CMD once per supported platform — every GOOS/GOARCH pair in the canonical
-# checksum.supported_envs of .aqua/aqua.yaml (the list below mirrors it; extend them
+# checksum.supported_envs of .hermetic/hermetic.yaml (the list below mirrors it; extend them
 # together) — with CGO disabled. The Go build graph is selected by both axes:
 # a file built only on linux is invisible to a darwin run, and a file built
 # only on amd64 (an _amd64.go, an _amd64.s) is invisible to an arm64 one, so a

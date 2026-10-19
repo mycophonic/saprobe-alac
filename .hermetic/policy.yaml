@@ -7,7 +7,7 @@ registries:
     ref: semver(">= 4.0.0")
   - name: local
     type: local
-    path: ../.limen/aqua-registry.yaml
+    path: ../.limen/hermetic-registry.yaml
 packages:
   - registry: standard
   - registry: local

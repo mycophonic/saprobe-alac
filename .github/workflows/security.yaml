@@ -6,7 +6,7 @@
 # well as on every push and pull request, and its check stands alone — a new
 # advisory reddens `security`, never `gate`, and the answer is a dependency
 # bump, never a code change. Same glue as ci: GitHub's own actions pinned by
-# SHA, aqua at .aqua/aqua.yaml's pins, `just` running the recipe a laptop runs. No
+# SHA, hermetic at .hermetic/hermetic.yaml's pins, `just` running the recipe a laptop runs. No
 # third-party actions.
 name: security
 
@@ -47,20 +47,17 @@ jobs:
           # workflow talks to GitHub after checkout.
           persist-credentials: false
 
-      - name: Install aqua (pinned, checksum-verified)
-        uses: ./.github/actions/setup-aqua
+      - name: Install hermetic (pinned, verified)
+        uses: ./.github/actions/setup-hermetic
 
-      # The job's caches (.github/actions/cache): aqua's store and the Go
+      # The job's caches (.github/actions/cache): hermetic's store and the Go
       # caches, which the scan needs once per supported platform, cold
       # without them; no linter cache, so the Go key is go-, not the verify
-      # legs' go-lint-.
+      # legs' go-lint-. The pins are linked by setup-hermetic: a tool
+      # downloads lazily on first use, checksum-verified.
       - uses: ./.github/actions/cache
         with:
           mode: restore
-
-      - name: Install pinned tools
-        # Link-only: tools download lazily on first use, checksum-verified.
-        run: aqua install --only-link
 
       # The project's `security`, like ci's `lint` and `test`: the root
       # .justfile names the shared scans and adds its own (a cgo project scans
