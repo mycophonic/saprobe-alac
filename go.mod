@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/mycophonic/agar v0.1.6
-	github.com/mycophonic/primordium v0.15.0
+	github.com/mycophonic/primordium v0.15.1
 )
 
 require (
