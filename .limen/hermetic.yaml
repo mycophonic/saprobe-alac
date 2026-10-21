@@ -26,7 +26,7 @@ packages:
   # afterwards): a standard-library fix must not wait for a limen release.
   - name: casey/just@1.59.0
   - name: koalaman/shellcheck@v0.11.0
-  - name: forkcloser/yamlfmt@v0.1.0
+  - name: forkcloser/yamlfmt@v0.2.0
     registry: local
   - name: lycheeverse/lychee@lychee-v0.24.2
   - name: goreleaser/goreleaser@v2.18.3
@@ -42,9 +42,9 @@ packages:
   # tar, gtar, xz, gzip, zstd, zip and unzip, one pure-Go build on every
   # platform, so a build script unpacks and packs with the same program
   # everywhere instead of the host's (the registry entry says more).
-  - name: forkcloser/compress@v0.2.0
+  - name: forkcloser/compress@v0.3.0
     registry: local
   # darwin/arm64 only. Its `docker` link shadows the machine's Docker on the
   # hermetic PATH there; aqua skips the package everywhere else.
-  - name: farcloser/ossein@v0.3.2
+  - name: farcloser/ossein@v0.3.3
     registry: local

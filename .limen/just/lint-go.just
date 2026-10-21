@@ -167,7 +167,7 @@ nilaway: (_banner "lint go" "nilaway") (_go-tool "nilaway" "go.uber.org/nilaway/
 # graph, the repository's own LICENSE is the `license` rule's, and go-licenses
 # classifies a license by its text, so the Closed-source notice limen writes
 # failed every package of such a module.
-licenses: (_banner "lint go" "licenses") (_go-tool "go-licenses" "github.com/google/go-licenses/v2") (_per-platform 'GOROOT="$(go env GOROOT)" "$LIMEN_BUILD/tools/go-licenses" check --include_tests --ignore "$(go list -m)" $(${LIMEN_LINT_GO_BIN:-limen-lint-go} flags licenses) ./...')
+licenses: (_banner "lint go" "licenses") (_go-tool "go-licenses" "github.com/forkcloser/go-licenses/cmd/go-licenses") (_per-platform 'GOROOT="$(go env GOROOT)" "$LIMEN_BUILD/tools/go-licenses" check --include_tests --ignore "$(go list -m)" $(${LIMEN_LINT_GO_BIN:-limen-lint-go} flags licenses) ./...')
 
 # Unreachable functions, by whole-program call-graph analysis (deeper than the
 # per-package `unused` linter in golangci). -test keeps library-only repos

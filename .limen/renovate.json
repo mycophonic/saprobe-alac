@@ -118,12 +118,12 @@
         ".limen/tools/go.mod"
       ],
       "matchDepNames": [
-        "github.com/vbatts/git-validation",
+        "github.com/forkcloser/git-validation",
         "github.com/forkcloser/godolint",
         "github.com/forkcloser/dot",
         "golang.org/x/tools",
         "golang.org/x/vuln",
-        "github.com/google/go-licenses/v2"
+        "github.com/forkcloser/go-licenses"
       ],
       "enabled": true
     },
