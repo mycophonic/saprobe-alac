@@ -19,8 +19,8 @@ runs:
         # version. One digest covers every platform: the asset is verified
         # against checksums.txt, and checksums.txt against this.
         # renovate: depName=forkcloser/hermetic
-        HERMETIC_VERSION: v0.2.1
-        HERMETIC_CHECKSUMS_SHA256: ccce092b673a33b287704a5ba949d5e75b5164dbbaf4ec75f391207a5f636166
+        HERMETIC_VERSION: v0.2.2
+        HERMETIC_CHECKSUMS_SHA256: da752591bf17d7fc5310c97b3bc47764fd876be387f099bc812c94790aee592a
         # The job's own token, for `gh attestation verify` only, here and not
         # exported: a read of GitHub's attestations API, before any
         # branch-declared binary runs.
@@ -124,20 +124,22 @@ runs:
         TOKEN: ${{ inputs.github-token }}
       run: echo "HERMETIC_GITHUB_TOKEN=${TOKEN}" >>"$GITHUB_ENV"
     - name: Authorize the committed policy and link the pins
-      # The runner's root holds no machine toolset, and hermetic reads the
-      # root's own policy on every run: an empty one, allowing nothing, so
-      # the repository's committed policy is the only one that applies.
-      # Written once; the cache image keeps it. Before hermetic will read
-      # the repo's local registry, the committed policy must be allowed —
-      # every caller needs this, whatever it runs next. Then the links: a
+      # The runner's root holds no machine toolset and no policy of its own,
+      # so the repository's committed policy is the only one that applies.
+      # Before hermetic will read the repo's local registry, the committed
+      # policy must be allowed — every caller needs this, whatever it runs
+      # next. Then the links: a
       # tool is pulled when first run, verified against the committed
       # checksums, so the steps after this one run the repository's pins by
       # name, `go` included, which the cache action's restore resolves the
-      # Go caches' paths with.
+      # Go caches' paths with. HERMETIC_CONFIG names the manifest outright
+      # for every later step: a link resolves its name by walking up from
+      # the working directory, so a step that builds in RUNNER_TEMP, or
+      # anywhere outside the checkout, would find no pins there; with the
+      # variable, the job's one checkout decides the pins wherever a step
+      # runs. A command's own -c still wins over it.
       shell: bash
       run: |
-        if [ ! -f "${HERMETIC_ROOT_DIR}/policy.yaml" ]; then
-          printf '# Written by setup-hermetic: no machine toolset on a runner, so the root allows nothing of its own.\nregistries: []\npackages: []\n' > "${HERMETIC_ROOT_DIR}/policy.yaml"
-        fi
         hermetic policy allow .hermetic/policy.yaml
         hermetic install -l
+        echo "HERMETIC_CONFIG=${PWD}/.hermetic/hermetic.yaml" >>"$GITHUB_ENV"

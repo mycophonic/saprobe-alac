@@ -183,7 +183,7 @@ shell: (_banner "lint" "shell")
 # Validate commit hygiene — DCO sign-off, subject length, dangling whitespace —
 # over a commit range (default: everything ahead of the upstream default branch;
 # pass one explicitly otherwise, e.g. `just do lint commits v1.0.0..HEAD`).
-commits range="": (_banner "lint" "commits") (_go-tool "git-validation" "github.com/vbatts/git-validation")
+commits range="": (_banner "lint" "commits") (_go-tool "git-validation" "github.com/forkcloser/git-validation/cmd/git-validation")
     #!/usr/bin/env bash
     set -euo pipefail
     range="{{ range }}"

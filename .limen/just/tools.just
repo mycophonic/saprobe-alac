@@ -185,7 +185,7 @@ update command="": (_banner "tools" "update")
         pkgs+=("$p")
     done <<< "$directives"
     # A directive builds as its last path element, except that go strips a /vN
-    # major suffix (github.com/google/go-licenses/v2 builds as go-licenses —
+    # major suffix (a directive ending in /v2 builds as the element before it —
     # see _go-tool).
     name_of() { local n=${1##*/}; if [[ $n =~ ^v[0-9]+$ ]]; then n=${1%/*}; n=${n##*/}; fi; printf '%s' "$n"; }
     # The isolated modules, .limen/tools/<name>/go.mod (see _go-tool in lib.just):

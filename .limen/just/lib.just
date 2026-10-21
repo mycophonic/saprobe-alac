@@ -60,7 +60,7 @@ _per-platform +cmd:
 # error). Directory form of -o: go names the binary itself, which on windows
 # means the .exe suffix the loader needs — git-bash then resolves the bare
 # .build/tools/<name> the recipes call to it. (go strips a /vN major suffix
-# when naming, so github.com/google/go-licenses/v2 lands as go-licenses.)
+# when naming, so a directive ending in /v2 lands under the element before it.)
 # -o is resolved relative to -C. CGO_ENABLED=0 throughout the tool builds:
 # the tools are pure Go, and with cgo on by default wherever a C compiler
 # exists, `net` alone would call one to build them.
