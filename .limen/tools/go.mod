@@ -18,7 +18,7 @@ require (
 	github.com/alecthomas/kong v1.16.1 // indirect
 	github.com/containerd/typeurl/v2 v2.3.0 // indirect
 	github.com/forkcloser/dot v1.3.1 // indirect
-	github.com/forkcloser/git-validation v0.1.0 // indirect
+	github.com/forkcloser/git-validation v0.1.1 // indirect
 	github.com/forkcloser/go-graphviz v0.5.2 // indirect
 	github.com/forkcloser/go-licenses v0.1.0 // indirect
 	github.com/forkcloser/godolint v0.5.1 // indirect
