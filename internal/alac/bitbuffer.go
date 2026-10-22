@@ -26,13 +26,20 @@ package alac
 // The buffer is padded with 4 zero bytes to allow safe reads near the end
 // without bounds checking in hot paths.
 type BitBuffer struct {
-	Buf    []byte // padded data (original + 4 zero bytes)
+	Buf    []byte // padded data (original + bitBufferPadding zero bytes)
 	Pos    int    // current byte position within Buf
 	BitIdx uint32 // 0-7, bit offset within current byte
 	Size   int    // original (unpadded) byte size
 }
 
-const bitBufferPadding = 4
+// bitBufferPadding is the zeroed tail behind the packet. DynDecomp bounds
+// every read by its cursor: the loop-top word, loaded from a cursor inside
+// the packet, reaches 3 bytes past the end; an escape's value, admitted only
+// when it ends in the packet, loads a word and a fifth byte, 4 past the end;
+// the zero-run count's word, loaded from a cursor inside the packet, 3; and
+// the 3-byte window Read loads, 2. Four bytes cover them; 16 is headroom
+// over the checks, so a missed one reads zeros rather than panicking.
+const bitBufferPadding = 16
 
 // Reset reuses the BitBuffer's backing storage, growing it only if needed.
 // This avoids a fresh allocation per packet.
