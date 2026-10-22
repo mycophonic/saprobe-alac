@@ -99,12 +99,13 @@ func (s *Decoder) Position() time.Duration {
 // Returns the actual position seeked to, which is always at a packet boundary.
 // Seeking past the end positions at the end of the stream.
 // Seeking to a negative time positions at the start.
-func (s *Decoder) Seek(t time.Duration) (time.Duration, error) {
+func (s *Decoder) Seek(target time.Duration) (time.Duration, error) {
 	frameLength := int64(s.dec.config.FrameLength)
 	sampleRate := int64(s.dec.config.SampleRate)
 
-	// Convert time to frame number, then to sample (packet) index.
-	targetFrame := int64(t.Seconds() * float64(sampleRate))
+	// Convert time to frame number, then to sample (packet) index, in
+	// integers, whole seconds first; the clamp below takes the rest.
+	targetFrame := int64(target/time.Second)*sampleRate + int64(target%time.Second)*sampleRate/int64(time.Second)
 	targetSample := int(targetFrame / frameLength)
 
 	// Clamp to valid range.

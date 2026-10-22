@@ -180,6 +180,13 @@ func iterChildren(
 			return err
 		}
 
+		// A child ends within its parent, and a top-level box within the
+		// file: one that claims more is cut there, so a table's size bounds
+		// what its box can hold, and a file cut short still opens.
+		if child.offset+child.size > end {
+			child.size = end - child.offset
+		}
+
 		stop, err := callback(child)
 		if err != nil {
 			return err
@@ -285,7 +292,7 @@ func FindALACTrack(reader io.ReadSeeker) ([]byte, []SampleInfo, error) {
 			return false, nil //nolint:nilerr // cookieErr means "not an ALAC track"; continue to next trak
 		}
 
-		trackSamples, tableErr := buildSampleTable(reader, &stbl)
+		trackSamples, tableErr := buildSampleTable(reader, &stbl, fileEnd)
 		if tableErr != nil {
 			return false, fmt.Errorf("building sample table: %w", tableErr)
 		}
@@ -351,7 +358,14 @@ func extractCookie(reader io.ReadSeeker, stbl *boxInfo) ([]byte, error) {
 		}
 
 		entrySize := int(binary.BigEndian.Uint32(data[pos : pos+4]))
-		if entrySize < sampleEntryHeaderSize+sampleEntryBaseSize || pos+entrySize > len(data) {
+
+		// An entry smaller than its header, or past the box, ends the table:
+		// a zero size would otherwise hold the walk in place for entryCount.
+		if entrySize < sampleEntryHeaderSize || pos+entrySize > len(data) {
+			break
+		}
+
+		if entrySize < sampleEntryHeaderSize+sampleEntryBaseSize {
 			pos += entrySize
 
 			continue
@@ -388,7 +402,7 @@ func extractCookie(reader io.ReadSeeker, stbl *boxInfo) ([]byte, error) {
 
 // buildSampleTable constructs a flat list of sample offsets and sizes from
 // the stco/co64, stsc, and stsz boxes within the given stbl box.
-func buildSampleTable(reader io.ReadSeeker, stbl *boxInfo) ([]SampleInfo, error) {
+func buildSampleTable(reader io.ReadSeeker, stbl *boxInfo, fileEnd int64) ([]SampleInfo, error) {
 	chunkOffsets, err := readChunkOffsets(reader, stbl)
 	if err != nil {
 		return nil, err
@@ -399,7 +413,7 @@ func buildSampleTable(reader io.ReadSeeker, stbl *boxInfo) ([]SampleInfo, error)
 		return nil, err
 	}
 
-	entrySizes, constantSize, sampleCount, err := readStsz(reader, stbl)
+	entrySizes, constantSize, sampleCount, err := readStsz(reader, stbl, fileEnd)
 	if err != nil {
 		return nil, err
 	}
@@ -463,6 +477,9 @@ func readStco(reader io.ReadSeeker, box *boxInfo) ([]uint64, error) {
 	}
 
 	count := binary.BigEndian.Uint32(header[fullBoxSize:])
+	if err := tableFits(box, len(header), count, 4); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrNoChunkOffset, err)
+	}
 
 	buf := make([]byte, int(count)*4)
 	if _, err := io.ReadFull(reader, buf); err != nil {
@@ -490,6 +507,9 @@ func readCo64(reader io.ReadSeeker, box *boxInfo) ([]uint64, error) {
 	}
 
 	count := binary.BigEndian.Uint32(header[fullBoxSize:])
+	if err := tableFits(box, len(header), count, 8); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrNoChunkOffset, err)
+	}
 
 	buf := make([]byte, int(count)*8)
 	if _, err := io.ReadFull(reader, buf); err != nil {
@@ -527,6 +547,10 @@ func readStsc(reader io.ReadSeeker, stbl *boxInfo) ([]stscEntry, error) {
 
 	const entryBytes = 12 // 3 × uint32
 
+	if err := tableFits(&box, len(header), count, entryBytes); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidStsc, err)
+	}
+
 	buf := make([]byte, int(count)*entryBytes)
 	if _, err := io.ReadFull(reader, buf); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidStsc, err)
@@ -549,7 +573,7 @@ func readStsc(reader io.ReadSeeker, stbl *boxInfo) ([]stscEntry, error) {
 // Layout: FullBox(4) + sampleSize(4) + sampleCount(4) + [sampleCount × uint32 if sampleSize == 0].
 //
 //revive:disable:function-result-limit,confusing-results
-func readStsz(reader io.ReadSeeker, stbl *boxInfo) ([]uint32, uint32, uint32, error) {
+func readStsz(reader io.ReadSeeker, stbl *boxInfo, fileEnd int64) ([]uint32, uint32, uint32, error) {
 	fccStsz := [4]byte{'s', 't', 's', 'z'}
 
 	box, found, err := findChild(reader, stbl, fccStsz)
@@ -570,8 +594,19 @@ func readStsz(reader io.ReadSeeker, stbl *boxInfo) ([]uint32, uint32, uint32, er
 	sampleCount := binary.BigEndian.Uint32(header[fullBoxSize+4:])
 
 	if sampleSize != 0 {
-		// Constant size: no per-sample entries.
+		// Constant size: no per-sample entries, so the count is bounded by
+		// the file the samples lie in, not by the box.
+		fileBytes := uint64(fileEnd) // #nosec G115 -- a Seek result, 0 or more
+		if uint64(sampleCount)*uint64(sampleSize) > fileBytes {
+			return nil, 0, 0, fmt.Errorf("%w: %d samples of %d bytes in a %d-byte file",
+				ErrInvalidStsz, sampleCount, sampleSize, fileEnd)
+		}
+
 		return nil, sampleSize, sampleCount, nil
+	}
+
+	if err := tableFits(&box, len(header), sampleCount, 4); err != nil {
+		return nil, 0, 0, fmt.Errorf("%w: %w", ErrInvalidStsz, err)
 	}
 
 	buf := make([]byte, int(sampleCount)*4)
@@ -585,6 +620,20 @@ func readStsz(reader io.ReadSeeker, stbl *boxInfo) ([]uint32, uint32, uint32, er
 	}
 
 	return sizes, 0, sampleCount, nil
+}
+
+// tableFits checks that a table of count entries of entryBytes each lies
+// within its box after the header read, before the table is allocated: the
+// count is the file's word, the box's size (cut to its parent and the file)
+// what the file holds.
+func tableFits(box *boxInfo, headerLen int, count uint32, entryBytes int) error {
+	room := box.payloadSize() - int64(headerLen)
+	if need := int64(count) * int64(entryBytes); need > room {
+		return fmt.Errorf("%w: %d entries need %d bytes, the box holds %d",
+			ErrTableTooLarge, count, need, room)
+	}
+
+	return nil
 }
 
 // lookupSamplesPerChunk finds the samples-per-chunk count for a 1-based

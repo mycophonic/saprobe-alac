@@ -32,4 +32,5 @@ var (
 	ErrInvalidStsc        = errors.New("mp4: invalid stsc payload")
 	ErrNoStsz             = errors.New("mp4: no stsz box")
 	ErrInvalidStsz        = errors.New("mp4: invalid stsz payload")
+	ErrTableTooLarge      = errors.New("mp4: sample table larger than its box")
 )
