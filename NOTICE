@@ -1,0 +1,9 @@
+saprobe-alac
+Copyright Mycophonic.
+
+This product includes software derived from the Apple Lossless Audio Codec
+reference implementation (https://github.com/macosforge/alac),
+Copyright (c) 2011 Apple Inc. All rights reserved, licensed under the
+Apache License, Version 2.0. The ported files carry Apple's notice in
+their headers: decoder.go and, under internal/alac, bitbuffer.go,
+golomb.go, matrix.go and predictor.go.

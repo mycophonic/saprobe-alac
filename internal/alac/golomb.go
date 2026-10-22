@@ -1,5 +1,9 @@
 /*
    Copyright Mycophonic.
+   Portions Copyright (c) 2011 Apple Inc. All rights reserved.
+
+   Ported from ag_dec.c and aglib.h of the Apple Lossless Audio Codec reference
+   implementation, licensed under the Apache License, Version 2.0.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
