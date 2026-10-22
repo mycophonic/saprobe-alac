@@ -62,6 +62,21 @@ var channelLayoutOffsets = [8][8]int{
 	{2, 6, 7, 0, 1, 4, 5, 3}, // 8ch: C,Lc,Rc,L,R,Ls,Rs,LFE → L,R,C,LFE,Ls,Rs,Lc,Rc
 }
 
+// Bounds on the configuration a magic cookie may carry.
+const (
+	maxChannels = 8 // the channel layouts ALAC defines
+
+	// maxFrameLength bounds the per-packet work and output buffers, which the
+	// frame length sizes. Encoders write 4096 (Apple's default) and no stream
+	// has been seen above it; 16 times that leaves room without letting a
+	// cookie size the buffers in the gigabytes.
+	maxFrameLength = 65536
+
+	// minShiftedBitDepth is the first bit depth whose writers take the
+	// shifted bytes a compressed element may carry.
+	minShiftedBitDepth = 24
+)
+
 // Element type tags from the ALAC bitstream.
 const (
 	elemSCE = 0 // Single Channel Element
@@ -89,6 +104,18 @@ type PacketDecoder struct {
 func NewPacketDecoder(config PacketConfig) (*PacketDecoder, error) {
 	if !slices.Contains(alacBitDepths, config.BitDepth) {
 		return nil, fmt.Errorf("%w: %w: %d", ErrConfig, alacint.ErrBitDepth, config.BitDepth)
+	}
+
+	if config.NumChannels < 1 || config.NumChannels > maxChannels {
+		return nil, fmt.Errorf("%w: %w: %d", ErrConfig, alacint.ErrChannels, config.NumChannels)
+	}
+
+	if config.FrameLength < 1 || config.FrameLength > maxFrameLength {
+		return nil, fmt.Errorf("%w: %w: %d", ErrConfig, alacint.ErrFrameLength, config.FrameLength)
+	}
+
+	if config.SampleRate == 0 {
+		return nil, fmt.Errorf("%w: %w", ErrConfig, alacint.ErrSampleRate)
 	}
 
 	frameLen := int(config.FrameLength)
@@ -166,8 +193,13 @@ func (d *PacketDecoder) decodePacketInto(packet, output []byte) (int, error) {
 			}
 
 			// Map bitstream channel to output position (MPEG → SMPTE order).
-			// CPE pairs always map to consecutive output positions.
+			// CPE pairs always map to consecutive output positions; a pair the
+			// layout places on the last channel would write past the output.
 			outChanIdx := offsets[chanIdx]
+			if outChanIdx+2 > numChan {
+				return 0, fmt.Errorf("%w: %w: channel %d of %d",
+					ErrDecode, alacint.ErrElementLayout, outChanIdx, numChan)
+			}
 
 			ns, err := d.decodeCPE(bits, output, outChanIdx, numChan, numSamples)
 			if err != nil {
@@ -204,6 +236,12 @@ func (d *PacketDecoder) decodePacketInto(packet, output []byte) (int, error) {
 	}
 
 done:
+	// Every declared channel must have been decoded: a packet that ends early
+	// would otherwise come back as silence on the channels it left out.
+	if chanIdx < numChan {
+		return 0, fmt.Errorf("%w: %w: %d of %d", ErrDecode, alacint.ErrMissingChannels, chanIdx, numChan)
+	}
+
 	return int(numSamples) * numChan * bps, nil
 }
 
@@ -224,6 +262,13 @@ func (d *PacketDecoder) decodeSCE(
 	bytesShifted := int((headerByte >> 1) & 0x3)
 
 	if bytesShifted == 3 {
+		return 0, alacint.ErrInvalidShift
+	}
+
+	// The 16 and 20-bit writers take no shifted bytes, as the reference
+	// decoder's unmix16 and unmix20 take none: a packet declaring them at
+	// those depths would decode without them. No encoder writes one.
+	if bytesShifted != 0 && d.config.BitDepth < minShiftedBitDepth {
 		return 0, alacint.ErrInvalidShift
 	}
 
@@ -381,6 +426,10 @@ func (d *PacketDecoder) decodeCPE(
 	bytesShifted := int((headerByte >> 1) & 0x3)
 
 	if bytesShifted == 3 {
+		return 0, alacint.ErrInvalidShift
+	}
+
+	if bytesShifted != 0 && d.config.BitDepth < minShiftedBitDepth {
 		return 0, alacint.ErrInvalidShift
 	}
 

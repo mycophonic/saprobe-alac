@@ -50,6 +50,10 @@ func UnpcBlock(pc1, out []int32, num int, coefs []int16, numActive int32, chanBi
 		denHalf = 1 << (denShift - 1)
 	}
 
+	if num <= 0 {
+		return
+	}
+
 	out[0] = pc1[0]
 
 	if numActive == 0 {
@@ -72,8 +76,10 @@ func UnpcBlock(pc1, out []int32, num int, coefs []int16, numActive int32, chanBi
 		return
 	}
 
-	// Warm-up phase: build predictor with growing coefficient set.
-	for idx := 1; idx <= int(numActive); idx++ {
+	// Warm-up phase: build predictor with growing coefficient set. A frame
+	// shorter than the coefficient count ends the warm-up early, as ffmpeg's
+	// lpc_prediction does; dp_dec.c assumes the frame is the longer.
+	for idx := 1; idx <= int(numActive) && idx < num; idx++ {
 		del := pc1[idx] + out[idx-1]
 		out[idx] = (del << chanShift) >> chanShift
 	}
