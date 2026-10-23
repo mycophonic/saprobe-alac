@@ -19,8 +19,8 @@ runs:
         # version. One digest covers every platform: the asset is verified
         # against checksums.txt, and checksums.txt against this.
         # renovate: depName=forkcloser/hermetic
-        HERMETIC_VERSION: v0.2.2
-        HERMETIC_CHECKSUMS_SHA256: da752591bf17d7fc5310c97b3bc47764fd876be387f099bc812c94790aee592a
+        HERMETIC_VERSION: v0.2.3
+        HERMETIC_CHECKSUMS_SHA256: c7eb09712dc3d756bead96ae1286b53de275134d0012601ef37f57ec793f9431
         # The job's own token, for `gh attestation verify` only, here and not
         # exported: a read of GitHub's attestations API, before any
         # branch-declared binary runs.
