@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -58,6 +59,32 @@ func FuzzNewDecoder(f *testing.F) {
 	f.Add([]byte{0, 0, 0, 0x14, 'f', 't', 'y', 'p', 'M', '4', 'A', ' ', 0, 0, 0, 0, 'M', '4', 'A', ' '})
 
 	f.Fuzz(func(t *testing.T, data []byte) {
+		// What a decode allocates is bounded by the input and the output,
+		// not by the counts and sizes the container declares: the packet
+		// buffers of the widest frame, a modest multiple of the bytes read,
+		// and the PCM collected (ALAC turns kilobytes of silence into
+		// megabytes, and io.ReadAll grows by doubling).
+		var decoded int
+
+		var before runtime.MemStats
+
+		runtime.ReadMemStats(&before)
+
+		defer func() {
+			if raceEnabled {
+				return
+			}
+
+			var after runtime.MemStats
+
+			runtime.ReadMemStats(&after)
+
+			bound := uint64(16<<20) + 64*uint64(len(data)) + 4*uint64(decoded)
+			if got := after.TotalAlloc - before.TotalAlloc; got > bound {
+				t.Fatalf("decoding %d bytes into %d allocated %d bytes (bound %d)", len(data), decoded, got, bound)
+			}
+		}()
+
 		dec, err := alac.NewDecoder(bytes.NewReader(data))
 		if err != nil {
 			if !isSentinel(err) {
@@ -84,6 +111,8 @@ func FuzzNewDecoder(f *testing.F) {
 		const limit = 32 << 20
 
 		pcm, err := io.ReadAll(io.LimitReader(dec, limit))
+		decoded = len(pcm)
+
 		if err != nil && !isSentinel(err) {
 			t.Fatalf("Read failed outside the package's errors: %v", err)
 		}
@@ -157,7 +186,25 @@ func fuzzSeedStreams(f *testing.F, ffmpegBin string) [][]byte {
 		seeds = append(seeds, data)
 	}
 
-	return seeds
+	// Silence: 40 s of 8-channel 16-bit zeros at 48 kHz, 30 MB of PCM in
+	// some 64 KB of stream, the ratio the allocation bound must have room
+	// for.
+	src := filepath.Join(dir, "silence.raw")
+	if err := os.WriteFile(src, make([]byte, 40*48000*8*2), 0o600); err != nil {
+		f.Fatal(err)
+	}
+
+	dst := filepath.Join(dir, "silence.m4a")
+	if err := ffmpegEncodeALAC(ffmpegBin, src, dst, 16, 48000, 8); err != nil {
+		f.Fatal(err)
+	}
+
+	silence, err := os.ReadFile(dst)
+	if err != nil {
+		f.Fatal(err)
+	}
+
+	return append(seeds, silence)
 }
 
 // ffmpegEncodeALAC encodes raw PCM to ALAC in MP4 with the options the
