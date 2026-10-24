@@ -21,8 +21,11 @@ import 'lib.just'
 
 # netgo/osusergo force the pure-Go resolver and user lookups. No-ops when
 # CGO_ENABLED=0 (pure Go already); with CGO they keep DNS and user handling
-# out of libc, which is exactly what makes `static` viable on glibc.
-go_tags := 'netgo,osusergo'
+# out of glibc, which is exactly what makes `static` viable there. Linux only:
+# on macOS libc is the one road to Open Directory users (the pure-Go os/user
+# reads /etc/passwd alone, so user.Lookup of a real account fails) and to
+# scoped DNS, and there is no static libc to keep clear of.
+go_tags := if os() == 'linux' { 'netgo,osusergo' } else { '' }
 
 # CGO is off unless a project exports GO_CGO := '1' (or CGO_ENABLED=1 for one
 # run); resolution in lib.just.

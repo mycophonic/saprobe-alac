@@ -19,6 +19,14 @@ on:
         description: The verify matrix's runners, as a JSON list.
         type: string
         default: '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15", "windows-2025", "windows-11-arm"]'
+      submodules:
+        # A test suite that reads its fixtures from a git submodule (a
+        # conformance corpus kept upstream) has them only if the checkout
+        # fetches them. Forwarded to actions/checkout by the jobs that run
+        # tests, verify and fuzz; tools installs pins and never needs it.
+        description: Submodule checkout for the test jobs, as actions/checkout takes it ("false", "true" or "recursive").
+        type: string
+        default: 'false'
 
 # No default token permissions: each job states what it needs, within what
 # the caller grants (contents: read).
@@ -47,6 +55,7 @@ jobs:
           # The token is not left behind in .git/config: nothing in this
           # workflow talks to GitHub after checkout.
           persist-credentials: false
+          submodules: ${{ inputs.submodules }}
           # Full history and refs: `just do lint commits` validates the commit
           # range against the PR's base branch, which a shallow clone lacks.
           fetch-depth: 0
@@ -94,6 +103,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          submodules: ${{ inputs.submodules }}
 
       - name: Install hermetic (pinned, verified)
         uses: ./.github/actions/setup-hermetic
