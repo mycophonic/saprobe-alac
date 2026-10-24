@@ -167,7 +167,9 @@ func iterChildren(
 			return fmt.Errorf("seeking current position: %w", err)
 		}
 
-		if pos >= end {
+		// Fewer bytes than a box header before the parent's end: trailing
+		// bytes, not a child.
+		if end-pos < smallHeaderSize {
 			return nil
 		}
 
@@ -185,6 +187,13 @@ func iterChildren(
 		// what its box can hold, and a file cut short still opens.
 		if child.offset+child.size > end {
 			child.size = end - child.offset
+
+			// The cut must leave the header itself: a size below it would make
+			// the payload negative, and a table's allocation with it.
+			if child.size < child.headerSize {
+				return fmt.Errorf("%w: box %q at %d runs past its parent",
+					ErrInvalidBoxSize, child.fourCC[:], child.offset)
+			}
 		}
 
 		stop, err := callback(child)
@@ -273,32 +282,19 @@ func FindALACTrack(reader io.ReadSeeker) ([]byte, []SampleInfo, error) {
 	var samples []SampleInfo
 
 	fccTrak := [4]byte{'t', 'r', 'a', 'k'}
-	fccMdia := [4]byte{'m', 'd', 'i', 'a'}
-	fccMinf := [4]byte{'m', 'i', 'n', 'f'}
-	fccStbl := [4]byte{'s', 't', 'b', 'l'}
 
 	err = iterChildren(reader, &moov, func(trak boxInfo) (bool, error) {
 		if trak.fourCC != fccTrak {
 			return false, nil
 		}
 
-		stbl, stblFound, findErr := findDescendant(reader, &trak, [][4]byte{fccMdia, fccMinf, fccStbl})
-		if findErr != nil || !stblFound {
-			return false, findErr
+		track, ours, trakErr := alacTrack(reader, &trak, fileEnd)
+		if trakErr != nil || !ours {
+			return false, trakErr
 		}
 
-		trackCookie, cookieErr := extractCookie(reader, &stbl)
-		if cookieErr != nil {
-			return false, nil //nolint:nilerr // cookieErr means "not an ALAC track"; continue to next trak
-		}
-
-		trackSamples, tableErr := buildSampleTable(reader, &stbl, fileEnd)
-		if tableErr != nil {
-			return false, fmt.Errorf("building sample table: %w", tableErr)
-		}
-
-		cookie = trackCookie
-		samples = trackSamples
+		cookie = track.cookie
+		samples = track.samples
 
 		return true, nil // found it, stop
 	})
@@ -330,7 +326,11 @@ func extractCookie(reader io.ReadSeeker, stbl *boxInfo) ([]byte, error) {
 	fccStsd := [4]byte{'s', 't', 's', 'd'}
 
 	stsd, found, err := findChild(reader, stbl, fccStsd)
-	if err != nil || !found {
+	if err != nil {
+		return nil, err
+	}
+
+	if !found {
 		return nil, ErrNoALACTrack
 	}
 
@@ -398,6 +398,43 @@ func extractCookie(reader io.ReadSeeker, stbl *boxInfo) ([]byte, error) {
 	}
 
 	return nil, ErrNoALACTrack
+}
+
+// alacTrackInfo is what FindALACTrack takes from the trak that is ours.
+type alacTrackInfo struct {
+	cookie  []byte
+	samples []SampleInfo
+}
+
+// alacTrack reads a trak's ALAC cookie and sample table. A track without a
+// sample table, with no ALAC entry or with a malformed one is not ours and
+// the search continues; a box the file cannot hold is the file's fault and
+// ends it.
+func alacTrack(reader io.ReadSeeker, trak *boxInfo, fileEnd int64) (track *alacTrackInfo, ours bool, err error) {
+	fccMdia := [4]byte{'m', 'd', 'i', 'a'}
+	fccMinf := [4]byte{'m', 'i', 'n', 'f'}
+	fccStbl := [4]byte{'s', 't', 'b', 'l'}
+
+	stbl, found, err := findDescendant(reader, trak, [][4]byte{fccMdia, fccMinf, fccStbl})
+	if err != nil || !found {
+		return nil, false, err
+	}
+
+	cookie, err := extractCookie(reader, &stbl)
+	if err != nil {
+		if errors.Is(err, ErrNoALACTrack) || errors.Is(err, ErrInvalidEntry) {
+			return nil, false, nil
+		}
+
+		return nil, false, err
+	}
+
+	samples, err := buildSampleTable(reader, &stbl, fileEnd)
+	if err != nil {
+		return nil, false, fmt.Errorf("building sample table: %w", err)
+	}
+
+	return &alacTrackInfo{cookie: cookie, samples: samples}, true, nil
 }
 
 // buildSampleTable constructs a flat list of sample offsets and sizes from
