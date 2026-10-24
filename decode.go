@@ -17,6 +17,7 @@
 package alac
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -30,6 +31,7 @@ import (
 // decoded on demand via Read.
 type Decoder struct {
 	reader    io.ReadSeeker
+	fileEnd   int64 // the reader's length, which every packet must lie within
 	dec       *PacketDecoder
 	samples   []mp4int.SampleInfo
 	sampleIdx int
@@ -65,8 +67,14 @@ func NewDecoder(rs io.ReadSeeker) (*Decoder, error) {
 	bps := alacint.BytesPerSample(config.BitDepth)
 	frameBytes := int(config.FrameLength) * int(config.NumChannels) * bps
 
+	fileEnd, err := rs.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("%w: seeking to the end: %w", ErrDecode, err)
+	}
+
 	return &Decoder{
 		reader:  rs,
+		fileEnd: fileEnd,
 		dec:     dec,
 		samples: samples,
 		buf:     make([]byte, 0, frameBytes),
@@ -161,6 +169,14 @@ func (s *Decoder) Read(p []byte) (int, error) {
 		// Decode next packet.
 		sample := s.samples[s.sampleIdx]
 
+		// A packet the file does not hold is a cut stream, not its end:
+		// refused before the allocation its declared size would make, and
+		// before the read that would end in a plain EOF.
+		if sample.Offset+uint64(sample.Size) > uint64(s.fileEnd) { // #nosec G115 -- fileEnd is a Seek result, 0 or more
+			return total, fmt.Errorf("%w: sample %d at %d of %d bytes past the end at %d: %w",
+				ErrDecode, s.sampleIdx, sample.Offset, sample.Size, s.fileEnd, io.ErrUnexpectedEOF)
+		}
+
 		if int(sample.Size) > len(s.packetBuf) {
 			s.packetBuf = make([]byte, sample.Size)
 		}
@@ -173,7 +189,11 @@ func (s *Decoder) Read(p []byte) (int, error) {
 		}
 
 		if _, err := io.ReadFull(s.reader, packet); err != nil {
-			return total, fmt.Errorf("reading sample %d: %w", s.sampleIdx, err)
+			if errors.Is(err, io.EOF) {
+				err = io.ErrUnexpectedEOF
+			}
+
+			return total, fmt.Errorf("%w: reading sample %d: %w", ErrDecode, s.sampleIdx, err)
 		}
 
 		// Ensure buf has capacity for a full frame.
