@@ -205,3 +205,35 @@ func TestNewDecoder_BoundedTablesOpen(t *testing.T) {
 		t.Fatalf("NewDecoder: %v", err)
 	}
 }
+
+// A sample description box whose header starts in the last 4 bytes of its
+// parent: read whole from the file beyond the parent, then cut to the parent
+// to a size below its own header, a negative payload, and an allocation from
+// it. The 4 bytes are trailing bytes, not a child, and the track has no
+// sample description. Found by a fuzz target over NewDecoder.
+func TestNewDecoder_ChildHeaderPastParent(t *testing.T) {
+	t.Parallel()
+
+	openMustFail(t,
+		[]byte("0000moov0000trak\x00\x00\x00\x1c0000000000000000000000000000mdia\x00"+
+			"\x00\x00 0000000000000000000000000000\x00\x00"+
+			"\x00-000000000000000000000000000000000000000000000minf\x00\x00\x00"+
+			"\x10000000000000\x00\x00\x00\fstbl0000stsd"),
+		mp4.ErrNoALACTrack)
+}
+
+// A sample description box whose 16-byte header (a large size) begins in the
+// last 8 bytes of its parent: the cut to the parent leaves less than the
+// header, which is refused as an invalid box size and ends the search, where
+// the earlier version read the box whole and allocated from a negative length.
+func TestNewDecoder_ChildLargeHeaderPastParent(t *testing.T) {
+	t.Parallel()
+
+	stbl := []byte("\x00\x00\x00\x10stbl\x00\x00\x00\x01stsd")
+
+	tail := append([]byte("\x00\x00\x00\x00\x00\x00\x00\x40"), make([]byte, 16)...)
+
+	openMustFail(t,
+		mp4Box("moov", mp4Box("trak", mp4Box("mdia", mp4Box("minf", append(stbl, tail...))))),
+		mp4.ErrInvalidBoxSize)
+}
