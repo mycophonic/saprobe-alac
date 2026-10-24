@@ -24,7 +24,7 @@ packages:
   # The Go toolchain is the repository's own pin, seeded from limen's own
   # manifest once and Renovate's here afterwards: a standard-library fix
   # must not wait for a limen release. Not in the import, on purpose.
-  - name: golang/go@go1.27.2
+  - name: golang/go@go1.27.3
   # The project's own tools go here, above the import: extras, and any
   # canonical tool at a version of the project's choosing (aqua takes a
   # package's first declaration, so an entry here overrides the import's).
