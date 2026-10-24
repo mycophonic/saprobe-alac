@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/mycophonic/agar/pkg/agar"
 
@@ -35,7 +36,7 @@ import (
 // compressible signal reaches the predictor, the adaptive Golomb decoder
 // and the shifted low bytes of 24-bit content. Tones with low-order
 // activity are encoded with ffmpeg at the depths it writes, 16 and 24 bits,
-// mono, stereo and 5.1, decoded by the stream decoder and held to the
+// one to eight channels, decoded by the stream decoder and held to the
 // source byte for byte; the encoded size is held below the PCM's, so a
 // corpus the encoder gave up compressing fails for that reason, loudly.
 
@@ -64,7 +65,7 @@ func TestCompressedStreamsAreTheirSource(t *testing.T) {
 	t.Parallel()
 
 	for _, bitDepth := range []int{16, 24} {
-		for _, channels := range []int{1, 2, 6} {
+		for channels := 1; channels <= 8; channels++ {
 			t.Run(fmt.Sprintf("%dbit/%dch", bitDepth, channels), func(t *testing.T) {
 				t.Parallel()
 
@@ -133,6 +134,43 @@ func TestCompressedStreamsAreTheirSource(t *testing.T) {
 
 					t.Fatalf("%d bytes decoded for %d of source, first difference at byte %d (sample %d)",
 						len(got), len(source), at, at/(channels*bitDepth/8))
+				}
+
+				// Seek inside the compressed stream: the landing is a packet
+				// boundary at or before the target, Position agrees, and
+				// reading on from there is the source from that boundary.
+				perSecond := sampleRate * channels * bitDepth / 8
+				total := dec.Duration()
+
+				for _, target := range []time.Duration{total / 3, 2 * total / 3} {
+					landed, err := dec.Seek(target)
+					if err != nil {
+						t.Fatalf("Seek(%v): %v", target, err)
+					}
+
+					if landed > target || target-landed > time.Second || landed != dec.Position() {
+						t.Fatalf("Seek(%v) landed %v, Position %v", target, landed, dec.Position())
+					}
+
+					offset := int(landed.Seconds()*float64(perSecond) + 0.5)
+					if offset%(channels*bitDepth/8) != 0 || offset > len(source) {
+						t.Fatalf("Seek(%v) landed at byte %d of %d", target, offset, len(source))
+					}
+
+					rest, err := io.ReadAll(dec)
+					if err != nil {
+						t.Fatalf("after Seek(%v): %v", target, err)
+					}
+
+					if !bytes.Equal(rest, source[offset:]) {
+						t.Fatalf(
+							"after Seek(%v) at byte %d: %d bytes, want %d, or the bytes differ",
+							target,
+							offset,
+							len(rest),
+							len(source)-offset,
+						)
+					}
 				}
 			})
 		}
