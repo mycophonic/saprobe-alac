@@ -113,14 +113,10 @@ profile: (_banner "perf go" "profile") (_go-tool "dot" "github.com/forkcloser/do
     docs="$LIMEN_BUILD/profiles-docs"
     mkdir -p "$prof" "$docs"
     # Rendered from pprof's -dot text rather than pprof's own -png, which
-    # shells out to a dot it expects on PATH. -o with a pre-created file: under
-    # a sandbox the WASM runtime can overwrite files but not always create
-    # them. Paths stay cwd-relative for the same reason (the runtime preopens
-    # only the working directory).
+    # shells out to a dot it expects on PATH.
     render() {
         src=$1; png=$2; shift 2
         go tool pprof -dot -nodecount=20 "$@" "$src" > "$png.dot" 2>/dev/null
-        : > "$png"
         "$LIMEN_BUILD/tools/dot" -Tpng -o "$png" "$png.dot"
         rm -f "$png.dot"
         echo "  -> $png"
@@ -128,7 +124,7 @@ profile: (_banner "perf go" "profile") (_go-tool "dot" "github.com/forkcloser/do
     for pkg in $(go list ./...); do
         # One directory per package keyed by the FULL import path: flattening
         # collides (example/a__b vs example/a/b, '_' being legal in import
-        # paths). Paths stay cwd-relative for the WASM dot (see render).
+        # paths).
         mkdir -p "$prof/$pkg" "$docs/$pkg"
         echo "Profiling $pkg..."
         go test -count=1 -o "$prof/$pkg/pkg.test" "$pkg" \

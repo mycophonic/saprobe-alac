@@ -14,9 +14,12 @@ import 'lib.just'
 # RuboCop would not know the formula cops. brew is not on the hermetic PATH on
 # purpose — it is the subject under test, not a substitute for a pinned tool;
 # BREW_BIN is captured from the ambient PATH in main.just. `style` (and its
-# fixing twin) may run from another brew than the machine's: BREW_STYLE_BIN,
-# exported by the project's .justfile, defaults to BREW_BIN and leaves `audit`
-# and `test` on the machine's, which installs and audits for real.
+# fixing twin) and `audit` may each run from another brew than the machine's:
+# BREW_STYLE_BIN and BREW_AUDIT_BIN, exported by the project's .justfile,
+# default to BREW_BIN. The machine's brew cannot run under a session sandbox
+# (it writes under its own prefix and caches) and refuses a tap it already has
+# installed, so without them `audit` is CI-only in a tap repository. `test`
+# stays on the machine's, which installs for real.
 
 default: style audit
 
@@ -89,7 +92,7 @@ audit: (_banner "lint homebrew" "audit")
         exit 0
     fi
     # shellcheck disable=SC2154 # BREW_BIN is exported by the canonical .justfile (main.just).
-    brew="${BREW_BIN:-}"
+    brew="${BREW_AUDIT_BIN:-${BREW_BIN:-}}"
     {{ _require_brew }}
     {{ _tap_link }}
     # shellcheck disable=SC2086 # deliberate word-split of the flags knob.
@@ -108,8 +111,8 @@ _skip_unless_macos := '''
 '''
 
 # Refuses when the brew the recipe chose ($brew) is empty: main.just's ambient
-# capture came up empty and the project exported no BREW_STYLE_BIN. Twin in
-# fix-homebrew.just.
+# capture came up empty and the project exported no BREW_STYLE_BIN or
+# BREW_AUDIT_BIN. Twin in fix-homebrew.just.
 [private]
 _require_brew := '''
     if [ -z "${brew:-}" ]; then

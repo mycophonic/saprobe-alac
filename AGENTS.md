@@ -14,6 +14,13 @@ is the [engineering book](https://github.com/farcloser/limen/tree/main/book).
   recipe covers the need — say so when you do it. `just --list` shows every task.
 - Always name the recipe; module defaults are curated subsets, not "run everything".
 - Never bump a tool version by hand: `just do tools set` / `just do tools update`.
+- **Every git command is `git c …`, never raw `git`**, local commands included: the
+  harness sets `GIT_SSH_COMMAND`, which sends raw git's ssh to the system ssh and the
+  machine's own keys; the sessions' `c` alias (`env -u GIT_SSH_COMMAND git`) drops it so
+  the rig's ssh and the bot's key are used. A network command also takes the rig's
+  transport explicitly,
+  `git c -c core.sshCommand="$(git c config -f ~/.claude/gitconfig core.sshCommand)" fetch`,
+  and the same for `push` and `pull`. The alias composes with `-C`: `git -C <clone> c …`.
 
 ## Contributing
 
@@ -97,13 +104,14 @@ chapter; the procedure is limen's `skills/contribute`.
   place — another transport, a variable set by hand per command, a manual step for a
   recipe — carried on as if the rig worked: that hides the defect. A workaround is used
   only after the breakage is reported and the human agrees, and is named as one every time.
-- **A locked laptop is not broken tooling.** The bot's key answers only while the human's
-  session is unlocked: once the screen locks, the agent refuses to sign or authenticate. So
-  when signing or pushing fails after it worked earlier in the session, the human is away,
-  not the rig broken. No retry loop, no workaround: finish the work in the worktree — done,
-  `just lint` and `just test` green, the commit message written — ready to commit and push
-  when the human is back, and say so once. Signing that never worked in the session is
-  broken tooling (above).
+- **A locked screen does not stop the key.** The bot's key is created to sign while the
+  screen is locked, from the human's first unlock after boot until the next boot (taciturn,
+  `--use locked`). So a signing or push failure that follows earlier successes in the session
+  is a defect and is reported as broken tooling (above), never waited out. Only a machine
+  still on Secretive refuses once the screen locks; there the human is away, not the rig
+  broken: no retry loop, no workaround, finish the work in the worktree — done, `just lint`
+  and `just test` green, the commit message written — ready to commit and push when the
+  human is back, and say so once.
 - **Read what the work needs, never the whole disk.** A targeted read outside the
   repositories is fine when the work calls for it; a filesystem-wide walk is not: no
   `find /`, `find ~`, disk-wide `mdfind`, or recursive grep over `/` or `~`.
@@ -133,11 +141,12 @@ chapter; the procedure is limen's `skills/contribute`.
   assessment or misreads the code, say so with the evidence and settle it between the two
   sessions, the reviewer's 🛑 included (the reviewer may miss what the owner knows; the
   owner may miss the cross-cutting picture). A deadlock goes to the human, as the exception.
-- **No GitHub issues unless the human asks for one.** The issue tracker is the human's.
-  A defect or a request that belongs to another repository goes to the session that owns
-  that repository, as a message with what, why, and where; that session fixes it, and
-  the human hears about it as a pull request. An issue you opened on your own is closed
-  once the owning session has the work.
+- **A follow-up is a GitHub issue; a defect in another repository is a message.** Anything
+  left for later, a follow-up or parked work, is filed as an issue in the repository it
+  belongs to, one per real item, written so its owner can act on it; never a scratch,
+  `TODO` or notes file, and never an issue for a passing note. A defect or a request in a
+  repository another session owns goes to that session as a message with what, why and
+  where; that session fixes it, and the human hears about it as a pull request.
 
 ## Code
 
