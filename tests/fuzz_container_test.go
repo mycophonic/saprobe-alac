@@ -59,11 +59,13 @@ func FuzzNewDecoder(f *testing.F) {
 	f.Add([]byte{0, 0, 0, 0x14, 'f', 't', 'y', 'p', 'M', '4', 'A', ' ', 0, 0, 0, 0, 'M', '4', 'A', ' '})
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		// What a decode allocates is bounded by the input and the output,
-		// not by the counts and sizes the container declares: the packet
-		// buffers of the widest frame, a modest multiple of the bytes read,
-		// and the PCM collected (ALAC turns kilobytes of silence into
-		// megabytes, and io.ReadAll grows by doubling).
+		// What a decode allocates is bounded by the input, not by the counts
+		// and sizes the container declares and not by the output: the packet
+		// buffers of the widest frame and a modest multiple of the bytes
+		// read. The PCM is counted through one buffer, not collected: ALAC
+		// turns kilobytes of silence into megabytes, and collecting them
+		// (io.ReadAll's growth, two and a half times the output) was the
+		// allocation measured, not the decoder's.
 		var decoded int
 
 		var before runtime.MemStats
@@ -79,7 +81,7 @@ func FuzzNewDecoder(f *testing.F) {
 
 			runtime.ReadMemStats(&after)
 
-			bound := uint64(16<<20) + 64*uint64(len(data)) + 4*uint64(decoded)
+			bound := uint64(16<<20) + 64*uint64(len(data))
 			if got := after.TotalAlloc - before.TotalAlloc; got > bound {
 				t.Fatalf("decoding %d bytes into %d allocated %d bytes (bound %d)", len(data), decoded, got, bound)
 			}
@@ -110,18 +112,18 @@ func FuzzNewDecoder(f *testing.F) {
 		// at most this much.
 		const limit = 32 << 20
 
-		pcm, err := io.ReadAll(io.LimitReader(dec, limit))
-		decoded = len(pcm)
+		read, err := countPCM(io.LimitReader(dec, limit))
+		decoded = read
 
 		if err != nil && !isSentinel(err) {
 			t.Fatalf("Read failed outside the package's errors: %v", err)
 		}
 
-		if len(pcm)%frameBytes != 0 {
-			t.Fatalf("%d bytes of PCM are not whole %d-byte samples", len(pcm), frameBytes)
+		if read%frameBytes != 0 {
+			t.Fatalf("%d bytes of PCM are not whole %d-byte samples", read, frameBytes)
 		}
 
-		if err == nil && len(pcm) < limit {
+		if err == nil && read < limit {
 			if n, again := dec.Read(make([]byte, 16)); n != 0 || !errors.Is(again, io.EOF) {
 				t.Fatalf("after the end, Read gave %d bytes and %v", n, again)
 			}
@@ -144,15 +146,38 @@ func FuzzNewDecoder(f *testing.F) {
 			t.Fatalf("Seek landed %v, Position says %v", landed, dec.Position())
 		}
 
-		again, err := io.ReadAll(io.LimitReader(dec, limit))
+		again, err := countPCM(io.LimitReader(dec, limit))
+		decoded += again
+
 		if err != nil && !isSentinel(err) {
 			t.Fatalf("Read after Seek failed outside the package's errors: %v", err)
 		}
 
-		if len(again)%frameBytes != 0 {
-			t.Fatalf("%d bytes of PCM after Seek are not whole %d-byte samples", len(again), frameBytes)
+		if again%frameBytes != 0 {
+			t.Fatalf("%d bytes of PCM after Seek are not whole %d-byte samples", again, frameBytes)
 		}
 	})
+}
+
+// countPCM reads r to its end through one buffer and returns the byte count
+// and the error that ended it, nil at a clean end: the stream's output is
+// measured, not kept.
+func countPCM(r io.Reader) (int, error) {
+	buf := make([]byte, 64<<10)
+	total := 0
+
+	for {
+		n, err := r.Read(buf)
+		total += n
+
+		if errors.Is(err, io.EOF) {
+			return total, nil
+		}
+
+		if err != nil {
+			return total, err
+		}
+	}
 }
 
 // fuzzSeedStreams encodes a few small streams through ffmpeg.
@@ -187,8 +212,8 @@ func fuzzSeedStreams(f *testing.F, ffmpegBin string) [][]byte {
 	}
 
 	// Silence: 40 s of 8-channel 16-bit zeros at 48 kHz, 30 MB of PCM in
-	// some 64 KB of stream, the ratio the allocation bound must have room
-	// for.
+	// some 64 KB of stream: the output the decoder must produce without
+	// allocating in step with it, as the bound no longer has room for.
 	src := filepath.Join(dir, "silence.raw")
 	if err := os.WriteFile(src, make([]byte, 40*48000*8*2), 0o600); err != nil {
 		f.Fatal(err)
