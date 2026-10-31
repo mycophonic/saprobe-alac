@@ -95,6 +95,27 @@ audit: (_banner "lint homebrew" "audit")
     brew="${BREW_AUDIT_BIN:-${BREW_BIN:-}}"
     {{ _require_brew }}
     {{ _tap_link }}
+    # brew loads a non-official tap's formulas only once the tap is trusted
+    # (Homebrew 6+, docs/Tap-Trust.md); `--tap` allows nothing for audit, and
+    # HOMEBREW_NO_REQUIRE_TAP_TRUST is deprecated. Whole-tap trust, since the
+    # audit judges every formula of a tap its author administers; granted for
+    # the run and withdrawn at exit when this run granted it, so the user's
+    # trust store is left as it was. A brew without the command (pre-6) needs
+    # no trust and skips this. `style` has no need: RuboCop loads no formula.
+    trusted=""
+    # shellcheck disable=SC2154 # $tap is assigned by the _tap_link snippet above, which the lint lane's dump does not expand.
+    if out="$("$brew" trust "$tap" 2>/dev/null)"; then
+        case "$out" in
+            "Trusted tap: "*) trusted="$tap"; echo "trusted tap $tap for this run" ;;
+        esac
+    fi
+    cleanup_trust() {
+        if [ -n "$trusted" ]; then
+            "$brew" untrust "$trusted" >/dev/null 2>&1 || true
+        fi
+        cleanup
+    }
+    trap cleanup_trust EXIT
     # shellcheck disable=SC2086 # deliberate word-split of the flags knob.
     # shellcheck disable=SC2154 # $tap is assigned by the _tap_link snippet above, which the lint lane's dump does not expand.
     "$brew" audit --strict --tap "$tap" ${LINT_HOMEBREW_AUDIT_FLAGS:-}

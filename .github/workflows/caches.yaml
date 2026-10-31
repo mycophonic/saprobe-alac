@@ -68,10 +68,10 @@ jobs:
           kept=
           while IFS=$'\t' read -r id key version size; do
             case "$key" in
-              aqua-pkgs-*|go-*|fuzz-corpus-*|win-image-*) ;;
+              aqua-pkgs-*|go-*|rust-*|fuzz-corpus-*|win-image-*) ;;
               *) continue ;;
             esac
-            family=$(printf '%s' "$key" | sed -E 's/-[0-9]{8}$//; s/-[0-9a-f]{64}$//; s/-+$//; s/^(go-(lint-)?[^-]+-[^-]+)-go[0-9][^-]*$/\1/')
+            family=$(printf '%s' "$key" | sed -E 's/-[0-9]{8}$//; s/(-[0-9a-f]{64})+$//; s/-+$//; s/^(go-(lint-)?[^-]+-[^-]+)-go[0-9][^-]*$/\1/')
             family="$family $version"
             if printf '%s' "$kept" | grep -qxF -- "$family"; then
               printf 'delete %s (%d MB)\n' "$key" "$((size / 1000000))"

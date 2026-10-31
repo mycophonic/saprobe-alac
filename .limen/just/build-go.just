@@ -68,9 +68,11 @@ release: (_banner "build go" "release")
     extra=()
     [ -z "${BUILD_GO_FLAGS:-}" ] || read -ra extra <<<"${BUILD_GO_FLAGS}"
     mkdir -p "$LIMEN_BUILD"
+    built=0
     for dir in cmd/*/; do
         name=$(basename "${dir}")
         ls "${dir}"*.go >/dev/null 2>&1 || continue
+        built=1
         echo "→ $LIMEN_BUILD/${name}"
         # A command that is a module of its own (cmd/<name>/go.mod) builds
         # from inside it: from the root, go refuses a package outside the main
@@ -80,6 +82,7 @@ release: (_banner "build go" "release")
         go -C "${src}" build -trimpath -buildmode=pie -tags='{{ go_tags }}' \
             -ldflags "${ldflags}" ${extra[@]+"${extra[@]}"} -o "$LIMEN_BUILD/${name}" "${pkg}"
     done
+    [ "$built" = 1 ] || echo "no main package under cmd/ — nothing to build (skipped, not failed)."
 
 # Debug: optimizations and inlining off, symbols kept, real paths kept — no
 # trimpath, deliberately: debuggers want actual file locations. -debug suffix.
@@ -99,15 +102,18 @@ debug: (_banner "build go" "debug")
     extra=()
     [ -z "${BUILD_GO_FLAGS:-}" ] || read -ra extra <<<"${BUILD_GO_FLAGS}"
     mkdir -p "$LIMEN_BUILD"
+    built=0
     for dir in cmd/*/; do
         name=$(basename "${dir}")
         ls "${dir}"*.go >/dev/null 2>&1 || continue
+        built=1
         echo "→ $LIMEN_BUILD/${name}-debug"
         src=. pkg="./${dir%/}"
         [ ! -f "${dir}go.mod" ] || { src="${dir%/}"; pkg=.; }
         go -C "${src}" build -buildmode=pie -gcflags='all=-N -l' -tags='{{ go_tags }}' \
             -ldflags "${ldflags}" ${extra[@]+"${extra[@]}"} -o "$LIMEN_BUILD/${name}-debug" "${pkg}"
     done
+    [ "$built" = 1 ] || echo "no main package under cmd/ — nothing to build (skipped, not failed)."
 
 # Race: a diagnostic build with the race detector, which requires cgo (forced
 # here) and, matching the test module, an external linkmode. Unstripped, real
@@ -121,9 +127,11 @@ race: (_banner "build go" "race")
     extra=()
     [ -z "${BUILD_GO_FLAGS:-}" ] || read -ra extra <<<"${BUILD_GO_FLAGS}"
     mkdir -p "$LIMEN_BUILD"
+    built=0
     for dir in cmd/*/; do
         name=$(basename "${dir}")
         ls "${dir}"*.go >/dev/null 2>&1 || continue
+        built=1
         echo "→ $LIMEN_BUILD/${name}-race"
         src=. pkg="./${dir%/}"
         [ ! -f "${dir}go.mod" ] || { src="${dir%/}"; pkg=.; }
@@ -131,6 +139,7 @@ race: (_banner "build go" "race")
             -ldflags "${ldflags}" \
             ${extra[@]+"${extra[@]}"} -o "$LIMEN_BUILD/${name}-race" "${pkg}"
     done
+    [ "$built" = 1 ] || echo "no main package under cmd/ — nothing to build (skipped, not failed)."
 
 # Static: fully static external link. Preconditions enforced, not commented:
 # Linux only (macOS has no static libc), and CGO_ENABLED=1 (with CGO off,
@@ -156,9 +165,11 @@ static: (_banner "build go" "static")
     extra=()
     [ -z "${BUILD_GO_FLAGS:-}" ] || read -ra extra <<<"${BUILD_GO_FLAGS}"
     mkdir -p "$LIMEN_BUILD"
+    built=0
     for dir in cmd/*/; do
         name=$(basename "${dir}")
         ls "${dir}"*.go >/dev/null 2>&1 || continue
+        built=1
         echo "→ $LIMEN_BUILD/${name}-static"
         src=. pkg="./${dir%/}"
         [ ! -f "${dir}go.mod" ] || { src="${dir%/}"; pkg=.; }
@@ -166,3 +177,4 @@ static: (_banner "build go" "static")
             -ldflags "${ldflags}" \
             ${extra[@]+"${extra[@]}"} -o "$LIMEN_BUILD/${name}-static" "${pkg}"
     done
+    [ "$built" = 1 ] || echo "no main package under cmd/ — nothing to build (skipped, not failed)."

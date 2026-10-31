@@ -82,21 +82,30 @@ runs:
           curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors "${revoke[@]}" \
             -o "${tmp}/checksums.txt" "${base}/checksums.txt"
           # No single digest tool exists everywhere: linux and windows git-bash
-          # ship coreutils sha256sum, macOS ships perl shasum.
-          if command -v sha256sum >/dev/null 2>&1; then
-            echo "${HERMETIC_CHECKSUMS_SHA256}  ${tmp}/checksums.txt" | sha256sum -c -
-          else
-            echo "${HERMETIC_CHECKSUMS_SHA256}  ${tmp}/checksums.txt" | shasum -a 256 -c -
-          fi
+          # ship coreutils sha256sum, macOS ships perl shasum. A mismatch names
+          # the computed digest and the size beside the expected one: a stale
+          # pin (the previous release's hash, which a Renovate bump carries
+          # until the checksum workflow refreshes it) and a wrong download read
+          # differently off the log.
+          verify_sha256() {
+            local expected="$1" file="$2" actual
+            if command -v sha256sum >/dev/null 2>&1; then
+              actual="$(sha256sum "$file" | cut -d' ' -f1)"
+            else
+              actual="$(shasum -a 256 "$file" | cut -d' ' -f1)"
+            fi
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::sha256 mismatch for $(basename "$file") ($(wc -c <"$file" | tr -d ' ') bytes): expected ${expected}, computed ${actual}"
+              exit 1
+            fi
+            echo "sha256 ok: $(basename "$file")"
+          }
+          verify_sha256 "${HERMETIC_CHECKSUMS_SHA256}" "${tmp}/checksums.txt"
           curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors "${revoke[@]}" \
             -o "${tmp}/${asset}" "${base}/${asset}"
           expected="$(awk -v a="$asset" '$2 == a {print $1}' "${tmp}/checksums.txt")"
           [ -n "$expected" ] || { echo "::error::checksums.txt of hermetic ${HERMETIC_VERSION} does not list ${asset}"; exit 1; }
-          if command -v sha256sum >/dev/null 2>&1; then
-            echo "${expected}  ${tmp}/${asset}" | sha256sum -c -
-          else
-            echo "${expected}  ${tmp}/${asset}" | shasum -a 256 -c -
-          fi
+          verify_sha256 "${expected}" "${tmp}/${asset}"
           # GitHub's build provenance, on every runner through gh: the asset was
           # built by hermetic's release workflow from the tagged commit.
           gh attestation verify "${tmp}/${asset}" --repo forkcloser/hermetic

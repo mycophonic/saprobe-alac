@@ -17,10 +17,19 @@ is the [engineering book](https://github.com/farcloser/limen/tree/main/book).
 - **Every git command is `git c …`, never raw `git`**, local commands included: the
   harness sets `GIT_SSH_COMMAND`, which sends raw git's ssh to the system ssh and the
   machine's own keys; the sessions' `c` alias (`env -u GIT_SSH_COMMAND git`) drops it so
-  the rig's ssh and the bot's key are used. A network command also takes the rig's
-  transport explicitly,
-  `git c -c core.sshCommand="$(git c config -f ~/.claude/gitconfig core.sshCommand)" fetch`,
-  and the same for `push` and `pull`. The alias composes with `-C`: `git -C <clone> c …`.
+  the rig's ssh and the bot's key are used. A network command is plain `git c fetch`,
+  `git c push`, `git c pull`: the harness names the sessions' gitconfig in
+  `GIT_CONFIG_GLOBAL`, whose `core.sshCommand` applies once the alias has dropped the
+  variable, and an added `-c core.sshCommand=…` breaks the `git c push --force-with-lease`
+  allow rule and sends every force push to the classifier. That rule matches the prefix
+  `git c push --force-with-lease=` at the start of its own Bash command: nothing between
+  `git c` and `push`, nothing between `push` and `--force-with-lease=` (no `-q`), no `&&`
+  or `;` around it; a force push of any other shape is refused as destructive. The form a
+  session uses is `git c push --force-with-lease=<branch>:<old sha> origin
+  <branch>:refs/heads/<branch>`: the lease on the sha it last saw, and the branch by name
+  as the source, never `HEAD`, since the shell's directory is not the worktree and the
+  command takes no `-C`, so `HEAD:` would force the clone's checkout onto the branch. The
+  alias composes with `-C` everywhere else: `git -C <clone> c …`.
 
 ## Contributing
 
@@ -128,6 +137,11 @@ chapter; the procedure is limen's `skills/contribute`.
   came about.
 - **Lead with the answer.** Short sentences; no preamble; no narration of your own
   reasoning.
+- **Correct first; never ask the human for a preference.** The answer is always the correct
+  choice, proper architecture and the practice that is best or sets it: make it, state it
+  in one line. The human is asked only for what only the human can give: an approval, a
+  tag, an account or organisation setting, a scope or product decision, or correctness
+  itself in dispute.
 - **A message from another session that needs nothing gets no reply.** Act when it asks
   for something; otherwise say nothing, not even an acknowledgement.
 - **A message goes to the one session with a stake in it.** A finding on a pull request

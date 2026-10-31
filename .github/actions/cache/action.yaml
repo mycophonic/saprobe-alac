@@ -1,6 +1,6 @@
 name: Job caches
 description: >
-  The caches a canonical job keeps: hermetic's package store and, with go, the Go build and module caches, plus the linter's with linter-cache. Called three times per job, each mode once: attach (before setup-hermetic), restore (right after setup-hermetic, before the job runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since hermetic's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on the default branch only, read from the event (a scheduled run is on it by definition), never assumed by name, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and the default branch refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
+  The caches a canonical job keeps: hermetic's package store, with go the Go build and module caches, plus the linter's with linter-cache, and in a repository that pins a Rust toolchain (rust-toolchain.toml) what the Rust lanes install under LIMEN_BUILD: rustup with the toolchain, cargo's caches, zig's. Called three times per job, each mode once: attach (before setup-hermetic), restore (right after setup-hermetic, before the job runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since hermetic's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on the default branch only, read from the event (a scheduled run is on it by definition), never assumed by name, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and the default branch refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
 inputs:
   mode:
     description: attach, restore or save.
@@ -37,7 +37,7 @@ runs:
       with:
         mode: attach
         prefix: win-image-${{ runner.os }}-${{ runner.arch }}-
-        hash: ${{ hashFiles('.hermetic/hermetic.yaml', '.hermetic/aqua-checksums.json', '.limen/hermetic.yaml', '.limen/hermetic-registry.yaml', '**/go.sum') }}
+        hash: ${{ hashFiles('.hermetic/hermetic.yaml', '.hermetic/aqua-checksums.json', '.limen/hermetic.yaml', '.limen/hermetic-registry.yaml', '**/go.sum', 'rust-toolchain.toml', '**/Cargo.lock') }}
 
     - if: inputs.mode == 'attach' && runner.os == 'Windows'
       shell: bash
@@ -102,6 +102,31 @@ runs:
           ${{ steps.paths.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.paths.outputs.version }}-
           ${{ steps.paths.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-
 
+    # The Rust toolchain and its caches, in a repository that pins one: what
+    # rust_env installs under LIMEN_BUILD (book/rust.md), rustup with the
+    # toolchain and its targets, cargo's registry and git caches, zig's and
+    # cargo-zigbuild's. No tool to run for the paths: LIMEN_BUILD is
+    # setup-hermetic's export. Keyed on the toolchain file and every
+    # Cargo.lock, plus the day: cargo's caches accumulate like Go's.
+    - id: rust-day
+      if: inputs.mode == 'restore' && runner.os != 'Windows' && hashFiles('rust-toolchain.toml') != ''
+      shell: bash
+      run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
+    - id: rust
+      if: inputs.mode == 'restore' && runner.os != 'Windows' && hashFiles('rust-toolchain.toml') != ''
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ env.LIMEN_BUILD }}/rustup
+          ${{ env.LIMEN_BUILD }}/cargo
+          ${{ env.LIMEN_BUILD }}/zig
+        key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('**/Cargo.lock') }}-${{ steps.rust-day.outputs.day }}
+        restore-keys: |
+          rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('**/Cargo.lock') }}-
+          rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml') }}-
+          rust-${{ runner.os }}-${{ runner.arch }}-
+
     - if: inputs.mode == 'restore' && runner.os != 'Windows'
       shell: bash
       env:
@@ -112,6 +137,8 @@ runs:
         BUILD: ${{ steps.paths.outputs.build }}
         MOD: ${{ steps.paths.outputs.mod }}
         LINT: ${{ steps.paths.outputs.lint }}
+        RUST_KEY: ${{ steps.rust.outputs.cache-primary-key }}
+        RUST_HIT: ${{ steps.rust.outputs.cache-hit }}
       run: |
         {
           echo "LIMEN_CACHE_AQUA_KEY=$AQUA_KEY"
@@ -123,6 +150,8 @@ runs:
           if [ -n "$MOD" ]; then echo "$MOD"; fi
           if [ -n "$LINT" ]; then echo "$LINT"; fi
           echo "LIMEN_CACHE_GO_PATHS_END"
+          echo "LIMEN_CACHE_RUST_KEY=$RUST_KEY"
+          echo "LIMEN_CACHE_RUST_HIT=$RUST_HIT"
         } >> "$GITHUB_ENV"
 
     # --- save: the default branch only, on a miss ---
@@ -137,6 +166,16 @@ runs:
       with:
         path: ${{ env.LIMEN_CACHE_GO_PATHS }}
         key: ${{ env.LIMEN_CACHE_GO_KEY }}
+
+    # The same three paths restore listed: LIMEN_BUILD is the same export.
+    - if: inputs.mode == 'save' && runner.os != 'Windows' && (github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && env.LIMEN_CACHE_RUST_KEY != '' && env.LIMEN_CACHE_RUST_HIT != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ env.LIMEN_BUILD }}/rustup
+          ${{ env.LIMEN_BUILD }}/cargo
+          ${{ env.LIMEN_BUILD }}/zig
+        key: ${{ env.LIMEN_CACHE_RUST_KEY }}
 
     - if: inputs.mode == 'save' && runner.os == 'Windows' && (github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && env.LIMEN_CACHE_IMAGE_KEY != '' && env.LIMEN_CACHE_IMAGE_HIT != 'true'
       uses: ./.github/actions/windows-cache-image
