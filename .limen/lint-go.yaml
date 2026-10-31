@@ -39,12 +39,15 @@ lint-go:
 
 licenses:
   # What go-licenses accepts in the dependency graph; a project's .lint-go.yaml
-  # `allowed` replaces the list, its `ignore` names modules to skip.
+  # `allowed` replaces the list, its `ignore` names modules to skip. A
+  # permissive license is fine on a dependency where it is no choice for a
+  # repository's own LICENSE (BSD-2-Clause, the Unlicense: book/mandatory-files.md).
   allowed:
     - Apache-2.0
     - BSD-2-Clause
     - BSD-3-Clause
     - MIT
+    - Unlicense
 
 nilaway:
   # NilAway (go.uber.org/nilaway) is not a golangci-lint linter and will not

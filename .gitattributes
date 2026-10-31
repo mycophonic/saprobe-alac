@@ -15,3 +15,8 @@
 # line-ending rule; the line above still applies to them.
 *.patch -whitespace
 *.diff -whitespace
+
+# Third-party licence texts beside LICENSE (LICENSE-graphviz, LICENSE-expat)
+# are kept byte for byte as their projects publish them, trailing whitespace
+# included: a stripped copy is no longer the text the pinned archive carries.
+LICENSE-* -whitespace

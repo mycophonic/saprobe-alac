@@ -13,3 +13,7 @@ default:
     @exit 1
 
 mod go 'test-go.just'
+
+# Rust tests: `just do test rust` runs the crate's tests from the pinned
+# toolchain (book/rust.md).
+mod rust 'test-rust.just'

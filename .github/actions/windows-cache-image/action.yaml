@@ -87,6 +87,16 @@ runs:
         $build = ($env:GITHUB_WORKSPACE -replace '\\', '/') + '/.build'
         New-Item -ItemType Directory -Force -Path C:\vcache\golangci, $build | Out-Null
         New-Item -ItemType Junction -Path "$build/cache" -Target C:\vcache\golangci | Out-Null
+        # The Rust lanes' state the same way, in a repository that pins a
+        # toolchain: rustup, cargo and zig under LIMEN_BUILD are junctions
+        # into the image (book/rust.md); rustup and cargo take a junction
+        # as the directory it is.
+        if (Test-Path "$env:GITHUB_WORKSPACE/rust-toolchain.toml") {
+          foreach ($d in 'rustup', 'cargo', 'zig') {
+            New-Item -ItemType Directory -Force -Path "C:\vcache\$d" | Out-Null
+            New-Item -ItemType Junction -Path "$build/$d" -Target "C:\vcache\$d" | Out-Null
+          }
+        }
         "LIMEN_BUILD=$build" >> $env:GITHUB_ENV
         "GOCACHE=C:\vcache\go-build" >> $env:GITHUB_ENV
         "GOMODCACHE=C:\vcache\mod" >> $env:GITHUB_ENV
@@ -98,6 +108,9 @@ runs:
       run: |
         $ErrorActionPreference = 'Stop'
         Remove-Item "$env:LIMEN_BUILD/cache" -Force
+        foreach ($d in 'rustup', 'cargo', 'zig') {
+          if (Test-Path "$env:LIMEN_BUILD/$d") { Remove-Item "$env:LIMEN_BUILD/$d" -Force }
+        }
         Dismount-DiskImage -ImagePath C:\vhd\cache.vhdx | Out-Null
 
     - if: inputs.mode == 'save'

@@ -15,7 +15,11 @@
 #
 # Tag pushes are exactly one tag, never --tags. A signed tag already on HEAD is
 # reused, so a failed publish retries safely.
+# The arguments arrive as the script's own "$@" (positional-arguments), never
+# interpolated into its text: a `{{ args }}` would run a `;` in an argument as
+# a command before the tag below is validated.
 [doc('Release: `vX.Y.Z` signed tag (+ CI artifacts when .release-go.yaml exists) · `--local <cosign-key> vX.Y.Z` · `--local --dry-run` · `--ci`')]
+[positional-arguments]
 release *args:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -116,7 +120,6 @@ release *args:
         git push origin HEAD
         git push origin "refs/tags/$1"
     }
-    set -- {{ args }}
     case "${1:-}" in
         --local)
             shift

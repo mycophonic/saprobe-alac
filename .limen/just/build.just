@@ -11,6 +11,10 @@ set quiet
 # binaries, `just do build go <recipe>` (debug, race, static) makes a variant.
 mod go 'build-go.just'
 
+# Rust builds: `just do build rust` makes the host's release binaries,
+# `just do build rust targets <triple>…` the cross builds through zig.
+mod rust 'build-rust.just'
+
 # A submodule's recipe IS addressable as a dependency (go::default); only a
 # bare module path (go) is not.
 default: go::default

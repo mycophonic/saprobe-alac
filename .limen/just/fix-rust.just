@@ -10,6 +10,16 @@ set quiet
 # Shared private _banner recipe (see lib.just).
 import 'lib.just'
 
+default: rust
+
+# The mutating twins of `just do lint rust`, from the same pinned toolchain.
 rust: (_banner "fix" "rust")
-    cargo clippy --fix --all-targets --all-features --allow-dirty --allow-staged
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f Cargo.toml ]; then
+        echo "no Cargo.toml — not a Rust crate, nothing to fix (skipped, not failed)."
+        exit 0
+    fi
+    {{ rust_env }}
+    cargo clippy --fix --all-targets --all-features --locked --allow-dirty --allow-staged
     cargo fmt --all

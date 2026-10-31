@@ -66,6 +66,35 @@ _per-platform +cmd:
 # exists, `net` alone would call one to build them.
 go_tool_build := 'mkdir -p "$LIMEN_BUILD/tools" && GOOS="" GOARCH="" CGO_ENABLED=0 go -C .limen/tools build -o "$LIMEN_BUILD/tools/"'
 
+# cargo through the pinned rustup, never ~/.cargo/bin (book/rust.md). The
+# pin is rust-lang/rustup in the project's .hermetic/hermetic.yaml, which
+# links rustup-init; the first lane installs rustup from it under
+# $LIMEN_BUILD with no toolchain, and the toolchain is rust-toolchain.toml's,
+# fetched by the first cargo call and verified against the release manifest.
+# Windows: rustup wants native paths for its two homes, hence cygpath, and
+# hermetic's link resolves rustup-init to the .exe. Injected as a just
+# variable: module recipes cannot share shell functions. Every Rust lane
+# passes vacuously without a Cargo.toml, so a module can sit in a default.
+rust_env := '''
+    export RUSTUP_HOME="$LIMEN_BUILD/rustup" CARGO_HOME="$LIMEN_BUILD/cargo"
+    if command -v cygpath >/dev/null 2>&1; then
+        RUSTUP_HOME="$(cygpath -m "$RUSTUP_HOME")"; CARGO_HOME="$(cygpath -m "$CARGO_HOME")"
+    fi
+    export RUSTUP_AUTO_INSTALL=1 RUSTUP_INIT_SKIP_PATH_CHECK=yes
+    if [ ! -f rust-toolchain.toml ]; then
+        echo "rust-toolchain.toml is missing: the toolchain is pinned there, an exact version with its components and targets (book/rust.md)." >&2
+        exit 1
+    fi
+    if [ ! -x "$LIMEN_BUILD/cargo/bin/cargo" ] && [ ! -x "$LIMEN_BUILD/cargo/bin/cargo.exe" ]; then
+        if ! command -v rustup-init >/dev/null 2>&1; then
+            echo "rustup-init is not on the hermetic PATH: pin rust-lang/rustup in .hermetic/hermetic.yaml (just do tools add local,rust-lang/rustup <version>, book/rust.md)." >&2
+            exit 1
+        fi
+        rustup-init -y -q --no-modify-path --no-update-default-toolchain --default-toolchain none --profile minimal
+    fi
+    export PATH="$LIMEN_BUILD/cargo/bin:$PATH"
+'''
+
 # Every Go-built tool the recipes run — the Go-source analyzers and the rest
 # alike — is a `tool` directive in a module under .limen/tools/, built natively ONCE
 # into .build/tools/ by the pinned go (book/tooling.md, "Go-built tools are

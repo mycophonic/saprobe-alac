@@ -550,6 +550,62 @@ packages:
       - darwin
       - linux
       - windows/amd64
+  # rustup, the Rust toolchain installer (book/rust.md): the standard registry's
+  # entry (v4.578.0, unchanged at main) with two deltas, each for a defect
+  # recorded in book/upstream.md, so the entry retires when both are fixed:
+  # - the checksum file is read by pattern. The posix .sha256 files name the
+  #   asset (`<sha> *./rustup-init`), and aqua's update-checksum maps a line
+  #   that names an asset back to an environment by the asset's name, the same
+  #   `rustup-init` for every posix environment, so three fetches land under
+  #   one wrong id and the install fails "checksum is required"; a pattern
+  #   takes the bare-digest path, recorded under the fetching environment's
+  #   own id.
+  # - the Windows download URL ends in .exe (the file the host serves; the
+  #   standard entry's URL answers 404 there), the file renamed on the way.
+  # Pin it as `rust-lang/rustup@<version>` with `registry: local`.
+  - name: rust-lang/rustup
+    aliases:
+      - name: rust-lang/rustup/rustup-init
+    type: http
+    repo_owner: rust-lang
+    repo_name: rustup
+    files:
+      - name: rustup
+        link: rustup
+      - name: rustup-init
+    description: The Rust toolchain installer
+    version_source: github_tag
+    version_constraint: "false"
+    version_overrides:
+      - version_constraint: "true"
+        url: https://static.rust-lang.org/rustup/archive/{{.Version}}/{{.Arch}}-{{.OS}}/rustup-init
+        format: raw
+        replacements:
+          amd64: x86_64
+          arm64: aarch64
+          darwin: apple-darwin
+          linux: unknown-linux-gnu
+          windows: pc-windows-msvc
+        checksum:
+          type: http
+          url: https://static.rust-lang.org/rustup/archive/{{.Version}}/{{.Arch}}-{{.OS}}/rustup-init.sha256
+          algorithm: sha256
+          file_format: regexp
+          pattern:
+            checksum: "^([0-9a-f]{64})"
+        overrides:
+          - goos: windows
+            url: https://static.rust-lang.org/rustup/archive/{{.Version}}/{{.Arch}}-{{.OS}}/rustup-init.exe
+            files:
+              - name: rustup-init
+                src: rustup-init.exe
+            checksum:
+              type: http
+              url: https://static.rust-lang.org/rustup/archive/{{.Version}}/{{.Arch}}-{{.OS}}/rustup-init.exe.sha256
+              algorithm: sha256
+              file_format: regexp
+              pattern:
+                checksum: "^([0-9a-f]{64})"
   # ossein: microVM containers on macOS. The `docker` file puts a command named
   # docker on the hermetic PATH ahead of any Docker the machine has, on purpose,
   # for the repositories that pin it: build scripts type `docker`, and get
