@@ -14,22 +14,16 @@ is the [engineering book](https://github.com/farcloser/limen/tree/main/book).
   recipe covers the need — say so when you do it. `just --list` shows every task.
 - Always name the recipe; module defaults are curated subsets, not "run everything".
 - Never bump a tool version by hand: `just do tools set` / `just do tools update`.
-- **Every git command is `git c …`, never raw `git`**, local commands included: the
-  harness sets `GIT_SSH_COMMAND`, which sends raw git's ssh to the system ssh and the
-  machine's own keys; the sessions' `c` alias (`env -u GIT_SSH_COMMAND git`) drops it so
-  the rig's ssh and the bot's key are used. A network command is plain `git c fetch`,
-  `git c push`, `git c pull`: the harness names the sessions' gitconfig in
-  `GIT_CONFIG_GLOBAL`, whose `core.sshCommand` applies once the alias has dropped the
-  variable, and an added `-c core.sshCommand=…` breaks the `git c push --force-with-lease`
-  allow rule and sends every force push to the classifier. That rule matches the prefix
-  `git c push --force-with-lease=` at the start of its own Bash command: nothing between
-  `git c` and `push`, nothing between `push` and `--force-with-lease=` (no `-q`), no `&&`
-  or `;` around it; a force push of any other shape is refused as destructive. The form a
-  session uses is `git c push --force-with-lease=<branch>:<old sha> origin
-  <branch>:refs/heads/<branch>`: the lease on the sha it last saw, and the branch by name
-  as the source, never `HEAD`, since the shell's directory is not the worktree and the
-  command takes no `-C`, so `HEAD:` would force the clone's checkout onto the branch. The
-  alias composes with `-C` everywhere else: `git -C <clone> c …`.
+- **Git is plain `git`.** The rig configures a session's git and ssh, so `git fetch`,
+  `git push`, `git pull` reach GitHub as the bot as they are; a network command that fails
+  is broken tooling, reported, never worked around with an option of your own. The force
+  push has one shape, the allow rule's prefix at the start of its own
+  Bash command: `git push --force-with-lease=<branch>:<old sha> origin
+  <branch>:refs/heads/<branch>`, nothing between `git` and `push`, nothing between `push`
+  and `--force-with-lease=` (no `-q`), no `&&` or `;` around it; the lease on the sha it
+  last saw, and the branch by name as the source, never `HEAD`, since the shell's
+  directory is not the worktree and the command takes no `-C`, so `HEAD:` would force the
+  clone's checkout onto the branch. Everywhere else, name the tree: `git -C <clone> …`.
 
 ## Contributing
 
@@ -47,8 +41,10 @@ chapter; the procedure is limen's `skills/contribute`.
   nowhere else in the tree.
 - **The pull request's title is its release note.** A release's notes are the titles of
   the pull requests it merged, so a title says what changed for a consumer; no
-  `CHANGELOG.md` is kept by hand. One that breaks a consumer carries the `breaking` label
-  (`gh label create breaking` the first time a repository needs it).
+  `CHANGELOG.md` is kept by hand. One that breaks a consumer carries the `breaking` label;
+  one that changes nothing for a consumer (tooling, CI, maintainers' documentation) carries
+  `internal` and is left out of the notes (`gh label create breaking` and
+  `gh label create internal` the first time a repository needs them).
 - **A pull request is read by someone who was not in the session.** Its description says
   what changes and why in the terms of the code: the defect or the gap, the mechanism, the
   evidence it works. A decision appears as its technical reason; who asked, who decided and
@@ -71,6 +67,11 @@ chapter; the procedure is limen's `skills/contribute`.
   message, round after round, until settled, and then tells the project-manager session
   `reviewed: <org/repo> <branch> <head sha>`. A commit after that is a new review: the same
   exchange, a new sha. Review discussion lives in the sessions, never on the pull request.
+  A trivial documentation-only change (a typo, a wrap, a stale link, prose with nothing
+  decided in it) goes to the project-manager session instead, which reviews, logs and arms
+  it; anything touching code, configuration, workflows or tests, and any documentation
+  change that is not trivial, goes to the reviewing session. In doubt, the reviewing
+  session.
 - **Open the pull request at the reviewed head, bind it, babysit it.** Push, open the pull
   request, bind it in your own PR pane, and own it to green: a red that needs a redesign
   goes back to the reviewing session; an environmental red (a links 503, a known flake) gets
@@ -81,6 +82,11 @@ chapter; the procedure is limen's `skills/contribute`.
   queue, or refuses it as `UNREVIEWED:`. The human approves on GitHub; auto-merge merges. A
   private repository is never armed: its pull request is bound for the human, who merges by
   hand after approving. No review request, no review comments, no message at open.
+- **Your worktree goes when its pull request has merged.** Once `git status` in it is clean
+  and its head is on `main`, remove it with `~/.claude/bin/farclauder worktree remove <path>`,
+  run as the whole Bash command: `git worktree remove` cannot finish inside the sandbox, and
+  the exclusion that runs farclauder outside it matches the call's text (the book's
+  [identity](https://github.com/farcloser/limen/blob/main/book/identity.md)).
 - **A native stack** is reviewed and opened layer by layer the same way; the project
   manager merges it from the top once every layer is approved, never from the middle. A
   lower layer merged alone comes back rebased and signed by GitHub, which `lint commits`
@@ -186,7 +192,9 @@ chapter; the procedure is limen's `skills/contribute`.
   package A states A's guarantee, never what B does with it; a wrapper with a stated
   contract grows no export outside it because a caller wanted a home for a helper. A bug
   reported to the owning session earns the guarantee and the version that carries it, not
-  a say in the owner's tests.
+  a say in the owner's tests. The provider knows nothing of its consumers: what one needs
+  is offered as a property of the contract any consumer can use, never as that consumer's
+  name, path or variable in the provider.
 - **Tests are black-box, never bought with indirection.** External test package
   (`package foo_test`), no reach into private state, and no interface, function field, or
   other indirection in production code whose only purpose is a test's fake: that is bad

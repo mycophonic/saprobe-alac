@@ -1,13 +1,14 @@
-# DO NOT EDIT MANUALLY: content-pinned by limen, reset on drift. A project's
-# own scans go in its `security` recipe in the root .justfile, which this runs.
+# DO NOT EDIT MANUALLY: content-pinned by limen, reset on drift; the one line
+# Renovate moves is the `uses:` sha. A project's own scans go in its
+# `security` recipe in the root .justfile, which the called workflow runs.
 #
 # The security lane, apart from ci: a scan's verdict moves with the
 # vulnerability database, not with the tree, so this runs on a schedule as
 # well as on every push and pull request, and its check stands alone — a new
 # advisory reddens `security`, never `gate`, and the answer is a dependency
-# bump, never a code change. Same glue as ci: GitHub's own actions pinned by
-# SHA, hermetic at .hermetic/hermetic.yaml's pins, `just` running the recipe a laptop runs. No
-# third-party actions.
+# bump, never a code change. The steps are limen's reusable workflow; the
+# `security` job below is the one check the ruleset requires, a stable name
+# over the called job, as ci.yaml's `gate` is over the verify lanes.
 name: security
 
 on:
@@ -19,7 +20,7 @@ on:
     - cron: '17 6 * * *'
   workflow_dispatch:
 
-# No default token permissions: the job states what it needs. This workflow
+# No default token permissions: each job states what it needs. This workflow
 # only ever reads the repository.
 permissions: {}
 
@@ -28,46 +29,28 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
-  # One linux leg: the scan loops over every supported platform itself
-  # (_per-platform in lib.just), so more legs would repeat one verdict.
-  security:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+  scan:
+    uses: farcloser/limen/.github/workflows/limen-security.yaml@71145be9e7b59068f59e25e1c02ed44677038590 # v0.20.0
     permissions:
       contents: read
+
+  # The required status check. always(), and the result asserted explicitly:
+  # without always() a failed or cancelled scan SKIPS this job instead of
+  # failing it, and a skipped required check does not block a merge.
+  security:
+    needs: [scan]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # The token is not left behind in .git/config: nothing in this
-          # workflow talks to GitHub after checkout.
-          persist-credentials: false
-
-      - name: Install hermetic (pinned, verified)
-        uses: ./.github/actions/setup-hermetic
-
-      # The job's caches (.github/actions/cache): hermetic's store and the Go
-      # caches, which the scan needs once per supported platform, cold
-      # without them; no linter cache, so the Go key is go-, not the verify
-      # legs' go-lint-. The pins are linked by setup-hermetic: a tool
-      # downloads lazily on first use, checksum-verified.
-      - uses: ./.github/actions/cache
-        with:
-          mode: restore
-
-      # The project's `security`, like ci's `lint` and `test`: the root
-      # .justfile names the shared scans and adds its own (a cgo project scans
-      # the packages the native leg cannot load). The shared scans pass on a
-      # tree with no Go module, so this job is safe in every repository.
-      - name: Scan
-        run: just security
-
-      # Saved on the default branch only, on a miss (the cache budget:
-      # caches.yaml); the scheduled run is on it by definition.
-      - uses: ./.github/actions/cache
-        with:
-          mode: save
+      - name: The scan succeeded
+        env:
+          # Via env, never interpolated into the script: the shell sees data,
+          # not something the expression layer can rewrite into code.
+          RESULT: ${{ needs.scan.result }}
+        shell: bash
+        run: |
+          printf 'scan: %s\n' "$RESULT"
+          [ "$RESULT" = "success" ]

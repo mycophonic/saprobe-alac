@@ -3,6 +3,7 @@
   "description": [
     "The canonical Renovate configuration of every farcloser repository, content-pinned like the rest of .limen/: each repository carries this file byte for byte and its renovate.json extends it by the repository's own name (local>owner/name//.limen/renovate — Renovate refuses a relative reference in a repository's own config), so a fix here reaches every repository at its next limen bump, in the bump's diff. Reasoning: limen's book, mandatory files (CI workflows).",
     "extends: config:recommended alone. aqua's own preset detected pins by the file names aqua.yaml and .aqua/aqua.yaml; the pins live in .hermetic/hermetic.yaml now, resolved by hermetic, which that preset never sees, so the customManagers below carry its three managers that apply here, pointed at .hermetic/hermetic.yaml and the canonical .limen/hermetic.yaml: owner/repo@version pins against GitHub releases and against GitHub tags (a package released by tag alone), and the standard registry's `ref:` line. hermetic itself is pinned in the canonical setup-hermetic action as HERMETIC_VERSION, watched by the manager below in limen alone (the content-pinned rule silences the action everywhere else), so it moves through a limen release like every other canonical pin; its sha256 companion is recomputed by the checksum workflow on Renovate's branch, as the project checksums are.",
+    "packageRules, the limen group: a repository carries limen twice, as the hermetic pin that selects the recipes and the `limen fix` of its branches, and as the `uses:` reference of its workflow callers to limen's reusable workflows at a commit (`farcloser/limen/.github/workflows/limen-*.yaml@<sha> # vX.Y.Z`, the github-actions manager). One group named limen keeps the two in one pull request, so the recipes and the lanes move together; nothing else joins it. The content-pinned pieces that are not workflows (the actions, .limen/) stay silenced outside limen: a limen bump moves them through `limen fix`.",
     "minimumReleaseAge: supply-chain cooldown before proposing a bump; doubles as protection against a release tag whose assets are not uploaded yet.",
     "packageRules, golang/go: no cooldown. The Go toolchain is each repository's own pin so that a standard-library fix reaches it without a limen release, and a Go patch release is that fix; three days of cooldown would be three days of red security lanes. Go's releases are not pulled or re-uploaded the way the cooldown guards against.",
     "packageRules, own releases: the cooldown guards against third parties (a tag whose assets are still uploading, a release pulled the next day). A release cut by one of our organizations carries no risk we do not already own, and its assets are published by the release workflow within minutes \u2014 so farcloser, forkcloser and mycophonic packages, in aqua's owner/repo form and Go's github.com/owner/repo form alike, are proposed as soon as they exist. A repository that wants the cooldown back on one of them adds a later packageRule in its own renovate.json; rules merge in order and the last match wins.",
@@ -19,7 +20,7 @@
     "packageRules, lychee: releases are tagged lychee-vX.Y.Z next to lychee-lib-vX.Y.Z and nightly; regex versioning that carries the prefix parses the pin and the candidates alike and excludes the others by construction.",
     "packageRules, git-for-windows: releases are tagged vX.Y.Z.windows.N, and the N moves on its own (a Git for Windows rebuild of the same Git); a semver reading drops it and would never propose that bump. The build group carries it, and release candidates (vX.Y.Z-rcN.windows.N) fall outside the pattern.",
     "packageRules, runner images: the github-actions manager, which config:recommended enables, also proposes the runs-on images (ubuntu-24.04 to 26.04, macos-15 to 26) from the github-runners datasource. Those are product targets, not dependencies: the matrix is the set of platforms the code and the commands are proven on, set by the canonical ci.yaml seed and moved deliberately, on purpose, as a reviewed change. Off for that datasource; the actions themselves keep moving.",
-    "customManagers, pins.yaml: the artifacts a repository fetches by hand (a kernel tarball, a toolchain release, a source archive) live in one limen-owned file, each entry naming its own datasource and depName on its renovate: line, optionally an extract-version regexp and a versioning scheme on the two lines after it, and the version: line that closes the block is what moves. The digest follows in the same pull request: the checksum workflow runs `limen pins refresh`, which recomputes it through the verifier the entry declares. Watched here, once, for every repository; nobody writes a regex manager per pin.",
+    "customManagers, pins.yaml: the artifacts a repository fetches by hand (a kernel tarball, a toolchain release, a source archive) live in one limen-owned file, each entry naming its own datasource and depName on its renovate: line (or `manual`, the one word, for a pin no datasource serves, which the regex below then leaves alone and a hand moves), optionally an extract-version regexp and a versioning scheme on the two lines after it, the version: line that moves, and for a commit pin (git-refs: the version is the branch) a commit: line after it, captured as the digest, so Renovate proposes the branch's new head. The digest follows in the same pull request: the checksum workflow runs `limen pins refresh`, which recomputes it through the verifier the entry declares. Watched here, once, for every repository; nobody writes a regex manager per pin.",
     "commitBody: `just do lint commits` enforces DCO on every PR range, bot commits included."
   ],
   "extends": [
@@ -47,7 +48,7 @@
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)pins\\.yaml$/"],
       "matchStrings": [
-        "renovate: (?<datasource>\\S+) (?<depName>\\S+)\\n(?:\\s+extract-version: (?<extractVersion>\\S+)\\n)?(?:\\s+versioning: (?<versioning>\\S+)\\n)?\\s+version: (?<currentValue>\\S+)"
+        "renovate: (?<datasource>\\S+) (?<depName>\\S+)\\n(?:\\s+extract-version: (?<extractVersion>\\S+)\\n)?(?:\\s+versioning: (?<versioning>\\S+)\\n)?\\s+version: (?<currentValue>\\S+)(?:\\n\\s+commit: (?<currentDigest>\\S+))?"
       ]
     },
     {
@@ -98,18 +99,21 @@
     },
     {
       "matchFileNames": [
-        ".github/workflows/update-aqua-checksum.yaml",
         ".github/actions/setup-hermetic/**",
         ".github/actions/windows-cache-image/**",
         ".github/actions/cache/**",
-        ".github/workflows/limen-verify.yaml",
-        ".github/workflows/security.yaml",
         ".limen/**"
       ],
       "matchRepositories": [
         "!farcloser/limen"
       ],
       "enabled": false
+    },
+    {
+      "matchDepNames": [
+        "farcloser/limen"
+      ],
+      "groupName": "limen"
     },
     {
       "matchManagers": [

@@ -21,5 +21,12 @@ rust: (_banner "fix" "rust")
         exit 0
     fi
     {{ rust_env }}
-    cargo clippy --fix --all-targets --all-features --locked --allow-dirty --allow-staged
+    # Under the sessions' sandbox, with the human's HOME: cargo fix discovers
+    # the repository in-process (not through git, so GIT_CONFIG_GLOBAL is not
+    # read) and opens the home's git configuration on the way, which the
+    # sandbox denies, and the discovery fails as "no VCS found". The home
+    # swap the hermetic recipes already use (agent_home) gives it a home with
+    # nothing to read; CARGO_HOME and RUSTUP_HOME are explicit above, so the
+    # swap changes nothing else.
+    {{ agent_home }} cargo clippy --fix --all-targets --all-features --locked --allow-dirty --allow-staged
     cargo fmt --all

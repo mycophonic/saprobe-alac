@@ -1,6 +1,6 @@
 name: Job caches
 description: >
-  The caches a canonical job keeps: hermetic's package store, with go the Go build and module caches, plus the linter's with linter-cache, and in a repository that pins a Rust toolchain (rust-toolchain.toml) what the Rust lanes install under LIMEN_BUILD: rustup with the toolchain, cargo's caches, zig's. Called three times per job, each mode once: attach (before setup-hermetic), restore (right after setup-hermetic, before the job runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since hermetic's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on the default branch only, read from the event (a scheduled run is on it by definition), never assumed by name, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and the default branch refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
+  The caches a canonical job keeps: hermetic's package store, with go the Go build cache (LIMEN_BUILD/go-build, main.just's GOCACHE) and the module cache, plus the linter's with linter-cache, and in a repository that pins a Rust toolchain (rust-toolchain.toml) what the Rust lanes install under LIMEN_BUILD: rustup with the toolchain, cargo's caches, zig's. Called three times per job, each mode once: attach (before setup-hermetic), restore (right after setup-hermetic, before the job runs a tool) and save (after the job's last command). On Windows they live in one disk image (windows-cache-image): attach restores and attaches it, since hermetic's root is inside it, restore does nothing, and save detaches and saves it. On Linux and macOS attach does nothing, restore restores the store and the Go caches as files, and save saves them. Every save is on the default branch only, read from the event (a scheduled run is on it by definition), never assumed by name, and only on a miss: a cache a pull request run saves is scoped to that pull request and restorable by nothing else, and a key is never overwritten (the cache budget, caches.yaml). The Go caches and the image accumulate, so their keys carry the UTC day and the default branch refreshes them at most once a day; the store is fully determined by its pins. What save needs, attach and restore leave in the job's environment, so save cannot use another key or path list, and a mode called twice in one job fails.
 inputs:
   mode:
     description: attach, restore or save.
@@ -59,9 +59,11 @@ runs:
           exit 1
         fi
 
-    # The store first: go is one of its tools, and resolving the Go caches'
-    # paths runs it, which would download the toolchain the store holds.
-    # Through the link setup-hermetic made, which installs on first use.
+    # The store first: go is one of its tools, and resolving the module
+    # cache's path runs it, which would download the toolchain the store
+    # holds. Through the link setup-hermetic made, which installs on first
+    # use. The build cache's path is main.just's, a fixed path under
+    # LIMEN_BUILD: nothing to run for it.
     - id: aqua
       if: inputs.mode == 'restore' && runner.os != 'Windows'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -78,7 +80,7 @@ runs:
       run: |
         {
           if [ "$LINTER" = true ]; then echo "prefix=go-lint"; else echo "prefix=go"; fi
-          echo "build=$(go env GOCACHE)"
+          echo "build=${LIMEN_BUILD}/go-build"
           echo "mod=$(go env GOMODCACHE)"
           echo "version=$(go env GOVERSION)"
           echo "day=$(date -u +%Y%m%d)"

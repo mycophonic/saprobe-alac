@@ -80,7 +80,7 @@ rust_env := '''
     if command -v cygpath >/dev/null 2>&1; then
         RUSTUP_HOME="$(cygpath -m "$RUSTUP_HOME")"; CARGO_HOME="$(cygpath -m "$CARGO_HOME")"
     fi
-    export RUSTUP_AUTO_INSTALL=1 RUSTUP_INIT_SKIP_PATH_CHECK=yes
+    export RUSTUP_INIT_SKIP_PATH_CHECK=yes
     if [ ! -f rust-toolchain.toml ]; then
         echo "rust-toolchain.toml is missing: the toolchain is pinned there, an exact version with its components and targets (book/rust.md)." >&2
         exit 1
@@ -90,9 +90,19 @@ rust_env := '''
             echo "rustup-init is not on the hermetic PATH: pin rust-lang/rustup in .hermetic/hermetic.yaml (just do tools add local,rust-lang/rustup <version>, book/rust.md)." >&2
             exit 1
         fi
-        rustup-init -y -q --no-modify-path --no-update-default-toolchain --default-toolchain none --profile minimal
+        # stdout is rustup-init's welcome ("Rust is installed now. Great!", the
+        # PATH advice): nothing a lane reports; its errors stay on stderr.
+        rustup-init -y -q --no-modify-path --no-update-default-toolchain --default-toolchain none --profile minimal >/dev/null
     fi
     export PATH="$LIMEN_BUILD/cargo/bin:$PATH"
+    # The toolchain rust-toolchain.toml names, installed explicitly when the
+    # file's toolchain is not there yet (a first run, a channel bump): the
+    # proxies would auto-install it under RUSTUP_AUTO_INSTALL, with a warning
+    # on every first lane, and a lane runs no step it did not state.
+    if ! RUSTUP_AUTO_INSTALL=0 rustup which cargo >/dev/null 2>&1; then
+        # --no-self-update: a pinned rustup asks nobody for a newer one.
+        rustup toolchain install --no-self-update
+    fi
 '''
 
 # Every Go-built tool the recipes run — the Go-source analyzers and the rest
