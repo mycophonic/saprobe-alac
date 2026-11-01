@@ -124,9 +124,11 @@ export SDKROOT := if xcode_sdk == '' { env('SDKROOT', '') } else { xcode_sdk }
 # tools and the native ones both read.
 export LIMEN_BUILD := replace(justfile_directory(), '\', '/') / '.build'
 
-# Hermetic, per-project linter cache (same doctrine as PATH and GOROOT: no
-# shared mutable state across repos). Lives under LIMEN_BUILD, so local runs
-# behave like CI instead of diverging on cache state.
+# Hermetic, per-checkout Go build cache and linter cache (same doctrine as
+# PATH and GOROOT: no shared mutable state across repos). Under LIMEN_BUILD,
+# so local runs behave like CI, and so no build or clean in another checkout
+# removes an entry a lane here was just handed.
+export GOCACHE := LIMEN_BUILD / 'go-build'
 export GOLANGCI_LINT_CACHE := LIMEN_BUILD / 'cache/golangci-lint'
 
 # just's default recipe is the first one defined, so a project's first own

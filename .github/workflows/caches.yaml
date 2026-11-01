@@ -1,4 +1,5 @@
-# DO NOT EDIT MANUALLY: content-pinned by limen, reset on drift.
+# DO NOT EDIT MANUALLY: content-pinned by limen, reset on drift; the one line
+# Renovate moves is the `uses:` sha.
 #
 # The cache budget. GitHub keeps 10 GB of Actions caches per repository and
 # evicts the least recently used beyond it, the current entries included, so
@@ -9,8 +10,8 @@
 # eviction (and the caches that accumulate, Go's and the fuzz corpus, start
 # one a day). This keeps one generation per key on the default branch: after
 # each ci run there, and once a day, every entry under a canonical prefix that
-# is not the newest of its family is deleted. GitHub's own token, `gh` from
-# the runner image; no checkout, no third-party actions.
+# is not the newest of its family is deleted. The steps are limen's reusable
+# workflow.
 name: caches
 
 on:
@@ -31,53 +32,9 @@ permissions: {}
 concurrency:
   group: ${{ github.workflow }}
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
   prune:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    uses: farcloser/limen/.github/workflows/limen-caches.yaml@71145be9e7b59068f59e25e1c02ed44677038590 # v0.20.0
     permissions:
       # Listing and deleting caches is an Actions write.
       actions: write
-    steps:
-      - name: One generation per key on the default branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          # The default branch's entries, newest first, the branch read from
-          # the repository, never assumed by name (a scheduled run has no
-          # event naming it). Listed before the loop so a refused token or a
-          # failed call fails the step: fed through a process
-          # substitution, the loop would read nothing and pass, and the prune
-          # would silently not happen. A family is a key without its UTC day
-          # and content hash (and, for the Go caches, without the Go version,
-          # so a toolchain bump retires the old version's entry too), plus the
-          # entry's version: GitHub tells entries apart by key and version,
-          # and the version follows the cached paths, so two entries caching
-          # different paths under one key are two families, never each
-          # other's older generation. The first of each family is kept, the
-          # rest deleted. Only the canonical prefixes; whatever else is in the
-          # store is not ours to judge.
-          default_branch=$(gh api "repos/$GH_REPO" --jq .default_branch)
-          entries=$(gh cache list --ref "refs/heads/$default_branch" --limit 500 --sort created_at --order desc \
-            --json id,key,version,sizeInBytes --jq '.[] | "\(.id)\t\(.key)\t\(.version)\t\(.sizeInBytes)"')
-          kept=
-          while IFS=$'\t' read -r id key version size; do
-            case "$key" in
-              aqua-pkgs-*|go-*|rust-*|fuzz-corpus-*|win-image-*) ;;
-              *) continue ;;
-            esac
-            family=$(printf '%s' "$key" | sed -E 's/-[0-9]{8}$//; s/(-[0-9a-f]{64})+$//; s/-+$//; s/^(go-(lint-)?[^-]+-[^-]+)-go[0-9][^-]*$/\1/')
-            family="$family $version"
-            if printf '%s' "$kept" | grep -qxF -- "$family"; then
-              printf 'delete %s (%d MB)\n' "$key" "$((size / 1000000))"
-              gh cache delete "$id"
-            else
-              kept="$kept$family"$'\n'
-              printf 'keep   %s\n' "$key"
-            fi
-          done <<< "$entries"

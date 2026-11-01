@@ -1,6 +1,6 @@
 name: Windows cache image
 description: >
-  Windows only. Holds the Go build and module caches, hermetic's root and the linter cache in one NTFS disk image (VHDX), cached as a single file. Restoring that file and attaching it costs under a minute; restoring the same caches as files writes 100,000+ small files, which costs several on the Windows runners. mode attach (before setup-hermetic) restores or creates the image, attaches it at C:\vcache, points GOCACHE, GOMODCACHE and HERMETIC_ROOT_DIR into it, and excludes it from Defender's real-time scan; mode save (last, on a cache miss, on main only) detaches it and saves it.
+  Windows only. Holds the Go build and module caches, hermetic's root and the linter cache in one NTFS disk image (VHDX), cached as a single file. Restoring that file and attaching it costs under a minute; restoring the same caches as files writes 100,000+ small files, which costs several on the Windows runners. mode attach (before setup-hermetic) restores or creates the image, attaches it at C:\vcache, points GOMODCACHE and HERMETIC_ROOT_DIR into it and junctions the Go build cache and the linter cache under LIMEN_BUILD into it, and excludes it from Defender's real-time scan; mode save (last, on a cache miss, on main only) detaches it and saves it.
 inputs:
   mode:
     description: attach or save.
@@ -81,11 +81,12 @@ runs:
         } catch {
           Write-Host "Defender exclusion skipped: $_"
         }
-        # The linter cache lives under the checkout's output directory
-        # (main.just's LIMEN_BUILD, the same path). This step runs before
-        # setup-hermetic, so it is the one that exports it for the steps after.
+        # The Go build cache and the linter cache are junctions into the
+        # image, under LIMEN_BUILD. main.just sets GOCACHE, so this step
+        # exports only LIMEN_BUILD, before setup-hermetic, for the steps after.
         $build = ($env:GITHUB_WORKSPACE -replace '\\', '/') + '/.build'
-        New-Item -ItemType Directory -Force -Path C:\vcache\golangci, $build | Out-Null
+        New-Item -ItemType Directory -Force -Path C:\vcache\go-build, C:\vcache\golangci, $build | Out-Null
+        New-Item -ItemType Junction -Path "$build/go-build" -Target C:\vcache\go-build | Out-Null
         New-Item -ItemType Junction -Path "$build/cache" -Target C:\vcache\golangci | Out-Null
         # The Rust lanes' state the same way, in a repository that pins a
         # toolchain: rustup, cargo and zig under LIMEN_BUILD are junctions
@@ -98,7 +99,6 @@ runs:
           }
         }
         "LIMEN_BUILD=$build" >> $env:GITHUB_ENV
-        "GOCACHE=C:\vcache\go-build" >> $env:GITHUB_ENV
         "GOMODCACHE=C:\vcache\mod" >> $env:GITHUB_ENV
         "HERMETIC_ROOT_DIR=C:/vcache/hermetic" >> $env:GITHUB_ENV
 
@@ -107,7 +107,7 @@ runs:
       shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
-        Remove-Item "$env:LIMEN_BUILD/cache" -Force
+        Remove-Item "$env:LIMEN_BUILD/go-build", "$env:LIMEN_BUILD/cache" -Force
         foreach ($d in 'rustup', 'cargo', 'zig') {
           if (Test-Path "$env:LIMEN_BUILD/$d") { Remove-Item "$env:LIMEN_BUILD/$d" -Force }
         }

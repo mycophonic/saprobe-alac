@@ -23,8 +23,22 @@ default: unit
 # CGO_ENABLED resolves through lib.just's go_cgo, so a cgo project tests the
 # artifact it ships; `race` forces 1 (the detector injects runtime/cgo).
 
+# A compile that needs a generated input (an embedded build product, codegen)
+# gets it from the project's `_test-prepare` recipe in the root .justfile,
+# run before every shared Go test recipe when it exists: the CI lanes call
+# these recipes directly (`just do test go race`), never the project's `test`
+# aggregate, so the aggregate's own prerequisites would not run there. A root
+# .justfile without the recipe is unchanged. `just --show` sees a private
+# recipe where `--summary` does not.
+_prepare:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if just --show _test-prepare >/dev/null 2>&1; then
+        just _test-prepare
+    fi
+
 # Unit tests.
-unit: (_banner "test go" "unit")
+unit: (_banner "test go" "unit") _prepare
     CGO_ENABLED="{{ go_cgo }}" \
         gotestsum -- -count=1 -timeout "${TEST_GO_TIMEOUT:-10m}" ./...
 
@@ -38,10 +52,16 @@ unit: (_banner "test go" "unit")
 # windows/arm64 among others. Ask the toolchain rather than keep a platform
 # list: a probe build of `unsafe` answers in milliseconds. Only the exact
 # "-race is not supported" refusal skips — loudly, and passes, since the other
-# legs run the detector natively; any other probe failure is real.
-race: (_banner "test go" "race")
+# legs run the detector natively; any other probe failure is real. No go.mod
+# at all: says so and passes, like fuzz, since CI runs this in every
+# repository.
+race: (_banner "test go" "race") _prepare
     #!/usr/bin/env bash
     set -euo pipefail
+    if [ ! -f go.mod ]; then
+        echo "no go.mod — not a Go module, nothing to run under the detector (skipped, not failed)."
+        exit 0
+    fi
     export CGO_ENABLED=1
     if ! probe="$(go build -race -o /dev/null unsafe 2>&1)"; then
         if printf '%s\n' "$probe" | grep -q -- '-race is not supported'; then
@@ -63,7 +83,7 @@ race: (_banner "test go" "race")
 # "context deadline exceeded" as fuzztime expires mid-iteration, so exit 1
 # without a new file is retried once. No Fuzz* targets, or no go.mod at all:
 # says so and passes.
-fuzz: (_banner "test go" "fuzz")
+fuzz: (_banner "test go" "fuzz") _prepare
     #!/usr/bin/env bash
     set -euo pipefail
     if [ ! -f go.mod ]; then
@@ -116,7 +136,7 @@ fuzz: (_banner "test go" "fuzz")
 # Coverage: per-function summary, an HTML report under .build/coverage/, and an
 # optional minimum gate — export TEST_GO_COVER_MIN := '80' (integer percent)
 # from the root .justfile to enforce a floor; unset or 0 reports without gating.
-cover: (_banner "test go" "cover")
+cover: (_banner "test go" "cover") _prepare
     #!/usr/bin/env bash
     set -euo pipefail
     export CGO_ENABLED="{{ go_cgo }}"

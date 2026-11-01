@@ -25,3 +25,8 @@ mod perf 'perf.just'
 
 # Flat (imported, not a module) so it takes arguments: `just do release v1.2.3`.
 import 'release.just'
+
+# Flat too, for the same reason: the Apple recipes take a bundle and a zip
+# (`just do apple-notarize <bundle>`), composed by a project's own package
+# recipe (apple.just).
+import 'apple.just'

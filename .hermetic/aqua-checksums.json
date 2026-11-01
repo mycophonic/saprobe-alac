@@ -26,6 +26,26 @@
       "algorithm": "sha256"
     },
     {
+      "id": "github_release/github.com/anchore/syft/v1.55.0/syft_1.55.0_darwin_arm64.tar.gz",
+      "checksum": "1217C258BD5EB91EF3189CF22A82E02F9CAC07E4CE934350F428E93AFF674625",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/anchore/syft/v1.55.0/syft_1.55.0_linux_amd64.tar.gz",
+      "checksum": "BB65249542DB5FEDEEB4D3F9B018B75E7264DBFBBB10486F044581A92F90490D",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/anchore/syft/v1.55.0/syft_1.55.0_linux_arm64.tar.gz",
+      "checksum": "929BD163DB2D7CD2255D3BCB8967208079813D7B46B0C952F7B794D8E2C7D304",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/anchore/syft/v1.55.0/syft_1.55.0_windows_amd64.zip",
+      "checksum": "ADA4C9B93AF575F479CE80FCE6629897272A2D41F300A14BC49BACE020767CA2",
+      "algorithm": "sha256"
+    },
+    {
       "id": "github_release/github.com/casey/just/1.59.0/just-1.59.0-aarch64-apple-darwin.tar.gz",
       "checksum": "6574CEA774ED4CAE12E24B6AA11857DE33E80DAB4667CF628FD5840DF96A2A9D",
       "algorithm": "sha256"
@@ -71,28 +91,28 @@
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.17.0/limen_0.17.0_darwin_arm64.tar.gz",
-      "checksum": "5FC14CF33F2AFF316BA6E473EBC4A4CFAAB94F531A22E9265E59822786A2372E",
+      "id": "github_release/github.com/farcloser/limen/v0.20.0/limen_0.20.0_darwin_arm64.tar.gz",
+      "checksum": "C6088F53605E717D75867ABAEF673568919910C50D5690ECD663B66353D87F70",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.17.0/limen_0.17.0_linux_amd64.tar.gz",
-      "checksum": "0A3A9DBE15897E3E7C88691E2072D3476089B84BA21E4E3E15398E2A522BF0BD",
+      "id": "github_release/github.com/farcloser/limen/v0.20.0/limen_0.20.0_linux_amd64.tar.gz",
+      "checksum": "8008CB39FA57A674E1E4C538BC7A0150CF928EAFC76A9D04A0778B56C02F34C0",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.17.0/limen_0.17.0_linux_arm64.tar.gz",
-      "checksum": "0F8F8606E1D97E4CB79A7FBDCCE2BBD0317B7DE5A20247A565CD731557FFE2EA",
+      "id": "github_release/github.com/farcloser/limen/v0.20.0/limen_0.20.0_linux_arm64.tar.gz",
+      "checksum": "2C4B372E5F2A2316E03DEFB4197B6A1F7CA4657AE6DDD282FE23F2870C8B9BEE",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.17.0/limen_0.17.0_windows_amd64.tar.gz",
-      "checksum": "FF022CD60F125B1845E8A29C1815A1C0CA40227A36C3F2AF4E6C09DE632BFA0C",
+      "id": "github_release/github.com/farcloser/limen/v0.20.0/limen_0.20.0_windows_amd64.tar.gz",
+      "checksum": "AD23DF52B7AC0FE60FF8033A63E132B59B835753863A68C495DD19C6F1B582B5",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.17.0/limen_0.17.0_windows_arm64.tar.gz",
-      "checksum": "87325D68150BA0AC7C1A970AE563639D08FC908DA9CE92B5191758C174F631F3",
+      "id": "github_release/github.com/farcloser/limen/v0.20.0/limen_0.20.0_windows_arm64.tar.gz",
+      "checksum": "86CB72208231E98D9B06BFC537278F81692CEA52FEE8C97E38836ABDDE104042",
       "algorithm": "sha256"
     },
     {
@@ -296,23 +316,23 @@
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/quint-co/quint/v0.33.0/quint-linux-amd64",
-      "checksum": "79EAA33AEB28A72681122656974557DB553F4D01B792E22727075B41806DB4D3",
+      "id": "github_release/github.com/quint-co/quint/v0.33.1/quint-linux-amd64",
+      "checksum": "ACD153075B7EDC6FC8F889930C5FF3EBDF94ADA381A45A26A2D41B18B9F10DB7",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/quint-co/quint/v0.33.0/quint-linux-arm64",
-      "checksum": "E99C0FCC88F4EBBDA0DFA5F58257F91DDF1AD40CEA452EB4770302FD24DAB315",
+      "id": "github_release/github.com/quint-co/quint/v0.33.1/quint-linux-arm64",
+      "checksum": "FFC0549933DB6787FFB932AA5C0E9A778018FE027E10D21CE4895C57502C11FC",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/quint-co/quint/v0.33.0/quint-macos-arm64",
-      "checksum": "E65D0CB2054C9823E3F035656F7F9DDAEBD11B7E270FCF2F773008287B95EEF7",
+      "id": "github_release/github.com/quint-co/quint/v0.33.1/quint-macos-arm64",
+      "checksum": "8744447E5C641291A28D29848A4FD22E0D18237E9964934545E6270B78D2B8E3",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/quint-co/quint/v0.33.0/quint-pc-amd64.exe",
-      "checksum": "8B419EE31C8A1D31B04FD5164BD966105FDF16FD6153DC687DF89FA37BFF036D",
+      "id": "github_release/github.com/quint-co/quint/v0.33.1/quint-pc-amd64.exe",
+      "checksum": "E2BFD802D1FA79A764216AC9D7948535F6EFFA6C68A0EBC5745D433709EB0C6D",
       "algorithm": "sha256"
     },
     {
