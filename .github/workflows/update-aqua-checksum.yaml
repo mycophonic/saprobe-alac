@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   update:
-    uses: farcloser/limen/.github/workflows/limen-update-aqua-checksum.yaml@71145be9e7b59068f59e25e1c02ed44677038590 # v0.20.0
+    uses: farcloser/limen/.github/workflows/limen-update-aqua-checksum.yaml@d2bf2f8b71f612a92039a4ab29bd7bde5499f5b0 # v0.21.0
     permissions:
       contents: write
       # To approve the pull request's runs on the head the job pushes.
