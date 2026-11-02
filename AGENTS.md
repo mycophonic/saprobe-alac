@@ -68,10 +68,10 @@ chapter; the procedure is limen's `skills/contribute`.
   `reviewed: <org/repo> <branch> <head sha>`. A commit after that is a new review: the same
   exchange, a new sha. Review discussion lives in the sessions, never on the pull request.
   A trivial documentation-only change (a typo, a wrap, a stale link, prose with nothing
-  decided in it) goes to the project-manager session instead, which reviews, logs and arms
-  it; anything touching code, configuration, workflows or tests, and any documentation
-  change that is not trivial, goes to the reviewing session. In doubt, the reviewing
-  session.
+  decided in it), and a pull request that only bumps dependencies, go to the project-manager
+  session instead, which reviews, logs and arms them; anything else touching code,
+  configuration, workflows or tests, and any documentation change that is not trivial, goes
+  to the reviewing session. In doubt, the reviewing session.
 - **Open the pull request at the reviewed head, bind it, babysit it.** Push, open the pull
   request, bind it in your own PR pane, and own it to green: a red that needs a redesign
   goes back to the reviewing session; an environmental red (a links 503, a known flake) gets
