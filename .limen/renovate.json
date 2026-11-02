@@ -21,12 +21,14 @@
     "packageRules, git-for-windows: releases are tagged vX.Y.Z.windows.N, and the N moves on its own (a Git for Windows rebuild of the same Git); a semver reading drops it and would never propose that bump. The build group carries it, and release candidates (vX.Y.Z-rcN.windows.N) fall outside the pattern.",
     "packageRules, runner images: the github-actions manager, which config:recommended enables, also proposes the runs-on images (ubuntu-24.04 to 26.04, macos-15 to 26) from the github-runners datasource. Those are product targets, not dependencies: the matrix is the set of platforms the code and the commands are proven on, set by the canonical ci.yaml seed and moved deliberately, on purpose, as a reviewed change. Off for that datasource; the actions themselves keep moving.",
     "customManagers, pins.yaml: the artifacts a repository fetches by hand (a kernel tarball, a toolchain release, a source archive) live in one limen-owned file, each entry naming its own datasource and depName on its renovate: line (or `manual`, the one word, for a pin no datasource serves, which the regex below then leaves alone and a hand moves), optionally an extract-version regexp and a versioning scheme on the two lines after it, the version: line that moves, and for a commit pin (git-refs: the version is the branch) a commit: line after it, captured as the digest, so Renovate proposes the branch's new head. The digest follows in the same pull request: the checksum workflow runs `limen pins refresh`, which recomputes it through the verifier the entry declares. Watched here, once, for every repository; nobody writes a regex manager per pin.",
-    "commitBody: `just do lint commits` enforces DCO on every PR range, bot commits included."
+    "commitBody: `just do lint commits` enforces DCO on every PR range, bot commits included.",
+    "lockFileMaintenance: a lock file pins the transitive dependencies too (Cargo.lock's crates under a crate the project names), and nothing moves one but a bump of a direct dependency or a vulnerability alert; weekly, Renovate regenerates every lock in the repository in one pull request, which the lanes prove as any other (`--locked`, the tests). Go has no lock maintenance in Renovate (go.sum is not on its list): an indirect Go requirement moves with the direct bump that re-resolves it and with vulnerability alerts, which the preset turns on."
   ],
   "extends": [
     "config:recommended"
   ],
   "minimumReleaseAge": "3 days",
+  "lockFileMaintenance": { "enabled": true, "schedule": ["before 5am on monday"] },
   "rebaseWhen": "behind-base-branch",
   "automerge": true,
   "automergeType": "pr",

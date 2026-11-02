@@ -10,16 +10,20 @@
 # Application"), APPLE_SIGN_TEAM (the ten-character team id read off the
 # certificate), APPLE_SIGNING_KEYCHAIN, APPLE_PROVISIONING_PROFILE_PATH, and
 # for notarization APPLE_NOTARY_KEY (the .p8's path), APPLE_NOTARY_KEY_ID,
-# APPLE_NOTARY_ISSUER_ID. Unset, every recipe treats the build as a local,
-# ad hoc one: nothing to notarize, an ad hoc signature accepted outside
-# GitHub Actions.
+# APPLE_NOTARY_ISSUER_ID. Unset, every recipe treats the build as an ad hoc
+# one: nothing to notarize, and an ad hoc signature accepted off the release
+# tag (apple-verify-signed).
 
-# codesign's verdict on a bundle. In GitHub Actions the signature must be the
+# codesign's verdict on a bundle. On a release run the signature must be the
 # Developer ID Application identity's, timestamped (a signature without a
-# timestamp expires with the certificate); a local build's ad hoc signature
-# is accepted as such. Notarization is a separate verdict (apple-verify-notarized):
-# the policy signs every bundle and notarizes the ones a human installs.
-[doc('Assert a bundle is signed: Developer ID and timestamped in CI, ad hoc accepted locally')]
+# timestamp expires with the certificate); anywhere else an ad hoc signature
+# is accepted as such. A release run is the sign job, which exports the
+# identity, or the publish job, on the release tag (GITHUB_REF_TYPE); the
+# verify lane builds the same bundle ad hoc on branches and pull requests,
+# in GitHub Actions too, so "in Actions" is not the key. Notarization is a
+# separate verdict (apple-verify-notarized): the policy signs every bundle
+# and notarizes the ones a human installs.
+[doc('Assert a bundle is signed: Developer ID and timestamped on a release run, ad hoc accepted elsewhere')]
 apple-verify-signed bundle:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -32,8 +36,10 @@ apple-verify-signed bundle:
         printf '%s\n' "$details" | grep -q '^Timestamp=' || fail "the Developer ID signature of $bundle carries no timestamp"
         echo "apple-verify-signed: $bundle is signed by Developer ID Application, timestamped"
     else
-        [ -z "${GITHUB_ACTIONS:-}" ] || fail "$bundle is not Developer ID signed; a release built in GitHub Actions must be"
-        echo "apple-verify-signed: $bundle is ad hoc signed (a local build)"
+        if [ -n "${APPLE_SIGN_IDENTITY:-}" ] || [ "${GITHUB_REF_TYPE:-}" = tag ]; then
+            fail "$bundle is not Developer ID signed; a release run's bundle must be"
+        fi
+        echo "apple-verify-signed: $bundle is ad hoc signed (not a release run)"
     fi
 
 # The stapled notarization ticket: Contents/CodeResources is where stapler
