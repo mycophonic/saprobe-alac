@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   limen:
-    uses: farcloser/limen/.github/workflows/limen-verify.yaml@71145be9e7b59068f59e25e1c02ed44677038590 # v0.20.0
+    uses: farcloser/limen/.github/workflows/limen-verify.yaml@d2bf2f8b71f612a92039a4ab29bd7bde5499f5b0 # v0.21.0
     permissions:
       contents: read
       # A project that needs another runner set passes it here, e.g.
