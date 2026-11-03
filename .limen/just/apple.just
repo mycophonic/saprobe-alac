@@ -43,9 +43,11 @@ apple-verify-signed bundle:
     fi
 
 # The stapled notarization ticket: Contents/CodeResources is where stapler
-# writes it, and `stapler validate` is the check that needs no network, the
-# one Gatekeeper makes offline. spctl has no assessment for a plug-in (its
-# execute type answers for app bundles alone), so it is not consulted.
+# writes it. `stapler validate` asks Apple's ticket service for the record, so
+# a dropped connection fails it with nothing wrong in the bundle: it is tried
+# three times before the bundle is refused. spctl has no assessment for a
+# plug-in (its execute type answers for app bundles alone), so it is not
+# consulted.
 [doc('Assert a bundle carries a stapled notarization ticket that validates')]
 apple-verify-notarized bundle:
     #!/usr/bin/env bash
@@ -53,7 +55,11 @@ apple-verify-notarized bundle:
     fail() { echo "apple-verify-notarized: $*" >&2; exit 1; }
     bundle='{{ bundle }}'
     [ -f "$bundle/Contents/CodeResources" ] || fail "no notarization ticket is stapled to $bundle"
-    xcrun stapler validate "$bundle" || fail "the ticket stapled to $bundle does not validate"
+    for attempt in 1 2 3; do
+        xcrun stapler validate "$bundle" && break
+        [ "$attempt" -lt 3 ] || fail "the ticket stapled to $bundle does not validate"
+        sleep $((attempt * 10))
+    done
     echo "apple-verify-notarized: $bundle carries a valid stapled ticket"
 
 # Submit the signed bundle to Apple and staple the ticket. The verdict is
@@ -85,8 +91,9 @@ apple-notarize bundle:
         [ -z "$id" ] || xcrun notarytool log "$id" "${key[@]}" >&2 || true
         exit 1
     fi
+    # staple validates what it writes; a second validate only asks the
+    # network again.
     xcrun stapler staple "$bundle"
-    xcrun stapler validate "$bundle"
     echo "apple-notarize: $bundle notarized (submission ${id:-?}), ticket stapled"
 
 # ditto, not zip: the archiver that keeps a bundle's extended attributes and
