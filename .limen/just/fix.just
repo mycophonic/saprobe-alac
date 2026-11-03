@@ -36,8 +36,8 @@ just: (_banner "fix" "just")
         just --fmt --justfile "$f"
     done < "$list"
 
-yaml: (_banner "fix" "yaml")
-    yamlfmt -conf .limen/.yamlfmt
+yaml: (_banner "fix" "yaml") (_go-tool "yamlfmt" "github.com/forkcloser/yamlfmt/cmd/yamlfmt")
+    "$LIMEN_BUILD/tools/yamlfmt" -conf .limen/.yamlfmt
 
 # Regenerate .hermetic/aqua-checksums.json from .hermetic/hermetic.yaml — the
 # mutating twin of `just do lint aqua` (needs network). In the default set so

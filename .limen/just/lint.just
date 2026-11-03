@@ -79,8 +79,8 @@ dockerfile: (_banner "lint" "dockerfile") (_go-tool "godolint" "github.com/forkc
     # pinned one, here.
     [ ${#files[@]} -eq 0 ] || "$LIMEN_BUILD/tools/godolint" "${files[@]}"
 
-yaml: (_banner "lint" "yaml")
-    yamlfmt -conf .limen/.yamlfmt -lint
+yaml: (_banner "lint" "yaml") (_go-tool "yamlfmt" "github.com/forkcloser/yamlfmt/cmd/yamlfmt")
+    "$LIMEN_BUILD/tools/yamlfmt" -conf .limen/.yamlfmt -lint
 
 shell: (_banner "lint" "shell")
     #!/usr/bin/env bash
