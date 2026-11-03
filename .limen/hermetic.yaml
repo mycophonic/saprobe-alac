@@ -9,10 +9,15 @@ packages:
   # collapses a two-line `version:` pin): `aqua update` rewrites only that form
   # and treats a separate `version:` key as hand-held, and Renovate reads only
   # that form.
-  # No Go-built tool is pinned here: every one is a `tool` directive in
-  # .limen/tools/go.mod, built by the pinned go (book/tooling.md, "Go-built tools
-  # are go.mod tools"). aqua's go_install would build it once per tool
-  # version, with whichever go ran first, and share that binary.
+  # A pure-Go tool is a `tool` directive in .limen/tools/, built by the pinned
+  # go (book/tooling.md, "Go-built tools are go.mod tools"), never a pin here.
+  # The Go programs below are the ones nothing here compiles: what a write
+  # job runs (cosign and gh; goreleaser and syft in the release job, which
+  # holds contents, id-token and attestations write), each verified against
+  # its upstream's signed release rather than compiled inside that job;
+  # compress, whose programs answer to bare names on every PATH, a script's
+  # and a shell's; ossein, which links a system framework through cgo.
+  # (limen is the repository's own pin, above the import.)
   # The coreutils under their bare names, the same pin on every platform:
   # uutils on macOS and Linux, Git for Windows' MSYS2 coreutils on Windows.
   # The registry entries say why, and how each is verified.
@@ -26,14 +31,11 @@ packages:
   # afterwards): a standard-library fix must not wait for a limen release.
   - name: casey/just@1.59.0
   - name: koalaman/shellcheck@v0.11.0
-  - name: forkcloser/yamlfmt@v0.2.1
-    registry: local
   - name: lycheeverse/lychee@lychee-v0.24.2
   - name: goreleaser/goreleaser@v2.19.0
   - name: sigstore/cosign@v3.1.4
   # The SBOM generator the release lane runs over every archive (book/releasing.md).
   - name: anchore/syft@v1.55.0
-  - name: gotestyourself/gotestsum@v1.13.0
   - name: jqlang/jq@jq-1.8.2
   - name: cli/cli@v2.103.3
   # --- spec tooling (local registry; see .limen/hermetic-registry.yaml) ---

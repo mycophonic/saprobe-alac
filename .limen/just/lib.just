@@ -145,10 +145,15 @@ rust_env := '''
 # dependencies past what upstream tested). The isolated module wins when both
 # exist. A directive missing from both fails with the recipe that adds it.
 # Recipes depend on this with the tool's name and package, then call
-# .build/tools/<name>.
-_go-tool name pkg:
+# .build/tools/<name>. A third argument names a file the recipe needs to run
+# at all (go.mod for a lane CI runs everywhere): without it the tool is not
+# built, so a repository with no Go module is not asked for the directive.
+_go-tool name pkg requires='':
     #!/usr/bin/env bash
     set -euo pipefail
+    if [ -n '{{ requires }}' ] && [ ! -f '{{ requires }}' ]; then
+        exit 0
+    fi
     pattern='^(tool[[:space:]]+)?[[:space:]]*{{ pkg }}([[:space:]]|$)'
     if grep -qE "$pattern" '.limen/tools/{{ name }}/go.mod' 2>/dev/null; then
         mkdir -p "$LIMEN_BUILD/tools" && GOOS='' GOARCH='' CGO_ENABLED=0 go -C '.limen/tools/{{ name }}' build -o "$LIMEN_BUILD/tools/" '{{ pkg }}'

@@ -57,7 +57,18 @@ targets +triples: (_banner "build rust" "targets")
     # directory.
     export ZIG_GLOBAL_CACHE_DIR="$LIMEN_BUILD/zig/global" ZIG_LOCAL_CACHE_DIR="$LIMEN_BUILD/zig/local"
     export CARGO_ZIGBUILD_CACHE_DIR="$LIMEN_BUILD/zig/cargo-zigbuild"
+    # For the host's own triple, cargo-zigbuild sets target-applies-to-host to
+    # false: build scripts and proc-macros stop reading [target.<host>] and
+    # read [host] instead. The linker rust_env gave the host (the arm64
+    # Windows one, which ships none) goes to [host] for that build.
+    host="$(rustc -vV | sed -n 's/^host: //p')"
+    host_linker_var="CARGO_TARGET_$(printf '%s' "$host" | tr 'a-z-' 'A-Z_')_LINKER"
+    host_linker="${!host_linker_var:-}"
     for triple in "$@"; do
         echo "→ target/$triple/release"
-        cargo zigbuild --release --locked --target "$triple"
+        if [ "$triple" = "$host" ] && [ -n "$host_linker" ]; then
+            CARGO_UNSTABLE_HOST_CONFIG=true CARGO_HOST_LINKER="$host_linker" cargo zigbuild --release --locked --target "$triple"
+        else
+            cargo zigbuild --release --locked --target "$triple"
+        fi
     done
