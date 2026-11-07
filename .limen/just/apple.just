@@ -63,8 +63,8 @@ apple-verify-notarized bundle:
     echo "apple-verify-notarized: $bundle carries a valid stapled ticket"
 
 # Submit the signed bundle to Apple and staple the ticket. The verdict is
-# notarytool's own "status: Accepted": --wait's exit status is not it. Without
-# an identity (a local build) there is nothing to notarize and the recipe says
+# notarytool's own "status: Accepted", never an exit status. Without an
+# identity (a local build) there is nothing to notarize and the recipe says
 # so; with one and no credentials it fails, since a Developer ID build that
 # leaves here unnotarized would be refused on every install.
 [doc('Notarize a signed bundle with notarytool and staple the ticket')]
@@ -84,17 +84,46 @@ apple-notarize bundle:
     rm -f "$archive"
     ditto -c -k --sequesterRsrc --keepParent "$bundle" "$archive"
     key=(--key "${APPLE_NOTARY_KEY:?}" --key-id "${APPLE_NOTARY_KEY_ID:?}" --issuer "${APPLE_NOTARY_ISSUER_ID:?}")
-    submission=$(xcrun notarytool submit "$archive" --wait "${key[@]}" 2>&1 | tee /dev/stderr) || true
+    # Submit, wait and the verdict are separate calls, each retried on its
+    # own: a connection that drops during the wait loses the verdict on an
+    # upload Apple already holds. Only a submit that exits 0 has finished its
+    # upload, so a failed one is submitted again; once one has, its id is
+    # waited on and asked about, never submitted again.
+    for attempt in 1 2 3; do
+        submission=$(xcrun notarytool submit "$archive" --no-wait "${key[@]}" 2>&1 | tee /dev/stderr) && break
+        [ "$attempt" -lt 3 ] || { echo "apple-notarize: $archive could not be submitted" >&2; exit 1; }
+        sleep $((attempt * 15))
+    done
     id=$(printf '%s\n' "$submission" | sed -n 's/^ *id: \([0-9a-f-]*\)$/\1/p' | head -n 1)
-    if ! printf '%s\n' "$submission" | grep -q '^ *status: Accepted$'; then
-        echo "apple-notarize: Apple did not accept the submission${id:+ $id}" >&2
-        [ -z "$id" ] || xcrun notarytool log "$id" "${key[@]}" >&2 || true
+    [ -n "$id" ] || { echo "apple-notarize: notarytool submit returned no submission id" >&2; exit 1; }
+    # A "status:" line is the end of processing, whatever wait exits with;
+    # anything else is a wait cut short, resumed on the same id.
+    for attempt in 1 2 3 4 5; do
+        waited=$(xcrun notarytool wait "$id" "${key[@]}" 2>&1 | tee /dev/stderr) && break
+        printf '%s\n' "$waited" | grep -q '^ *status: ' && break
+        [ "$attempt" -lt 5 ] || { echo "apple-notarize: submission $id did not finish processing" >&2; exit 1; }
+        sleep $((attempt * 15))
+    done
+    for attempt in 1 2 3; do
+        info=$(xcrun notarytool info "$id" "${key[@]}" 2>&1 | tee /dev/stderr) && break
+        [ "$attempt" -lt 3 ] || { echo "apple-notarize: the status of submission $id could not be read" >&2; exit 1; }
+        sleep $((attempt * 10))
+    done
+    if ! printf '%s\n' "$info" | grep -q '^ *status: Accepted$'; then
+        echo "apple-notarize: Apple did not accept the submission $id" >&2
+        xcrun notarytool log "$id" "${key[@]}" >&2 || true
         exit 1
     fi
-    # staple validates what it writes; a second validate only asks the
-    # network again.
-    xcrun stapler staple "$bundle"
-    echo "apple-notarize: $bundle notarized (submission ${id:-?}), ticket stapled"
+    # staple fetches the ticket from Apple's ticket service and validates
+    # what it writes: a connection that drops on the runner fails it with the
+    # submission accepted, so it is tried five times, further apart each time,
+    # before the release stops.
+    for attempt in 1 2 3 4 5; do
+        xcrun stapler staple "$bundle" && break
+        [ "$attempt" -lt 5 ] || { echo "apple-notarize: the ticket for submission $id could not be stapled" >&2; exit 1; }
+        sleep $((attempt * 15))
+    done
+    echo "apple-notarize: $bundle notarized (submission $id), ticket stapled"
 
 # ditto, not zip: the archiver that keeps a bundle's extended attributes and
 # code signature intact, so what a user unzips is what was signed.
