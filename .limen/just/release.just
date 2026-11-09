@@ -218,3 +218,24 @@ release *args:
             fi
             ;;
     esac
+
+# goreleaser's sign command (.release-go.yaml `signs:`): one keyless
+# signature over a release file, in CI. cosign gives up on Fulcio at the first
+# dropped connection and retries Rekor once, so a reset on the runner fails
+# the release with nothing wrong in it. Every attempt is a fresh key, a fresh
+# certificate and a new log entry, so one that failed halfway cannot collide
+# with the next; its partial bundle is removed first.
+[doc("Sign a release file keyless with cosign into a Sigstore bundle (goreleaser's sign command)")]
+[positional-arguments]
+release-sign file bundle:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    file="$1" bundle="$2"
+    for attempt in 1 2 3; do
+        rm -f "$bundle"
+        if cosign sign-blob --yes --bundle "$bundle" "$file" && [ -s "$bundle" ]; then
+            exit 0
+        fi
+        [ "$attempt" -lt 3 ] || { echo "release-sign: $file could not be signed" >&2; exit 1; }
+        sleep $((attempt * 15))
+    done
