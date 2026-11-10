@@ -50,9 +50,13 @@ release *args:
     }
     # A fourth segment is a fork's rebuild of the same upstream version
     # (v10.6.1.2, book/forks.md): never a -suffix, which semver sorts before
-    # the release it rebuilds.
+    # the release it rebuilds. A rebuild carries no prerelease of its own:
+    # goreleaser reads no semver from it (--ci below), so a suffix would be
+    # published as a full release.
+    rebuild_tag_re='^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
     require_version_tag() {
-        if ! printf '%s' "$1" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+        if ! printf '%s' "$1" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$' &&
+            ! printf '%s' "$1" | grep -qE "$rebuild_tag_re"; then
             echo "'$1' is not a version tag (vX.Y.Z, vX.Y.Z-prerelease, or a fork's rebuild vX.Y.Z.N)." >&2
             exit 2
         fi
@@ -154,7 +158,22 @@ release *args:
                 echo "HEAD carries no tag — this lane only runs on a tag push." >&2
                 exit 1
             fi
-            exec goreleaser release --config .release-go.yaml --clean
+            # goreleaser refuses a tag that is not semver, and a fork's
+            # rebuild tag is not: --skip=validate is its one way past, and it
+            # also drops goreleaser's dirty-tree and tag-at-HEAD checks, so
+            # the two are made here first, on the tag this run was pushed for.
+            opts=()
+            tag="${GITHUB_REF_NAME:-}"
+            if printf '%s' "$tag" | grep -qE "$rebuild_tag_re"; then
+                require_clean
+                if ! git describe --exact-match --tags --match "$tag" HEAD >/dev/null 2>&1; then
+                    echo "$tag is not on HEAD — this lane releases the tag its run was pushed for." >&2
+                    exit 1
+                fi
+                export GORELEASER_CURRENT_TAG="$tag"
+                opts+=(--skip=validate)
+            fi
+            exec goreleaser release --config .release-go.yaml --clean ${opts[@]+"${opts[@]}"}
             ;;
         --dry-run)
             echo "dry runs are a local concern: use 'just do release --local --dry-run'." >&2
