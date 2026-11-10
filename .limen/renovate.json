@@ -19,6 +19,7 @@
     "packageRules, golang/go, versioning: Go tags its releases go1.N.M, and the candidates golang/go offers are tags (it publishes no GitHub release). The regex managers' default versioning, semver-coerced, parses such a tag but calls every one unstable, since its stability check accepts only a bare or v-prefixed number; from a current version it holds unstable, Renovate lets through only a candidate with the same major, minor and patch, so no bump was ever proposed, silently. Regex versioning that carries the prefix parses the pin and the candidates alike, as lychee's does, and leaves the rc tags out by construction. Out of the aqua tools group: a toolchain patch is the standard-library fix the pin exists to receive without delay, in a pull request that names it.",
     "packageRules, lychee: releases are tagged lychee-vX.Y.Z next to lychee-lib-vX.Y.Z and nightly; regex versioning that carries the prefix parses the pin and the candidates alike and excludes the others by construction.",
     "packageRules, git-for-windows: releases are tagged vX.Y.Z.windows.N, and the N moves on its own (a Git for Windows rebuild of the same Git); a semver reading drops it and would never propose that bump. The build group carries it, and release candidates (vX.Y.Z-rcN.windows.N) fall outside the pattern.",
+    "packageRules, own releases, versioning: a fork's rebuild of the same upstream version is tagged with a fourth segment, vX.Y.Z.N (book/forks.md); the regex managers' default versioning, semver-coerced, reads v8.22.0.2 as 8.22.0 and so never proposes a rebuild (limen stayed on forkcloser/curl v8.22.0 through v8.22.0.1 and v8.22.0.2). The build group carries the fourth segment; absent, the release compares as the one its rebuilds follow, and a -suffix stays a prerelease. The rule claims a pin by its current value, a v-prefixed version, since a packageRule's versioning overrides the one a pins.yaml entry declares for itself: a release line of another shape (ossein-kernel's X.Y.Z-ossein.N, read by its own regex in the pin) keeps its own.",
     "packageRules, runner images: the github-actions manager, which config:recommended enables, also proposes the runs-on images (ubuntu-24.04 to 26.04, macos-15 to 26) from the github-runners datasource. Those are product targets, not dependencies: the matrix is the set of platforms the code and the commands are proven on, set by the canonical ci.yaml seed and moved deliberately, on purpose, as a reviewed change. Off for that datasource; the actions themselves keep moving.",
     "customManagers, pins.yaml: the artifacts a repository fetches by hand (a kernel tarball, a toolchain release, a source archive) live in one limen-owned file, each entry naming its own datasource and depName on its renovate: line (or `manual`, the one word, for a pin no datasource serves, which the regex below then leaves alone and a hand moves), optionally an extract-version regexp and a versioning scheme on the two lines after it, the version: line that moves, and for a commit pin (git-refs: the version is the branch) a commit: line after it, captured as the digest, so Renovate proposes the branch's new head. The digest follows in the same pull request: the checksum workflow runs `limen pins refresh`, which recomputes it through the verifier the entry declares. Watched here, once, for every repository; nobody writes a regex manager per pin.",
     "commitBody: `just do lint commits` enforces DCO on every PR range, bot commits included.",
@@ -190,6 +191,20 @@
         "git-for-windows/git"
       ],
       "versioning": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.windows\\.(?<build>\\d+)$"
+    },
+    {
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDatasources": [
+        "github-releases",
+        "github-tags"
+      ],
+      "matchDepNames": [
+        "/^(farcloser|forkcloser|mycophonic)/[^/]+$/"
+      ],
+      "matchCurrentValue": "/^v\\d+\\.\\d+\\.\\d+(\\.\\d+)?(-[0-9A-Za-z.-]+)?$/",
+      "versioning": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:\\.(?<build>\\d+))?(?:-(?<prerelease>[0-9A-Za-z.-]+))?$"
     },
     {
       "matchDepNames": [

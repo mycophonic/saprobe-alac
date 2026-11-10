@@ -21,9 +21,9 @@ runs:
         # renovate: depName=forkcloser/hermetic
         HERMETIC_VERSION: v0.2.3
         HERMETIC_CHECKSUMS_SHA256: c7eb09712dc3d756bead96ae1286b53de275134d0012601ef37f57ec793f9431
-        # The job's own token, for `gh attestation verify` only, here and not
-        # exported: a read of GitHub's attestations API, before any
-        # branch-declared binary runs.
+        # The job's own token, for gh alone (the release download and
+        # `gh attestation verify`), here and not exported: reads of GitHub's
+        # API, before any branch-declared binary runs.
         GH_TOKEN: ${{ github.token }}
       run: |
         # Pin the root explicitly: hermetic's own default differs per
@@ -71,16 +71,23 @@ runs:
           echo "hermetic ${HERMETIC_VERSION} already in the root (the cache image)"
         else
           tmp="$(mktemp -d)"
-          base="https://github.com/forkcloser/hermetic/releases/download/${HERMETIC_VERSION}"
-          # Retries for transient runner failures. Windows curl (schannel)
-          # refuses a handshake when the CA's revocation server is unreachable
-          # (exit 35, seen repeatedly): best-effort revocation still rejects a
-          # known-revoked certificate, and the checksums below are the real
-          # guard. schannel-only flag, so windows-only.
-          revoke=()
-          [ "$RUNNER_OS" != Windows ] || revoke=(--ssl-revoke-best-effort)
-          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors "${revoke[@]}" \
-            -o "${tmp}/checksums.txt" "${base}/checksums.txt"
+          # Through the releases API with the job's token, by gh: the release
+          # page's download URL is an anonymous fetch, which GitHub throttles
+          # per runner IP under load (a 504 on every lane of a run, through
+          # curl's own retries), and a token sent there is routed, not checked.
+          # gh retries nothing itself; --clobber so a retry starts over. A
+          # pattern no asset matches is not an error to gh while another
+          # matches, so each file is checked for.
+          attempt=0
+          until gh release download "${HERMETIC_VERSION}" --repo forkcloser/hermetic --dir "${tmp}" --clobber \
+              --pattern checksums.txt --pattern "${asset}"; do
+            attempt=$((attempt + 1))
+            [ "$attempt" -lt 5 ] || { echo "::error::hermetic ${HERMETIC_VERSION}: checksums.txt or ${asset} could not be downloaded"; exit 1; }
+            sleep 3
+          done
+          for f in checksums.txt "${asset}"; do
+            [ -f "${tmp}/${f}" ] || { echo "::error::hermetic ${HERMETIC_VERSION} has no release asset ${f}"; exit 1; }
+          done
           # No single digest tool exists everywhere: linux and windows git-bash
           # ship coreutils sha256sum, macOS ships perl shasum. A mismatch names
           # the computed digest and the size beside the expected one: a stale
@@ -101,8 +108,6 @@ runs:
             echo "sha256 ok: $(basename "$file")"
           }
           verify_sha256 "${HERMETIC_CHECKSUMS_SHA256}" "${tmp}/checksums.txt"
-          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors "${revoke[@]}" \
-            -o "${tmp}/${asset}" "${base}/${asset}"
           expected="$(awk -v a="$asset" '$2 == a {print $1}' "${tmp}/checksums.txt")"
           [ -n "$expected" ] || { echo "::error::checksums.txt of hermetic ${HERMETIC_VERSION} does not list ${asset}"; exit 1; }
           verify_sha256 "${expected}" "${tmp}/${asset}"

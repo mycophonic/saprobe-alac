@@ -83,17 +83,22 @@ chapter; the procedure is limen's `skills/contribute`.
   private repository is never armed: its pull request is bound for the human, who merges by
   hand after approving. No review request, no review comments, no message at open.
 - **Your worktree goes when its pull request has merged.** Once `git status` in it is clean
-  and its head is on `main`, remove it with `~/.claude/bin/farclauder worktree remove <path>`,
-  run as the whole Bash command: `git worktree remove` cannot finish inside the sandbox, and
-  the exclusion that runs farclauder outside it matches the call's text (the book's
+  and its head is on `main`, remove it with
+  `/Users/apostasie/.claude/bin/farclauder worktree remove <path>`, run as the whole Bash
+  command and by that absolute path: `git worktree remove` cannot finish inside the sandbox,
+  and the exclusion that runs farclauder outside it matches the call's text, which the `~`
+  form does not (the book's
   [identity](https://github.com/farcloser/limen/blob/main/book/identity.md)).
 - **A native stack** is reviewed and opened layer by layer the same way; the project
   manager merges it from the top once every layer is approved, never from the middle. A
   lower layer merged alone comes back rebased and signed by GitHub, which `lint commits`
   rejects.
-- **Not yours to do:** merge by hand, push to `main`, force-push a shared branch, tag a
-  release. A release waits for an empty queue: no tag while a pull request is open, a bot's
-  included, unless the human parks it by number for that tag (`PARKED_PRS`).
+- **Not yours to do:** merge by hand, push to `main` (but for the empty `Birth` commit that
+  creates it on a new repository, the book's
+  [creating a repository](https://github.com/farcloser/limen/blob/main/book/github.md#creating-a-repository)),
+  force-push a shared branch, tag a release. A release waits for an empty queue: no tag
+  while a pull request is open, a bot's included, unless the human parks it by number for
+  that tag (`PARKED_PRS`).
 
 ## Scope
 
