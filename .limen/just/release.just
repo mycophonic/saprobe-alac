@@ -78,7 +78,11 @@ release *args:
             # to be trusted — the GPG keyring, or gpg.ssh.allowedSignersFile for
             # SSH — and would reject a legitimately SSH-signed tag when that is
             # not set up, breaking the very retry this branch exists for.
-            if ! git cat-file tag "refs/tags/$1" 2>/dev/null | grep -qE '^-----BEGIN [A-Z0-9]+ SIGNATURE-----'; then
+            # Read first, searched after: piped into grep -q, which closes the
+            # pipe at its match, git is killed by SIGPIPE under pipefail and a
+            # signed tag reads as unsigned.
+            object="$(git cat-file tag "refs/tags/$1" 2>/dev/null || true)"
+            if ! printf '%s\n' "$object" | grep -qE '^-----BEGIN [A-Z0-9]+ SIGNATURE-----'; then
                 echo "tag $1 is on HEAD but is not a signed tag — refusing to reuse it." >&2
                 echo "delete it and let the release create a fresh signed tag: git tag -d $1" >&2
                 exit 1

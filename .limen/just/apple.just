@@ -1,5 +1,5 @@
-# Apple signing, notarization and packaging, for a project that releases a
-# bundle macOS evaluates (book/releasing.md, the Apple policy), under `just
+# Apple signing, notarization and packaging, for a project that releases what
+# macOS or a peer evaluates (book/releasing.md, the Apple policy), under `just
 # do` like release. The project keeps its build and composes its own
 # `package <version>` and `verify-assets <version>` from these; the Apple
 # release lane's sign job runs `package`, goreleaser's before hook runs

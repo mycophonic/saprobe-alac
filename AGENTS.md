@@ -166,12 +166,16 @@ chapter; the procedure is limen's `skills/contribute`.
   assessment or misreads the code, say so with the evidence and settle it between the two
   sessions, the reviewer's 🛑 included (the reviewer may miss what the owner knows; the
   owner may miss the cross-cutting picture). A deadlock goes to the human, as the exception.
-- **A follow-up is a GitHub issue; a defect in another repository is a message.** Anything
-  left for later, a follow-up or parked work, is filed as an issue in the repository it
-  belongs to, one per real item, written so its owner can act on it; never a scratch,
-  `TODO` or notes file, and never an issue for a passing note. A defect or a request in a
-  repository another session owns goes to that session as a message with what, why and
-  where; that session fixes it, and the human hears about it as a pull request.
+- **An issue is work the human has tabled; a defect in another repository is a message.**
+  A GitHub issue records work the human has decided on and deferred ("table it for
+  later"), in the repository it belongs to, one per real item, written so its owner can
+  act on it; never a scratch, `TODO` or notes file, and never an issue for a passing note.
+  It is not where a session parks what it does not do now: a suggestion that needs a scope
+  or product decision, a reviewer's 💡 included, is put to the human then and there and
+  settled in the current change or dropped, never filed to decide later. A defect or a
+  request in a repository another session owns goes to that session as a message with
+  what, why and where; that session fixes it, and the human hears about it as a pull
+  request.
 
 ## Code
 

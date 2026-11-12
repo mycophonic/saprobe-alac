@@ -12,11 +12,13 @@ import 'lib.just'
 
 default: vuln
 
-# Known-vulnerability scan of the module's dependency graph against the Go
+# Known-vulnerability scan of each module's dependency graph against the Go
 # vulnerability database (fetched once, see _vulndb in lib.just), once per
 # supported platform (see _per-platform in lib.just: call paths and
-# dependencies differ by platform). Reports what the module reaches, not what
-# it merely imports: a finding is a call path to cut or a bump to take. No
+# dependencies differ by platform) and for every module the lint lanes enter
+# (go_modules_init: the root and each command that is a module of its own),
+# since govulncheck stops at a nested go.mod. Reports what a module reaches,
+# not what it merely imports: a finding is a call path to cut or a bump to take. No
 # go.mod at all: says so and passes, so `just do security` is safe in every
 # repository — the guard is a recipe of its own because a dependency cannot
 # short-circuit the ones after it, and the tool build would fail first.
@@ -29,4 +31,4 @@ vuln: (_banner "security go" "vuln")
     fi
     just do security go _vuln
 
-_vuln: (_go-tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck") _vulndb (_per-platform '"$LIMEN_BUILD/tools/govulncheck" -db "$(cat "$LIMEN_BUILD/vulndb.url")" ./...')
+_vuln: (_go-tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck") _vulndb (_per-platform go_modules_init + '; for module in "${modules[@]}"; do [ "$module" = . ] || echo "→ $module"; (cd "$module" && "$LIMEN_BUILD/tools/govulncheck" -db "$(cat "$LIMEN_BUILD/vulndb.url")" ./...); done')

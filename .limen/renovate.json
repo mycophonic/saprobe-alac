@@ -6,6 +6,7 @@
     "packageRules, the limen group: a repository carries limen twice, as the hermetic pin that selects the recipes and the `limen fix` of its branches, and as the `uses:` reference of its workflow callers to limen's reusable workflows at a commit (`farcloser/limen/.github/workflows/limen-*.yaml@<sha> # vX.Y.Z`, the github-actions manager). One group named limen keeps the two in one pull request, so the recipes and the lanes move together; nothing else joins it. The content-pinned pieces that are not workflows (the actions, .limen/) stay silenced outside limen: a limen bump moves them through `limen fix`.",
     "minimumReleaseAge: supply-chain cooldown before proposing a bump; doubles as protection against a release tag whose assets are not uploaded yet.",
     "packageRules, golang/go: no cooldown. The Go toolchain is each repository's own pin so that a standard-library fix reaches it without a limen release, and a Go patch release is that fix; three days of cooldown would be three days of red security lanes. Go's releases are not pulled or re-uploaded the way the cooldown guards against.",
+    "packageRules, rust-toolchain: no cooldown, for golang/go's reason. rust-toolchain.toml's channel is each repository's own exact pin (book/rust.md), and a Rust point release is the compiler and standard-library fix the pin exists to receive without delay. The manager reads a pinned version alone, never a channel name, so a bump moves the exact version; ungrouped, as a toolchain bump is its own reviewed change, named in its pull request.",
     "packageRules, own releases: the cooldown guards against third parties (a tag whose assets are still uploading, a release pulled the next day). A release cut by one of our organizations carries no risk we do not already own, and its assets are published by the release workflow within minutes \u2014 so farcloser, forkcloser and mycophonic packages, in aqua's owner/repo form and Go's github.com/owner/repo form alike, are proposed as soon as they exist. A repository that wants the cooldown back on one of them adds a later packageRule in its own renovate.json; rules merge in order and the last match wins.",
     "rebaseWhen behind-base-branch: a Renovate branch is rebased whenever main moves. The default, auto, rebases only on a conflict here, since the rulesets do not require a branch to be up to date, so a pull request gone red from a bug since fixed on main stayed red at its stale head until someone ticked its dashboard checkbox. The cost, per main commit per open Renovate pull request: a CI run on the rebase, the checksum workflow's re-converge, and a CI run on that, which the groups keep to a few pull requests per repository. The converge commits do not stop the rebase: each repository's renovate.json lists the bots that make them in gitIgnoredAuthors (the renovate rule keeps it so). A rebase is a push, and the rulesets dismiss a stale approval on push, so a rebase after the reviewing session's approval costs a re-approval at the new head, accepted: an approval covers one head, and Renovate re-arms auto-merge after the rebase.",
     "automerge, platformAutomerge: Renovate arms GitHub's auto-merge on every pull request it opens, and GitHub merges it the moment the ruleset is satisfied: one approval, gate and security green. The approval is the decision, so the reviewing session's approval is the only gate a Renovate bump waits on; nobody clicks merge. platformAutomerge keeps the merge GitHub's (Renovate re-arms it after each rebase), automergeType pr keeps it a pull request a reviewer sees, and automergeStrategy merge-commit is the method the signatures rule relies on, the branch's commits landing verbatim. The checksum workflow's converge commit lands before the approval, since the reviewer approves the converged head.",
@@ -16,6 +17,7 @@
     "packageRules, content-pinned files: the checksum-update workflow, the shared CI lanes (limen-verify.yaml), the security workflow, the setup-hermetic, cache and windows-cache-image actions and everything under .limen/ are limen's byte for byte; a bump Renovate makes inside one is drift the next `limen check` rejects. Their pins move in limen's own repository, the one place Renovate keeps touching them, and reach every other repository through a limen release.",
     "packageRules, Go-built tools: the tool directives under .limen/tools/ (git-validation, godolint, dot, yamlfmt, gotestsum, the Go-source analyzers deadcode, govulncheck, go-licenses, and golangci-lint and nilaway in .limen/tools/<name>/go.mod, each a module of its own so its dependencies stay upstream's), which Go lists as // indirect and the gomod manager would skip; re-enabled exactly, by module. dot is forkcloser's own tagged module (upstream's cmd/dot is a nested module without tags), so it moves like the others, and as one of ours it is proposed without the cooldown. Two rules, by file: .limen/tools/go.mod for the shared tools, .limen/tools/*/go.mod for the isolated tools only. One rule over every gomod file re-enabled golang.org/x/tools where it is a plain // indirect requirement of golangci-lint's and nilaway's own modules, and bumped it past the version each upstream pins (forkcloser/infra#10): the isolated module exists so that graph stays upstream's, so nothing in it moves but the tool itself.",
     "packageRules, groups: one pull request per repository per kind, not one per dependency — a registry ref that moves most days and a dozen tool pins were arriving as a dozen pull requests a month per repository, each reviewed alone. Three groups: `aqua tools` (every third-party pin in .hermetic/hermetic.yaml and the standard-registry ref), `github actions`, and `go modules` (non-major gomod bumps, the .limen/tools/go.mod directives included). Renovate keeps the one open pull request current as further versions arrive instead of opening another. Grouped, not scheduled: a bump still arrives as soon as its cooldown ends. Outside the groups on purpose: our own releases (immediate and alone, so a limen bump is its own reviewed change), major Go bumps (code may have to move), pins.yaml entries (each a deliberate supply-chain change), and security fixes, which Renovate's vulnerabilityAlerts defaults keep ungrouped. A repository that wants a dependency out of a group adds a later packageRule with groupName null.",
+    "packageRules, rust crates: the cargo manager's minor and patch bumps in one pull request per repository, the fourth group, as go modules is for Go. Cargo.toml pins an exact version (=X.Y.Z, book/rust.md), so the manager's default range strategy, update-lockfile, moves the pin and regenerates Cargo.lock in the same pull request, which the lanes' --locked proves. Major bumps stay alone: code may have to move.",
     "packageRules, golang/go, versioning: Go tags its releases go1.N.M, and the candidates golang/go offers are tags (it publishes no GitHub release). The regex managers' default versioning, semver-coerced, parses such a tag but calls every one unstable, since its stability check accepts only a bare or v-prefixed number; from a current version it holds unstable, Renovate lets through only a candidate with the same major, minor and patch, so no bump was ever proposed, silently. Regex versioning that carries the prefix parses the pin and the candidates alike, as lychee's does, and leaves the rc tags out by construction. Out of the aqua tools group: a toolchain patch is the standard-library fix the pin exists to receive without delay, in a pull request that names it.",
     "packageRules, lychee: releases are tagged lychee-vX.Y.Z next to lychee-lib-vX.Y.Z and nightly; regex versioning that carries the prefix parses the pin and the candidates alike and excludes the others by construction.",
     "packageRules, git-for-windows: releases are tagged vX.Y.Z.windows.N, and the N moves on its own (a Git for Windows rebuild of the same Git); a semver reading drops it and would never propose that bump. The build group carries it, and release candidates (vX.Y.Z-rcN.windows.N) fall outside the pattern.",
@@ -101,6 +103,12 @@
       "minimumReleaseAge": "0 days"
     },
     {
+      "matchManagers": [
+        "rust-toolchain"
+      ],
+      "minimumReleaseAge": "0 days"
+    },
+    {
       "matchFileNames": [
         ".github/actions/setup-hermetic/**",
         ".github/actions/windows-cache-image/**",
@@ -179,6 +187,16 @@
         "!/^(github\\.com/)?(farcloser|forkcloser|mycophonic)/[^/]+$/"
       ],
       "groupName": "go modules"
+    },
+    {
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "rust crates"
     },
     {
       "matchDepNames": [
