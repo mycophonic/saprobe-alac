@@ -33,4 +33,14 @@ exclude = [
   # someone else's file is pinned to a commit, which does not move. Every other
   # page stays checked, github.com's included; no status code is accepted.
   'https://github\.com/[^/]+/[^/]+/(blob|tree)/',
+  # github.com's page for a commit, whoever owns the repository: github.com
+  # answers it with 429 from Actions runners past lychee's retries, and
+  # lychee's token cannot reach a page: it is spent on GET
+  # /repos/<owner>/<repo>, which rescues a bare repository URL, and any URL
+  # under a private repository the token reads; under a public repository a
+  # path past the repository gets the page's own failure. So
+  # `security links` asks the API, authenticated, whether the commit exists
+  # (GET /repos/<owner>/<repo>/commits/<sha>, through gh): excluded here,
+  # checked there; no status code is accepted.
+  'https://github\.com/[^/]+/[^/]+/commit/',
 ]

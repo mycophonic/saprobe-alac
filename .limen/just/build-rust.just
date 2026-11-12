@@ -59,8 +59,9 @@ targets +triples: (_banner "build rust" "targets")
     export CARGO_ZIGBUILD_CACHE_DIR="$LIMEN_BUILD/zig/cargo-zigbuild"
     # For the host's own triple, cargo-zigbuild sets target-applies-to-host to
     # false: build scripts and proc-macros stop reading [target.<host>] and
-    # read [host] instead. The linker rust_env gave the host (the arm64
-    # Windows one, which ships none) goes to [host] for that build.
+    # read [host] instead. The linker rust_env gave the host (rust-lld on the
+    # arm64 Windows one, whose default is a clang it does not ship) goes to
+    # [host] for that build.
     host="$(rustc -vV | sed -n 's/^host: //p')"
     host_linker_var="CARGO_TARGET_$(printf '%s' "$host" | tr 'a-z-' 'A-Z_')_LINKER"
     host_linker="${!host_linker_var:-}"

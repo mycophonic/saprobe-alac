@@ -50,9 +50,26 @@ _per-platform +cmd:
         platforms=(darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64)
         for platform in "${platforms[@]}"; do
             echo "→ GOOS=${platform%/*} GOARCH=${platform#*/}"
-            CGO_ENABLED=0 GOOS="${platform%/*}" GOARCH="${platform#*/}" {{ cmd }}
+            # Exported, not prefixed: a prefix binds to a simple command alone,
+            # and a leg's command may be a loop over modules. The recipe is its
+            # own process, so nothing outlives the loop.
+            export CGO_ENABLED=0 GOOS="${platform%/*}" GOARCH="${platform#*/}"
+            {{ cmd }}
         done
     fi
+
+# The Go modules the Go lanes analyze, built into the array `modules` by this
+# statement: the root, then every command that is a module of its own
+# (cmd/<name>/go.mod, the shape build-go.just builds from inside). A tool
+# module under .limen/tools/ is not project code and is not on it. For a
+# command a lane hands _per-platform; a recipe body writes the statement
+# out instead, since the shell lane lints a body with its interpolations
+# opaque and must see the assignment the loop reads.
+go_modules_init := 'modules=(.); for d in cmd/*/; do [ -f "${d}go.mod" ] || continue; modules+=("${d%/}"); done'
+
+# The rendered golangci configuration of the module `$module` names in such a
+# loop: the root's at golangci.yml, as before; a command's beside it by name.
+golangci_config := '"$LIMEN_BUILD/golangci$([ "$module" = . ] || echo "-${module##*/}").yml"'
 
 # The native build of one .limen/tools/go.mod tool into .build/tools/, shared by
 # _go-tool and the tools recipes (`{{ go_tool_build }} <pkg>`). GOOS/GOARCH
@@ -97,33 +114,20 @@ rust_env := '''
     export PATH="$LIMEN_BUILD/cargo/bin:$PATH"
     # Windows: rustup's default host is the msvc triple, whose host builds
     # (build scripts, proc-macros, the tests) link through the runner image's
-    # Visual Studio, which nothing pins. The GNU triples link through pinned
-    # tools instead, so the pinned toolchain is the whole build: x64 through
-    # the toolchain's own rust-mingw; arm64, whose gnullvm host ships no
-    # linker (it expects a MinGW clang on PATH), through the pinned zig by
-    # way of cargo-zigbuild's `zig cc`, the linker the cross builds use,
-    # which maps the libraries rustc asks for (msvcrt) to zig's. Read from
-    # rustup rather than from uname or the environment, which lie under
-    # emulation on arm64 (book/windows.md); idempotent, so a cached rustup
-    # from before this line is moved too.
+    # Visual Studio, which nothing pins. The GNU triples link with the
+    # toolchain's own rust-mingw instead, so the pinned toolchain is the
+    # whole build. Read from rustup rather than from uname or the
+    # environment, which lie under emulation on arm64 (book/windows.md);
+    # idempotent, so a cached rustup from before this line is moved too.
     case "$(rustup show 2>/dev/null | sed -n 's/^Default host: //p')" in
         x86_64-pc-windows-msvc) rustup set default-host x86_64-pc-windows-gnu >/dev/null ;;
         aarch64-pc-windows-msvc) rustup set default-host aarch64-pc-windows-gnullvm >/dev/null ;;
     esac
+    # The gnullvm host's default linker is a MinGW clang it expects on PATH,
+    # and rustc does not fall back to its own: rust-lld is named, and links
+    # with rust-mingw's CRT (rustc's platform-support page, windows-gnullvm).
     if [ "$(rustup show 2>/dev/null | sed -n 's/^Default host: //p')" = aarch64-pc-windows-gnullvm ]; then
-        for tool in zig cargo-zigbuild; do
-            if ! command -v "$tool" >/dev/null 2>&1; then
-                echo "$tool is not on the hermetic PATH: the aarch64 Windows host links through the project's pinned zig and cargo-zigbuild (ziglang/zig and rust-cross/cargo-zigbuild in .hermetic/hermetic.yaml)." >&2
-                exit 1
-            fi
-        done
-        mkdir -p "$LIMEN_BUILD/zig"
-        linker="$LIMEN_BUILD/zig/aarch64-pc-windows-gnullvm-linker.cmd"
-        printf '@echo off\r\nsetlocal DisableDelayedExpansion\r\n"%s" zig cc -- -target aarch64-windows-gnu %%*\r\n' "$(cygpath -w "$(command -v cargo-zigbuild)")" > "$linker"
-        linker_native="$(cygpath -m "$linker")"
-        export CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_LINKER="$linker_native"
-        export ZIG_GLOBAL_CACHE_DIR="$LIMEN_BUILD/zig/global" ZIG_LOCAL_CACHE_DIR="$LIMEN_BUILD/zig/local"
-        export CARGO_ZIGBUILD_CACHE_DIR="$LIMEN_BUILD/zig/cargo-zigbuild"
+        export CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_LINKER=rust-lld
     fi
     # The toolchain rust-toolchain.toml names, installed explicitly when the
     # file's toolchain is not there yet (a first run, a channel bump): the
@@ -185,5 +189,13 @@ _vulndb:
 # LIMEN_LINT_GO_BIN is for the limen repository itself, which builds it from
 # its own tree (same idea as LIMEN_BIN in lint.just).
 _golangci-config:
+    #!/usr/bin/env bash
+    set -euo pipefail
     ${LIMEN_LINT_GO_BIN:-limen-lint-go} check "$LIMEN_BUILD/tools/golangci-lint"
-    ${LIMEN_LINT_GO_BIN:-limen-lint-go} render -o "$LIMEN_BUILD/golangci.yml"
+    # One configuration per module: the baseline with that module's own
+    # .lint-go.yaml, so a command that is a module of its own carries its
+    # own carve-outs.
+    modules=(.); for d in cmd/*/; do [ -f "${d}go.mod" ] || continue; modules+=("${d%/}"); done
+    for module in "${modules[@]}"; do
+        ${LIMEN_LINT_GO_BIN:-limen-lint-go} -C "$module" render -o {{ golangci_config }}
+    done

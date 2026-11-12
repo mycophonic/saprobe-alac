@@ -20,12 +20,21 @@ default: code vet mod licenses nilaway
 # .golangci.yml), then once per supported platform (see _per-platform:
 # platform-specific files are only analyzed for the GOOS/GOARCH that builds
 # them). Built with the toolchain it analyzes, it cannot skew from it — the
-# reason the prebuilt binary and its lockstep check are gone.
-# The formatter is build-graph-independent and runs once. The last step
-# enforces the suppression doctrine (book/linting-go.md, "silencing a
-# finding"): a finding is silenced by its rule, never by its linter.
-code: (_banner "lint go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform '"$LIMEN_BUILD/tools/golangci-lint" run -c "$LIMEN_BUILD/golangci.yml"') _suppression-check
-    "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c "$LIMEN_BUILD/golangci.yml"
+# reason the prebuilt binary and its lockstep check are gone. Every module
+# (see go_modules_init in lib.just: the root and each command that is one of its
+# own), from inside it, on its own rendered configuration: golangci stops at
+# a nested go.mod, so a module not entered is a module not linted.
+# The formatter is build-graph-independent and runs once per module. The
+# last step enforces the suppression doctrine (book/linting-go.md,
+# "silencing a finding"): a finding is silenced by its rule, never by its
+# linter.
+code: (_banner "lint go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform go_modules_init + '; for module in "${modules[@]}"; do [ "$module" = . ] || echo "→ $module"; (cd "$module" && "$LIMEN_BUILD/tools/golangci-lint" run -c ' + golangci_config + ' ./...); done') _suppression-check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    modules=(.); for d in cmd/*/; do [ -f "${d}go.mod" ] || continue; modules+=("${d%/}"); done
+    for module in "${modules[@]}"; do
+        (cd "$module" && "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c {{ golangci_config }})
+    done
 
 # Polices the shape the book requires (linting-go.md, "silencing a
 # finding"): nolintlint checks a directive's form, not which linter it names,
@@ -95,23 +104,30 @@ _suppression-check:
 # neither the rendered configuration nor //nolint, so any analyzer that overlaps with
 # golangci's govet would re-report findings a project deliberately silenced,
 # and the same exception would then have to be written twice. Every
-# supported platform, like the rest (see _per-platform in lib.just); vet
-# type-checks without an assembler or C toolchain, so each leg is a few
-# seconds. Note `go test` is not a backstop here: the vet subset it runs
-# excludes both analyzers.
-vet: (_banner "lint go" "vet") (_per-platform "go vet -asmdecl -buildtag ./...")
+# supported platform, like the rest (see _per-platform in lib.just), and
+# every module (go_modules_init); vet type-checks without an assembler or C
+# toolchain, so each leg is a few seconds. Note `go test` is not a backstop
+# here: the vet subset it runs excludes both analyzers.
+vet: (_banner "lint go" "vet") (_per-platform go_modules_init + '; for module in "${modules[@]}"; do [ "$module" = . ] || echo "→ $module"; go -C "$module" vet -asmdecl -buildtag ./...; done')
 
-# go.mod/go.sum tidiness, for the module and for .limen/tools/ (the Go-built tools'
-# own module — see _go-tool in lib.just). Fails printing the diff; `just do fix
-# go mod` repairs.
+# go.mod/go.sum tidiness, for every module (go_modules_init) and for .limen/tools/
+# (the Go-built tools' own module — see _go-tool in lib.just). Fails printing
+# the diff; `just do fix go mod` repairs.
 mod: (_banner "lint go" "mod")
     #!/usr/bin/env bash
     set -euo pipefail
-    go mod tidy -diff
+    modules=(.); for d in cmd/*/; do [ -f "${d}go.mod" ] || continue; modules+=("${d%/}"); done
+    for module in "${modules[@]}"; do
+        [ "$module" = . ] || echo "→ $module"
+        go -C "$module" mod tidy -diff
+    done
     go -C .limen/tools mod tidy -diff
     # The isolated tool modules too (.limen/tools/<name>/go.mod, see _go-tool).
+    # `continue`, not `&&`: the loop's status is the recipe's, and a
+    # repository with no isolated tool module would otherwise end on 1.
     for m in .limen/tools/*/go.mod; do
-        [ -f "$m" ] && go -C "${m%/go.mod}" mod tidy -diff
+        [ -f "$m" ] || continue
+        go -C "${m%/go.mod}" mod tidy -diff
     done
 
 # NilAway (go.uber.org/nilaway), Uber's nil-panic analyzer: not a golangci-lint
@@ -127,29 +143,38 @@ mod: (_banner "lint go" "mod")
 nilaway: (_banner "lint go" "nilaway") (_go-tool "nilaway" "go.uber.org/nilaway/cmd/nilaway")
     #!/usr/bin/env bash
     set -euo pipefail
-    flags=$(${LIMEN_LINT_GO_BIN:-limen-lint-go} flags nilaway)
-    mode=$(${LIMEN_LINT_GO_BIN:-limen-lint-go} mode nilaway)
-    fail=0
-    # The platform loop of _per-platform, inline: a leg's failure must not
-    # stop the others, and the verdict depends on the mode.
-    if [ "{{ go_cgo }}" = "1" ]; then
-        echo "CGO_ENABLED=1: cross-platform runs are impossible (foreign-platform package" >&2
-        echo "loading needs that platform's C toolchain) — native platform only." >&2
-        # shellcheck disable=SC2086 # the flags are a list by contract
-        "$LIMEN_BUILD/tools/nilaway" $flags ./... || fail=1
-    else
-        platforms=(darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64)
-        for platform in "${platforms[@]}"; do
-            echo "→ GOOS=${platform%/*} GOARCH=${platform#*/}"
+    verdict=0
+    # Every module (go_modules_init), each with the flags and the mode of its own
+    # overlay; the platform loop of _per-platform, inline: a leg's failure
+    # must not stop the others, and the verdict depends on the mode.
+    modules=(.); for d in cmd/*/; do [ -f "${d}go.mod" ] || continue; modules+=("${d%/}"); done
+    for module in "${modules[@]}"; do
+        flags=$(${LIMEN_LINT_GO_BIN:-limen-lint-go} -C "$module" flags nilaway)
+        mode=$(${LIMEN_LINT_GO_BIN:-limen-lint-go} -C "$module" mode nilaway)
+        fail=0
+        [ "$module" = . ] || echo "→ $module"
+        if [ "{{ go_cgo }}" = "1" ]; then
+            echo "CGO_ENABLED=1: cross-platform runs are impossible (foreign-platform package" >&2
+            echo "loading needs that platform's C toolchain) — native platform only." >&2
             # shellcheck disable=SC2086 # the flags are a list by contract
-            CGO_ENABLED=0 GOOS="${platform%/*}" GOARCH="${platform#*/}" "$LIMEN_BUILD/tools/nilaway" $flags ./... || fail=1
-        done
-    fi
-    if [ "$fail" = 1 ] && [ "$mode" != blocking ]; then
-        echo "nilaway: findings above are informational for this project (nilaway.blocking is false in .lint-go.yaml)" >&2
-        exit 0
-    fi
-    exit "$fail"
+            (cd "$module" && "$LIMEN_BUILD/tools/nilaway" $flags ./...) || fail=1
+        else
+            platforms=(darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64)
+            for platform in "${platforms[@]}"; do
+                echo "→ GOOS=${platform%/*} GOARCH=${platform#*/}"
+                # shellcheck disable=SC2086 # the flags are a list by contract
+                (cd "$module" && CGO_ENABLED=0 GOOS="${platform%/*}" GOARCH="${platform#*/}" "$LIMEN_BUILD/tools/nilaway" $flags ./...) || fail=1
+            done
+        fi
+        if [ "$fail" = 1 ]; then
+            if [ "$mode" = blocking ]; then
+                verdict=1
+            else
+                echo "nilaway: findings above are informational for ${module} (nilaway.blocking is false in its .lint-go.yaml)" >&2
+            fi
+        fi
+    done
+    exit "$verdict"
 
 # Dependency license compliance, once per supported platform (see _per-platform in
 # lib.just: each platform pulls its own dependencies). The allowed licenses
@@ -167,11 +192,17 @@ nilaway: (_banner "lint go" "nilaway") (_go-tool "nilaway" "go.uber.org/nilaway/
 # graph, the repository's own LICENSE is the `license` rule's, and go-licenses
 # classifies a license by its text, so the Closed-source notice limen writes
 # failed every package of such a module.
-licenses: (_banner "lint go" "licenses") (_go-tool "go-licenses" "github.com/forkcloser/go-licenses/cmd/go-licenses") (_per-platform 'GOROOT="$(go env GOROOT)" "$LIMEN_BUILD/tools/go-licenses" check --include_tests --ignore "$(go list -m)" $(${LIMEN_LINT_GO_BIN:-limen-lint-go} flags licenses) ./...')
+licenses: (_banner "lint go" "licenses") (_go-tool "go-licenses" "github.com/forkcloser/go-licenses/cmd/go-licenses") (_per-platform go_modules_init + '; for module in "${modules[@]}"; do [ "$module" = . ] || echo "→ $module"; (cd "$module" && GOROOT="$(go env GOROOT)" "$LIMEN_BUILD/tools/go-licenses" check --include_tests --ignore "$(go list -m)" $(${LIMEN_LINT_GO_BIN:-limen-lint-go} -C . flags licenses) ./...); done')
 
 # Unreachable functions, by whole-program call-graph analysis (deeper than the
 # per-package `unused` linter in golangci). -test keeps library-only repos
 # analyzable (test binaries serve as roots) and stops dead code from hiding
 # behind test-only callers. Informational: native only, not in the default set.
 deadcode: (_banner "lint go" "deadcode") (_go-tool "deadcode" "golang.org/x/tools/cmd/deadcode")
-    "$LIMEN_BUILD/tools/deadcode" -test ./...
+    #!/usr/bin/env bash
+    set -euo pipefail
+    modules=(.); for d in cmd/*/; do [ -f "${d}go.mod" ] || continue; modules+=("${d%/}"); done
+    for module in "${modules[@]}"; do
+        [ "$module" = . ] || echo "→ $module"
+        (cd "$module" && "$LIMEN_BUILD/tools/deadcode" -test ./...)
+    done

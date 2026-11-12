@@ -39,36 +39,47 @@ go_fixers := "wsl_v5,godot,tagalign,nolintlint"
 # runs and no other, since `go vet` honours neither the rendered lint
 # configuration nor `//nolint` and a fix must not fail on a finding lint
 # never reports (book/linting-go.md).
-code: (_banner "fix go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform '"$LIMEN_BUILD/tools/golangci-lint" run --fix --issues-exit-code 0 --enable-only ' + go_fixers + ' -c "$LIMEN_BUILD/golangci.yml"')
+code: (_banner "fix go" "go") (_go-tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint") _golangci-config (_per-platform go_modules_init + '; for module in "${modules[@]}"; do (cd "$module" && "$LIMEN_BUILD/tools/golangci-lint" run --fix --issues-exit-code 0 --enable-only ' + go_fixers + ' -c ' + golangci_config + ' ./...); done')
     #!/usr/bin/env bash
     set -euo pipefail
-    max=5
-    pass=0
-    # Check first: an already-formatted tree costs one --diff and no rewrite.
-    while ! "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c "$LIMEN_BUILD/golangci.yml" >/dev/null 2>&1; do
-        pass=$((pass + 1))
-        if [ "${pass}" -gt "${max}" ]; then
-            echo "formatters did not converge after ${max} passes — they are fighting each other." >&2
-            echo "The residual diff below reverses on the next pass; fix the formatter config." >&2
-            "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c "$LIMEN_BUILD/golangci.yml" >&2 || true
+    # Every module the lint lane enters (go_modules_init in lib.just), each on its
+    # own rendered configuration, as `lint go` checks it.
+    modules=(.); for d in cmd/*/; do [ -f "${d}go.mod" ] || continue; modules+=("${d%/}"); done
+    for module in "${modules[@]}"; do
+        config={{ golangci_config }}
+        max=5
+        pass=0
+        # Check first: an already-formatted tree costs one --diff and no rewrite.
+        while ! (cd "$module" && "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c "$config" >/dev/null 2>&1); do
+            pass=$((pass + 1))
+            if [ "${pass}" -gt "${max}" ]; then
+                echo "formatters did not converge after ${max} passes in ${module} — they are fighting each other." >&2
+                echo "The residual diff below reverses on the next pass; fix the formatter config." >&2
+                (cd "$module" && "$LIMEN_BUILD/tools/golangci-lint" fmt --diff -c "$config" >&2) || true
+                exit 1
+            fi
+            (cd "$module" && "$LIMEN_BUILD/tools/golangci-lint" fmt -c "$config")
+        done
+        if ! go -C "$module" vet -asmdecl -buildtag ./...; then
+            echo "the fixers left ${module} not compiling: repair what they broke above, then run again." >&2
             exit 1
         fi
-        "$LIMEN_BUILD/tools/golangci-lint" fmt -c "$LIMEN_BUILD/golangci.yml"
     done
-    if ! go vet -asmdecl -buildtag ./...; then
-        echo "the fixers left a tree that does not compile: repair what they broke above, then run again." >&2
-        exit 1
-    fi
 
-# Tidy go.mod/go.sum, for the module, for .limen/tools/ (the analyzers' module) and
-# for each isolated tool module (.limen/tools/<name>/go.mod, see _go-tool).
+# Tidy go.mod/go.sum, for every module (go_modules_init in lib.just), for
+# .limen/tools/ (the analyzers' module) and for each isolated tool module
+# (.limen/tools/<name>/go.mod, see _go-tool).
 mod: (_banner "fix go" "mod")
     #!/usr/bin/env bash
     set -euo pipefail
-    go mod tidy
+    modules=(.); for d in cmd/*/; do [ -f "${d}go.mod" ] || continue; modules+=("${d%/}"); done
+    for module in "${modules[@]}"; do
+        go -C "$module" mod tidy
+    done
     go -C .limen/tools mod tidy
     for m in .limen/tools/*/go.mod; do
-        [ -f "$m" ] && go -C "${m%/go.mod}" mod tidy
+        [ -f "$m" ] || continue
+        go -C "${m%/go.mod}" mod tidy
     done
 
 # Update every dependency to its latest version, then tidy.
