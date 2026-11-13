@@ -302,3 +302,76 @@ aqua: (_banner "lint" "aqua")
     fi
     echo ".hermetic/aqua-checksums.json is out of sync with .hermetic/hermetic.yaml — run 'just do fix aqua'." >&2
     exit 1
+
+# The files derived from a pin (.converge, book/tooling.md) are what the
+# project's `converge` recipe makes of the tree as it stands. Named, never in
+# the default set: the recipe is the project's and may fetch a toolchain, so a
+# project that declares derived files names this lane in its own lint.
+# Vacuous without a .converge.
+converge: (_banner "lint" "converge")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f .converge ]; then
+        echo "no .converge — no derived files declared, nothing to check (skipped, not failed)."
+        exit 0
+    fi
+    # mktemp gets an explicit template because macOS mktemp ignores $TMPDIR.
+    tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/lint-converge.XXXXXX")
+    trap 'rm -rf "$tmpdir"' EXIT
+    # The declaration, held to what the checksum workflow accepts: one tracked
+    # regular file under git's own name for it, outside the directories that
+    # are git's, GitHub's or limen's.
+    : > "$tmpdir/declared"
+    while IFS= read -r line || [ -n "$line" ]; do
+        path="${line%$'\r'}"
+        case "$path" in
+            '' | '#'*) continue ;;
+        esac
+        if [ "$(git ls-files -- "$path")" != "$path" ] || [ ! -f "$path" ] || [ -L "$path" ]; then
+            echo ".converge: $path is not a tracked regular file under that exact name." >&2
+            exit 1
+        fi
+        case "$path" in
+            .git/* | .github/* | .limen/* | .hermetic/*)
+                echo ".converge: $path is not a path a derived file may have." >&2
+                exit 1
+                ;;
+        esac
+        printf '%s\n' "$path" >> "$tmpdir/declared"
+    done < .converge
+    # The lint observes, never mutates: the declared files are restored as
+    # they were found on every exit, a failing recipe's included.
+    mkdir -p "$tmpdir/snapshot"
+    while IFS= read -r path; do
+        mkdir -p "$tmpdir/snapshot/$(dirname "$path")"
+        cp "$path" "$tmpdir/snapshot/$path"
+    done < "$tmpdir/declared"
+    # shellcheck disable=SC2329 # trap-invoked
+    restore() {
+        while IFS= read -r path; do
+            cp "$tmpdir/snapshot/$path" "$path"
+        done < "$tmpdir/declared"
+        rm -rf "$tmpdir"
+    }
+    trap restore EXIT
+    git status --porcelain --untracked-files=all > "$tmpdir/before"
+    {{ just_executable() }} converge
+    git status --porcelain --untracked-files=all > "$tmpdir/after"
+    failed=0
+    while IFS= read -r path; do
+        if ! cmp -s "$path" "$tmpdir/snapshot/$path"; then
+            echo "$path is not what 'just converge' makes of this tree — run it and commit the result." >&2
+            failed=1
+        fi
+    done < "$tmpdir/declared"
+    # What the recipe touched beside the declared files: the status lines
+    # that were not there before it ran.
+    while IFS= read -r entry; do
+        path="${entry:3}"
+        if grep -Fxq -- "$entry" "$tmpdir/before" || grep -Fxq -- "$path" "$tmpdir/declared"; then
+            continue
+        fi
+        echo "'just converge' changed $path, which .converge does not declare: the checksum workflow commits declared files alone." >&2
+        failed=1
+    done < "$tmpdir/after"
+    exit "$failed"

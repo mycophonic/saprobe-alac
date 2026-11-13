@@ -61,14 +61,19 @@ targets +triples: (_banner "build rust" "targets")
     # false: build scripts and proc-macros stop reading [target.<host>] and
     # read [host] instead. The linker rust_env gave the host (rust-lld on the
     # arm64 Windows one, whose default is a clang it does not ship) goes to
-    # [host] for that build.
+    # [host] for that build, and leaves the target's variable: cargo-zigbuild
+    # sets a target's linker only where none is set, so left exported it
+    # would link the product itself, and not zig.
     host="$(rustc -vV | sed -n 's/^host: //p')"
     host_linker_var="CARGO_TARGET_$(printf '%s' "$host" | tr 'a-z-' 'A-Z_')_LINKER"
     host_linker="${!host_linker_var:-}"
     for triple in "$@"; do
         echo "→ target/$triple/release"
         if [ "$triple" = "$host" ] && [ -n "$host_linker" ]; then
-            CARGO_UNSTABLE_HOST_CONFIG=true CARGO_HOST_LINKER="$host_linker" cargo zigbuild --release --locked --target "$triple"
+            (
+                unset "$host_linker_var"
+                CARGO_UNSTABLE_HOST_CONFIG=true CARGO_HOST_LINKER="$host_linker" cargo zigbuild --release --locked --target "$triple"
+            )
         else
             cargo zigbuild --release --locked --target "$triple"
         fi

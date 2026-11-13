@@ -3,7 +3,7 @@
   "description": [
     "The canonical Renovate configuration of every farcloser repository, content-pinned like the rest of .limen/: each repository carries this file byte for byte and its renovate.json extends it by the repository's own name (local>owner/name//.limen/renovate — Renovate refuses a relative reference in a repository's own config), so a fix here reaches every repository at its next limen bump, in the bump's diff. Reasoning: limen's book, mandatory files (CI workflows).",
     "extends: config:recommended alone. aqua's own preset detected pins by the file names aqua.yaml and .aqua/aqua.yaml; the pins live in .hermetic/hermetic.yaml now, resolved by hermetic, which that preset never sees, so the customManagers below carry its three managers that apply here, pointed at .hermetic/hermetic.yaml and the canonical .limen/hermetic.yaml: owner/repo@version pins against GitHub releases and against GitHub tags (a package released by tag alone), and the standard registry's `ref:` line. hermetic itself is pinned in the canonical setup-hermetic action as HERMETIC_VERSION, watched by the manager below in limen alone (the content-pinned rule silences the action everywhere else), so it moves through a limen release like every other canonical pin; its sha256 companion is recomputed by the checksum workflow on Renovate's branch, as the project checksums are.",
-    "packageRules, the limen group: a repository carries limen twice, as the hermetic pin that selects the recipes and the `limen fix` of its branches, and as the `uses:` reference of its workflow callers to limen's reusable workflows at a commit (`farcloser/limen/.github/workflows/limen-*.yaml@<sha> # vX.Y.Z`, the github-actions manager). One group named limen keeps the two in one pull request, so the recipes and the lanes move together; nothing else joins it. The content-pinned pieces that are not workflows (the actions, .limen/) stay silenced outside limen: a limen bump moves them through `limen fix`.",
+    "packageRules, the limen group: a repository carries limen twice, as the hermetic pin that selects the recipes and the `limen fix` of its branches, and as the `uses:` reference of its workflow callers to limen's reusable workflows at a commit (`farcloser/limen/.github/workflows/limen-*.yaml@<sha> # vX.Y.Z`, the github-actions manager). One group named limen keeps the two in one pull request, so the recipes and the lanes move together; nothing else joins it. The rule stands after the github actions group: rules merge in order and the last match wins, so placed before it the `uses:` reference went to the github actions pull request and the two halves came apart. The content-pinned pieces that are not workflows (the actions, .limen/) stay silenced outside limen: a limen bump moves them through `limen fix`.",
     "minimumReleaseAge: supply-chain cooldown before proposing a bump; doubles as protection against a release tag whose assets are not uploaded yet.",
     "packageRules, golang/go: no cooldown. The Go toolchain is each repository's own pin so that a standard-library fix reaches it without a limen release, and a Go patch release is that fix; three days of cooldown would be three days of red security lanes. Go's releases are not pulled or re-uploaded the way the cooldown guards against.",
     "packageRules, rust-toolchain: no cooldown, for golang/go's reason. rust-toolchain.toml's channel is each repository's own exact pin (book/rust.md), and a Rust point release is the compiler and standard-library fix the pin exists to receive without delay. The manager reads a pinned version alone, never a channel name, so a bump moves the exact version; ungrouped, as a toolchain bump is its own reviewed change, named in its pull request.",
@@ -121,12 +121,6 @@
       "enabled": false
     },
     {
-      "matchDepNames": [
-        "farcloser/limen"
-      ],
-      "groupName": "limen"
-    },
-    {
       "matchManagers": [
         "gomod"
       ],
@@ -173,6 +167,12 @@
         "github-actions"
       ],
       "groupName": "github actions"
+    },
+    {
+      "matchDepNames": [
+        "farcloser/limen"
+      ],
+      "groupName": "limen"
     },
     {
       "matchManagers": [

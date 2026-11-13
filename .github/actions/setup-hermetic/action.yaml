@@ -112,8 +112,11 @@ runs:
           [ -n "$expected" ] || { echo "::error::checksums.txt of hermetic ${HERMETIC_VERSION} does not list ${asset}"; exit 1; }
           verify_sha256 "${expected}" "${tmp}/${asset}"
           # GitHub's build provenance, on every runner through gh: the asset was
-          # built by hermetic's release workflow from the tagged commit.
-          gh attestation verify "${tmp}/${asset}" --repo forkcloser/hermetic
+          # built by hermetic's release workflow at this version's tag. The
+          # signer is named, with its ref: --repo alone admits any workflow of
+          # the repository, at any ref.
+          gh attestation verify "${tmp}/${asset}" --repo forkcloser/hermetic \
+            --signer-workflow "forkcloser/hermetic/.github/workflows/release.yaml@refs/tags/${HERMETIC_VERSION}"
           tar -xzf "${tmp}/${asset}" -C "${tmp}" "${bin}"
           # Set aside, not overwritten: on windows the links are hard links
           # and the old file may be held; the install below relinks.
