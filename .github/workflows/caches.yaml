@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   prune:
-    uses: farcloser/limen/.github/workflows/limen-caches.yaml@879e912a093a5a036ba9508dbb3e448178ae876c # v0.30.0
+    uses: farcloser/limen/.github/workflows/limen-caches.yaml@558f7ae692e9df0c5055e9ac2d1d6c66172544f3 # v0.31.0
     permissions:
       # Listing and deleting caches is an Actions write.
       actions: write
