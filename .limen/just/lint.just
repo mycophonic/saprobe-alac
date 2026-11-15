@@ -42,7 +42,7 @@ just: (_banner "lint" "just")
     # The list goes through a file, never a process substitution: on the
     # windows-11-arm runners, bash runs emulated, and a `< <(...)` whose child
     # runs a program intermittently crashes it mid-recipe — exit 4 or 127, no
-    # output. A pipeline does not. Same in every shared recipe
+    # output. A pipeline has not been seen to. Same in every shared recipe
     # (design/WINDOWS-ARM-EXIT-4.md).
     list=$(mktemp "${TMPDIR:-/tmp}/lint-just.XXXXXX")
     trap 'rm -f "$list"' EXIT
@@ -319,47 +319,143 @@ converge: (_banner "lint" "converge")
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/lint-converge.XXXXXX")
     trap 'rm -rf "$tmpdir"' EXIT
     # The declaration, held to what the checksum workflow accepts: one tracked
-    # regular file under git's own name for it, outside the directories that
-    # are git's, GitHub's or limen's.
+    # regular file under git's own name for it, or, ending in a slash, a
+    # directory that holds tracked files, under git's own name too; either
+    # outside the directories that are git's, GitHub's or limen's.
+    # Whether git tracks exactly this name: literal, so a name is no
+    # pattern, and NUL-ended, so a name git would quote is compared as it is.
+    tracked_as() {
+        printf '%s\0' "$1" > "$tmpdir/want"
+        git --literal-pathspecs ls-files -z -- "$1" > "$tmpdir/got" 2> /dev/null || return 1
+        cmp -s "$tmpdir/want" "$tmpdir/got"
+    }
     : > "$tmpdir/declared"
+    : > "$tmpdir/declared-dirs"
     while IFS= read -r line || [ -n "$line" ]; do
         path="${line%$'\r'}"
         case "$path" in
             '' | '#'*) continue ;;
         esac
-        if [ "$(git ls-files -- "$path")" != "$path" ] || [ ! -f "$path" ] || [ -L "$path" ]; then
-            echo ".converge: $path is not a tracked regular file under that exact name." >&2
-            exit 1
-        fi
         case "$path" in
-            .git/* | .github/* | .limen/* | .hermetic/*)
+            .git | .git/* | .github | .github/* | .limen | .limen/* | .hermetic | .hermetic/*)
                 echo ".converge: $path is not a path a derived file may have." >&2
                 exit 1
                 ;;
         esac
+        case "$path" in
+            */)
+                # Literal, so a name is no pattern. The first path git lists
+                # carries the directory's own spelling or the entry was not
+                # it; a path git refuses outright lists nothing.
+                git --literal-pathspecs ls-files -z -- "$path" > "$tmpdir/under" 2> /dev/null || : > "$tmpdir/under"
+                first=""
+                IFS= read -r -d '' first < "$tmpdir/under" || true
+                if [ -z "$first" ] || [ "${first#"$path"}" = "$first" ] || [ ! -d "$path" ] || [ -L "${path%/}" ]; then
+                    echo ".converge: $path is not a directory of tracked files under that exact name." >&2
+                    exit 1
+                fi
+                printf '%s\n' "$path" >> "$tmpdir/declared-dirs"
+                continue
+                ;;
+        esac
+        if ! tracked_as "$path" || [ ! -f "$path" ] || [ -L "$path" ]; then
+            echo ".converge: $path is not a tracked regular file under that exact name." >&2
+            exit 1
+        fi
         printf '%s\n' "$path" >> "$tmpdir/declared"
     done < .converge
-    # The lint observes, never mutates: the declared files are restored as
-    # they were found on every exit, a failing recipe's included.
+    under_declared_dir() {
+        while IFS= read -r dir; do
+            case "$1" in
+                "$dir"?*) return 0 ;;
+            esac
+        done < "$tmpdir/declared-dirs"
+        return 1
+    }
+    # The regular files git sees under the declared directories, tracked or
+    # not, ignored ones aside: what the checksum workflow would carry.
+    # NUL-separated, a name being anything but that.
+    listed() {
+        : > "$1"
+        while IFS= read -r dir; do
+            git --literal-pathspecs ls-files -z --cached --others --exclude-standard -- "$dir" > "$tmpdir/raw"
+            while IFS= read -r -d '' path; do
+                if [ -f "$path" ] && [ ! -L "$path" ]; then
+                    printf '%s\0' "$path" >> "$1"
+                fi
+            done < "$tmpdir/raw"
+        done < "$tmpdir/declared-dirs"
+    }
+    # The lint observes, never mutates: the declared files, and every file
+    # under a declared directory, are restored as they were found on every
+    # exit, a failing recipe's included; what the recipe created there goes.
     mkdir -p "$tmpdir/snapshot"
     while IFS= read -r path; do
         mkdir -p "$tmpdir/snapshot/$(dirname "$path")"
         cp "$path" "$tmpdir/snapshot/$path"
     done < "$tmpdir/declared"
+    listed "$tmpdir/dirs-before"
+    while IFS= read -r -d '' path; do
+        mkdir -p "$tmpdir/snapshot/${path%/*}"
+        cp "$path" "$tmpdir/snapshot/$path"
+    done < "$tmpdir/dirs-before"
+    # No link stands on the way to a path, or in its place: where the recipe
+    # left one, at the file or at any directory above it, a removal or a copy
+    # would go through it, into whatever it points at. No tracked path runs
+    # through a link, so any that is there is the recipe's.
+    # shellcheck disable=SC2329 # called from restore
+    make_way() {
+        local way="" part
+        local -a parts
+        IFS=/ read -r -a parts <<< "$1"
+        for part in "${parts[@]}"; do
+            way="${way:+$way/}$part"
+            if [ -L "$way" ]; then
+                rm -f "$way"
+            fi
+        done
+        rm -rf "$1"
+        case "$1" in
+            */*) mkdir -p "${1%/*}" ;;
+        esac
+    }
     # shellcheck disable=SC2329 # trap-invoked
     restore() {
         while IFS= read -r path; do
+            make_way "$path"
             cp "$tmpdir/snapshot/$path" "$path"
         done < "$tmpdir/declared"
+        listed "$tmpdir/dirs-now"
+        while IFS= read -r -d '' path; do
+            if [ ! -f "$tmpdir/snapshot/$path" ]; then
+                rm -f "$path"
+                rmdir -p "${path%/*}" 2> /dev/null || true
+            fi
+        done < "$tmpdir/dirs-now"
+        while IFS= read -r -d '' path; do
+            make_way "$path"
+            cp "$tmpdir/snapshot/$path" "$path"
+        done < "$tmpdir/dirs-before"
         rm -rf "$tmpdir"
     }
     trap restore EXIT
-    git status --porcelain --untracked-files=all > "$tmpdir/before"
+    # NUL-ended, as the checksum workflow reads it: a name git would quote
+    # (a space, a non-ASCII letter) is then the name itself.
+    git status --porcelain -z --untracked-files=all > "$tmpdir/before"
+    # shellcheck disable=SC2329 # called from the loop below
+    was_before() {
+        while IFS= read -r -d '' seen; do
+            if [ "$seen" = "$1" ]; then
+                return 0
+            fi
+        done < "$tmpdir/before"
+        return 1
+    }
     # By name, as every shared recipe calls it: the pinned just, first on the
     # PATH. Its own path, pasted here unquoted, is backslashes on Windows,
     # which bash strips.
     just converge
-    git status --porcelain --untracked-files=all > "$tmpdir/after"
+    git status --porcelain -z --untracked-files=all > "$tmpdir/after"
     failed=0
     while IFS= read -r path; do
         if ! cmp -s "$path" "$tmpdir/snapshot/$path"; then
@@ -367,11 +463,39 @@ converge: (_banner "lint" "converge")
             failed=1
         fi
     done < "$tmpdir/declared"
-    # What the recipe touched beside the declared files: the status lines
-    # that were not there before it ran.
-    while IFS= read -r entry; do
+    # A declared directory is derived whole: a file changed, a file the
+    # recipe makes that is not there, a file there the recipe no longer
+    # makes.
+    listed "$tmpdir/dirs-after"
+    while IFS= read -r -d '' path; do
+        if [ ! -f "$path" ] || [ -L "$path" ]; then
+            echo "$path is no longer made by 'just converge' — run it and commit the result." >&2
+            failed=1
+        elif ! cmp -s "$path" "$tmpdir/snapshot/$path"; then
+            echo "$path is not what 'just converge' makes of this tree — run it and commit the result." >&2
+            failed=1
+        fi
+    done < "$tmpdir/dirs-before"
+    while IFS= read -r -d '' path; do
+        if [ ! -f "$tmpdir/snapshot/$path" ]; then
+            echo "$path is made by 'just converge' and is not in this tree — run it and commit the result." >&2
+            failed=1
+        fi
+    done < "$tmpdir/dirs-after"
+    # What the recipe touched beside what is declared: the status lines that
+    # were not there before it ran. Under a declared directory anything but
+    # a regular file or a deletion is one too: the checksum workflow carries
+    # nothing else.
+    while IFS= read -r -d '' entry; do
         path="${entry:3}"
-        if grep -Fxq -- "$entry" "$tmpdir/before" || grep -Fxq -- "$path" "$tmpdir/declared"; then
+        if was_before "$entry" || grep -Fxq -- "$path" "$tmpdir/declared"; then
+            continue
+        fi
+        if under_declared_dir "$path"; then
+            if [ -L "$path" ] || { [ -e "$path" ] && [ ! -f "$path" ]; }; then
+                echo "'just converge' made $path, which is not a regular file: the checksum workflow carries regular files alone." >&2
+                failed=1
+            fi
             continue
         fi
         echo "'just converge' changed $path, which .converge does not declare: the checksum workflow commits declared files alone." >&2

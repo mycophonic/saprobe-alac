@@ -166,16 +166,16 @@ chapter; the procedure is limen's `skills/contribute`.
   assessment or misreads the code, say so with the evidence and settle it between the two
   sessions, the reviewer's 🛑 included (the reviewer may miss what the owner knows; the
   owner may miss the cross-cutting picture). A deadlock goes to the human, as the exception.
-- **An issue is work the human has tabled; a defect in another repository is a message.**
-  A GitHub issue records work the human has decided on and deferred ("table it for
-  later"), in the repository it belongs to, one per real item, written so its owner can
-  act on it; never a scratch, `TODO` or notes file, and never an issue for a passing note.
-  It is not where a session parks what it does not do now: a suggestion that needs a scope
-  or product decision, a reviewer's 💡 included, is put to the human then and there and
-  settled in the current change or dropped, never filed to decide later. A defect or a
-  request in a repository another session owns goes to that session as a message with
-  what, why and where; that session fixes it, and the human hears about it as a pull
-  request.
+- **An issue is a bug, or work not done on the spot; a question for the human is asked,
+  never filed.** A bug met on the way, and work that is real and not done now, are logged
+  as GitHub issues in the repository they belong to, one per real item, written so that
+  whoever takes it can act on it; never a scratch, `TODO` or notes file. The tracker is not
+  a scratchpad for what a session wants to ask the human: a question, and a suggestion
+  that needs a scope or product decision, a reviewer's 💡 included, is put to the human
+  then and there and settled, never filed to decide later. A defect or a request in a
+  repository another session owns goes to that session as a message with what, why and
+  where; that session fixes it, or logs it there when it does not fix it now, and the
+  human hears about it as a pull request or an issue.
 
 ## Code
 
