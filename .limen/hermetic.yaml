@@ -23,7 +23,7 @@ packages:
   # The registry entries say why, and how each is verified.
   - name: uutils/coreutils@0.12.0
     registry: local
-  - name: git-for-windows/git@v2.56.0.windows.4
+  - name: git-for-windows/git@v2.56.1.windows.1
     registry: local
   # --- binary-release tools (standard registry, aqua-verified) ---
   # Not here: golang/go. The Go toolchain is each repository's own pin, in its
@@ -32,7 +32,7 @@ packages:
   - name: casey/just@1.59.0
   - name: koalaman/shellcheck@v0.11.0
   - name: lycheeverse/lychee@lychee-v0.24.2
-  - name: goreleaser/goreleaser@v2.20.0
+  - name: goreleaser/goreleaser@v2.20.1
   - name: sigstore/cosign@v3.1.4
   # The SBOM generator the release lane runs over every archive (book/releasing.md).
   - name: anchore/syft@v1.57.1

@@ -355,7 +355,10 @@ converge: (_banner "lint" "converge")
     }
     trap restore EXIT
     git status --porcelain --untracked-files=all > "$tmpdir/before"
-    {{ just_executable() }} converge
+    # By name, as every shared recipe calls it: the pinned just, first on the
+    # PATH. Its own path, pasted here unquoted, is backslashes on Windows,
+    # which bash strips.
+    just converge
     git status --porcelain --untracked-files=all > "$tmpdir/after"
     failed=0
     while IFS= read -r path; do

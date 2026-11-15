@@ -67,14 +67,47 @@ targets +triples: (_banner "build rust" "targets")
     host="$(rustc -vV | sed -n 's/^host: //p')"
     host_linker_var="CARGO_TARGET_$(printf '%s' "$host" | tr 'a-z-' 'A-Z_')_LINKER"
     host_linker="${!host_linker_var:-}"
+    # zig links its own libunwind for a library asked for by name, and for
+    # the windows-gnullvm targets rustc stopped naming it: it hands the
+    # driver `--unwindlib=libunwind`, which zig cc does not act on and
+    # cargo-zigbuild does not translate, and the link ends on undefined
+    # _Unwind_* symbols (book/upstream.md). Named here, in the source cargo
+    # will read, since each shadows the ones after it and a flag put in a
+    # shadowed one is dropped without a word: CARGO_ENCODED_RUSTFLAGS and
+    # RUSTFLAGS as soon as they are set, empty included; the target's own
+    # flags when it has any; build.rustflags last. That last one is where
+    # the flag goes when the environment says nothing, so a project's
+    # `[build] rustflags` keep applying. The lane cannot see a config file:
+    # a project that gives these targets flags of their own there, and none
+    # in the environment, names the library itself.
+    unwind="-Clink-arg=-lunwind"
+    # The encoded list's separator, a variable since $'…' stays literal
+    # inside a double-quoted expansion.
+    sep=$'\x1f'
     for triple in "$@"; do
         echo "→ target/$triple/release"
-        if [ "$triple" = "$host" ] && [ -n "$host_linker" ]; then
-            (
+        # A subshell a triple: what one target needs does not reach the next.
+        (
+            case "$triple" in
+                *-windows-gnullvm)
+                    flags_var="CARGO_TARGET_$(printf '%s' "$triple" | tr 'a-z-' 'A-Z_')_RUSTFLAGS"
+                    if [ -n "${CARGO_ENCODED_RUSTFLAGS+x}" ]; then
+                        # No separator after an empty list: an empty element
+                        # is an empty argument to rustc.
+                        export CARGO_ENCODED_RUSTFLAGS="${CARGO_ENCODED_RUSTFLAGS:+${CARGO_ENCODED_RUSTFLAGS}${sep}}${unwind}"
+                    elif [ -n "${RUSTFLAGS+x}" ]; then
+                        export RUSTFLAGS="${RUSTFLAGS} ${unwind}"
+                    elif [ -n "${!flags_var:-}" ]; then
+                        export "${flags_var}=${!flags_var} ${unwind}"
+                    else
+                        export CARGO_BUILD_RUSTFLAGS="${CARGO_BUILD_RUSTFLAGS:-} ${unwind}"
+                    fi
+                    ;;
+            esac
+            if [ "$triple" = "$host" ] && [ -n "$host_linker" ]; then
                 unset "$host_linker_var"
-                CARGO_UNSTABLE_HOST_CONFIG=true CARGO_HOST_LINKER="$host_linker" cargo zigbuild --release --locked --target "$triple"
-            )
-        else
+                export CARGO_UNSTABLE_HOST_CONFIG=true CARGO_HOST_LINKER="$host_linker"
+            fi
             cargo zigbuild --release --locked --target "$triple"
-        fi
+        )
     done
