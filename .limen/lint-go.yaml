@@ -173,6 +173,24 @@ golangci:
         # baseline exclusion, which warn-unused flags on every clean project.
         comparison: true
 
+      wrapcheck:
+        # wrapcheck takes every call into another package that returns an
+        # error type for an error received, a constructor's included, and
+        # exempts the constructors it knows by signature (errors.New, .Errorf,
+        # .Wrap). Connect's NewError, and WithCause and WithDetail chained on
+        # it, are the same thing: they build the coded error a handler
+        # returns, and nothing was received to give context to. WithRemote is
+        # left out on purpose: it marks an error a peer sent, which is one
+        # received. An entry is a substring of the signature wrapcheck prints,
+        # module path and major included, so a new major of the library is a
+        # new entry; and wrapcheck reads the signature, never the receiver, so
+        # a *Error that was received and goes out through one of the two
+        # builders is exempt too.
+        extra-ignore-sigs:
+          - connectrpc.com/connect/v2.NewError(
+          - connectrpc.com/connect/v2.Error).WithCause(
+          - connectrpc.com/connect/v2.Error).WithDetail(
+
       govet:
         # Every analyzer, including the ten vet leaves off by default:
         # nilness, shadow, unusedwrite, deepequalerrors and friends are real

@@ -91,33 +91,33 @@
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.29.0/limen_0.29.0_darwin_arm64.tar.gz",
-      "checksum": "114D3D44645BD6D16258D2C608FC8A6D49ADB8B4B0FEE15802FFE6028584C6A1",
+      "id": "github_release/github.com/farcloser/limen/v0.30.0/limen_0.30.0_darwin_arm64.tar.gz",
+      "checksum": "A677C91750F7FBC2E3C69ED19FE6B0BCD16FEC9E416D0EE1366984341E041F1E",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.29.0/limen_0.29.0_linux_amd64.tar.gz",
-      "checksum": "D37C17E47C9764AA734B1C95E72282A92E065978B5CF44E345E4AE080011B5B3",
+      "id": "github_release/github.com/farcloser/limen/v0.30.0/limen_0.30.0_linux_amd64.tar.gz",
+      "checksum": "D2EEE32CEDED00766D76487C30527B1EFDA8A3FDF8ED37EA1C0AAEFB726C44CA",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.29.0/limen_0.29.0_linux_arm64.tar.gz",
-      "checksum": "BA1A668F44FEEBB3A145391E4447433E0DCA862A2265F013FEAAA9D0D1E98868",
+      "id": "github_release/github.com/farcloser/limen/v0.30.0/limen_0.30.0_linux_arm64.tar.gz",
+      "checksum": "220E1E62FC1F96D06076F4BF4E253A70A5E2DA29A34CC49F03142EBE348B6A4F",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.29.0/limen_0.29.0_windows_amd64.tar.gz",
-      "checksum": "2210C128E9AEBF50714436A0437091623E0E57C68F2D7BC4B6871DB50E99267D",
+      "id": "github_release/github.com/farcloser/limen/v0.30.0/limen_0.30.0_windows_amd64.tar.gz",
+      "checksum": "7FB4410E6C18E3996B57309CF6670ADD6A4134E4B459C30503C10FCA503F14BD",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.29.0/limen_0.29.0_windows_arm64.tar.gz",
-      "checksum": "1899CCB10A226C5AC574CE80917C0659E119B9D658877400F9E9864F2032A563",
+      "id": "github_release/github.com/farcloser/limen/v0.30.0/limen_0.30.0_windows_arm64.tar.gz",
+      "checksum": "B74BC9AFF2B6110DADFA10D3A2DB0F28B7D2C16B4CC51A23212E22AE2E3C702F",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/ossein/v0.3.4/ossein_0.3.4_darwin_arm64.tar.gz",
-      "checksum": "9654C95462E5C907D9562695BDDB01675EF580BF847B122FFEADF3ED7F761A67",
+      "id": "github_release/github.com/farcloser/ossein/v0.3.5/ossein_0.3.5_darwin_arm64.tar.gz",
+      "checksum": "E109CD32A1986DC85EE2647191C05F835D61DE049DEF9CBBB30F958311AB8059",
       "algorithm": "sha256"
     },
     {
