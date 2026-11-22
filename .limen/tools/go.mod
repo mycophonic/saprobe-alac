@@ -23,11 +23,12 @@ require (
 	github.com/containerd/typeurl/v2 v2.3.0 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/fatih/color v1.18.0 // indirect
-	github.com/forkcloser/dot v1.3.1 // indirect
+	github.com/forkcloser/dot v1.4.0 // indirect
 	github.com/forkcloser/git-validation v0.1.1 // indirect
-	github.com/forkcloser/go-graphviz v0.5.2 // indirect
+	github.com/forkcloser/go-graphviz v0.6.0 // indirect
 	github.com/forkcloser/go-licenses v0.1.1 // indirect
 	github.com/forkcloser/godolint v0.5.1 // indirect
+	github.com/forkcloser/xos v0.1.2 // indirect
 	github.com/forkcloser/yamlfmt v0.2.1 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -45,13 +46,13 @@ require (
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/image v0.47.0 // indirect
+	golang.org/x/image v0.48.0 // indirect
 	golang.org/x/mod v0.43.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261116191925-e77a43154acb // indirect
 	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/tools v0.53.0 // indirect
 	golang.org/x/vuln v1.10.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
