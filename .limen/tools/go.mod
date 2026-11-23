@@ -17,7 +17,7 @@ tool (
 )
 
 require (
-	github.com/alecthomas/kong v1.16.1 // indirect
+	github.com/alecthomas/kong v1.17.0 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.3 // indirect
 	github.com/containerd/typeurl/v2 v2.3.0 // indirect
@@ -27,7 +27,7 @@ require (
 	github.com/forkcloser/git-validation v0.1.1 // indirect
 	github.com/forkcloser/go-graphviz v0.6.0 // indirect
 	github.com/forkcloser/go-licenses v0.1.1 // indirect
-	github.com/forkcloser/godolint v0.5.1 // indirect
+	github.com/forkcloser/godolint v0.6.0 // indirect
 	github.com/forkcloser/xos v0.1.2 // indirect
 	github.com/forkcloser/yamlfmt v0.2.1 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
@@ -36,7 +36,7 @@ require (
 	github.com/lmittmann/tint v1.2.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/moby/buildkit v0.34.0 // indirect
+	github.com/moby/buildkit v0.35.0 // indirect
 	github.com/mycophonic/primordium v0.15.1 // indirect
 	github.com/otiai10/copy v1.14.1 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
@@ -45,13 +45,14 @@ require (
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
+	go.yaml.in/yaml/v4 v4.0.0 // indirect
 	golang.org/x/image v0.48.0 // indirect
 	golang.org/x/mod v0.43.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261116191925-e77a43154acb // indirect
-	golang.org/x/term v0.46.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/tools v0.53.0 // indirect
 	golang.org/x/vuln v1.10.0 // indirect
